@@ -1,0 +1,32 @@
+# Render builds this repository as a *public Git URL* service, and Render
+# does not auto-deploy public-URL services (see render.com/docs/deploys:
+# "Services that use a prebuilt Docker image or a public Git repository URL
+# must be deployed manually"). This workflow restores the missing half of the
+# ship loop: every push to main calls the service's deploy hook, so a push is
+# still the deploy.
+name: Deploy to Render
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: render-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the Render deploy hook
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK secret is not set" >&2
+            exit 1
+          fi
+          code=$(curl -s -o /tmp/hook.out -w '%{http_code}' -X POST "$HOOK")
+          echo "deploy hook answered HTTP $code"
+          [ "$code" = "200" ] || { cat /tmp/hook.out; exit 1; }
