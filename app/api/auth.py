@@ -4,7 +4,7 @@ import json
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,10 @@ RESET_TTL_MINUTES = 60
 @router.post("/register", response_model=UserOut, status_code=201)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
     email = user_in.email.strip().lower()
+    # Same rule the reset and change-password screens enforce, checked here too: an account
+    # created over the API with a one-character password is a support ticket waiting to happen.
+    if len(user_in.password or "") < 8:
+        raise HTTPException(status_code=400, detail="Use at least 8 characters for the password")
     blocked = signup_block_reason(email, getattr(user_in, "invite_code", None),
                                   settings.SIGNUP_EMAILS, settings.SIGNUP_CODE,
                                   settings.ADMIN_EMAILS)
@@ -89,6 +93,35 @@ def change_password(current_password: str, new_password: str,
     return {"status": "password_changed"}
 
 
+@router.delete("/me")
+def delete_me(password: str, current_user: User = Depends(get_current_user),
+              db: Session = Depends(get_db)):
+    """Close the account and remove the personal details from it.
+
+    The password has to be typed again: a stale token left in a browser must not be able to
+    wipe an account. Orders are kept (they are the payment record), campaigns are kept for
+    the operator's history, but the address, name, brand profile and password are removed
+    and the account can never sign in again — a California customer has the right to ask
+    for this, so the product has to be able to do it without a database edit.
+    """
+    if not verify_password(password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Password is incorrect")
+    if current_user.is_admin:
+        raise HTTPException(status_code=400,
+                            detail="Operator accounts are removed from the console, not from the site.")
+    user_id = current_user.id
+    current_user.is_active = False
+    current_user.email = f"deleted-{user_id}@resmara.invalid"
+    current_user.name = "Deleted account"
+    current_user.brand = {}
+    current_user.hashed_password = get_password_hash(secrets.token_urlsafe(32))
+    db.query(PasswordReset).filter(PasswordReset.user_id == user_id,
+                                   PasswordReset.used_at.is_(None)).update({"used_at": datetime.utcnow()})
+    db.add(Event(user_id=user_id, event_type="account_deleted", payload={"reason": "customer request"}))
+    db.commit()
+    return {"status": "deleted", "detail": "This account is closed and its details have been removed."}
+
+
 @router.get("/me/brand")
 def get_my_brand(current_user: User = Depends(get_current_user)):
     """The brand profile that belongs to this account, wherever it was typed."""
@@ -121,32 +154,62 @@ def _hash(token: str) -> str:
 
 
 @router.post("/password-reset/request")
-def request_reset(email: str, db: Session = Depends(get_db)):
+def request_reset(email: str, request: Request, db: Session = Depends(get_db)):
     """Start a reset. Always answers the same way, so this cannot be used to discover
     which email addresses have accounts.
 
-    Delivery: the link is emailed when SMTP is configured. Until then it returns
-    delivery='not_configured' (and in development the token is returned so the flow can
-    be exercised) - the reset itself always works, only the letter is missing.
+    The reset link is emailed when a mail provider is configured. Until one is, the answer
+    says ``delivery='not_configured'`` and the token goes nowhere near the response: it used
+    to be handed back "so the flow could be exercised", which on the public site meant anyone
+    who knew an address could reset that account's password. A locked-out customer now gets
+    a link from support instead (an operator mints one in the console), so no token ever has
+    to leave the server.
     """
     user = db.query(User).filter(User.email == email.strip().lower()).first()
     delivery = "not_configured"
-    token = None
     if user and user.is_active:
         raw = secrets.token_urlsafe(32)
         db.add(PasswordReset(user_id=user.id, token_hash=_hash(raw),
                              expires_at=datetime.utcnow() + timedelta(minutes=RESET_TTL_MINUTES)))
         db.commit()
-        link = f"{settings.PUBLIC_BASE_URL}/reset?token={raw}"
+        link = reset_link(raw, request)
         if mail.send_email(user.email, "Reset your Resmara password",
                            f"Someone asked to reset the password for this account.\n\n"
                            f"Use this link within {RESET_TTL_MINUTES} minutes:\n{link}\n\n"
                            f"If this wasn't you, ignore this email."):
             delivery = "email"
+            db.add(Event(user_id=user.id, event_type="password_reset_sent",
+                         payload={"delivery": "email"}))
         else:
-            token = raw  # no mailer yet: hand it back so the reset can still be completed
+            db.add(Event(user_id=user.id, event_type="password_reset_unmailed",
+                         payload={"reason": "no mail provider configured"}))
+        db.commit()
     return {"status": "ok", "delivery": delivery, "expires_minutes": RESET_TTL_MINUTES,
-            "reset_token": token, "detail": "Check your email for the reset link."}
+            "detail": ("Check your email for the reset link." if delivery == "email"
+                       else "We could not email a link. Contact support and we will send you one.")}
+
+
+def reset_link(token: str, request: Request | None = None) -> str:
+    """The page a reset token opens: a real path, not a hash route (mail clients and
+    scanners strip fragments), on the host the customer is actually using.
+
+    The host comes from the request rather than configuration, so a link minted on
+    www.resmara.com is a www.resmara.com link — not the onrender.com host the platform
+    happens to set, and not a laptop's tunnel URL.
+    """
+    return f"{site_base(request)}/reset?token={token}"
+
+
+def site_base(request: Request | None = None) -> str:
+    """The public origin of this request, honouring the proxy's forwarded headers."""
+    if request is not None:
+        proto = (request.headers.get("x-forwarded-proto") or request.url.scheme).split(",")[0].strip()
+        host = (request.headers.get("x-forwarded-host") or request.headers.get("host")
+                or request.url.netloc)
+        if host:
+            return f"{proto}://{host.split(',')[0].strip()}"
+    return settings.PUBLIC_BASE_URL.rstrip("/")
+
 
 
 @router.post("/password-reset/confirm")

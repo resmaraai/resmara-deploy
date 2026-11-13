@@ -111,7 +111,11 @@ async function myCredits() {
     <section class="panel"><h2>How it works</h2>
       <p>You pay ${billingMoney(BILLING_PRICE_CENTS)} when you build a campaign. Card details go to
       Stripe; Resmara never stores them. Meta ad spend is separate and paid to Meta from your own
-      ad account.</p></section>`;
+      ad account.</p></section>
+    <section class="panel"><h2>Your account</h2>
+      <p class="fine">Closing your account removes your name, email and brand profile and stops it
+      signing in. Purchases stay on record for accounting. This cannot be undone.</p>
+      <button class="alt" onclick="closeAccount()">Close my account…</button></section>`;
 
   // Saved card: Stripe keeps it on your customer record, so the next campaign is one click.
   var cardBox = document.getElementById('billing-cards');
@@ -172,3 +176,40 @@ async function myCredits() {
     toast('Checkout cancelled — nothing was charged.');
   }
 })();
+
+// ── closing an account ────────────────────────────────────────────────────────────
+// The password is asked for again: the server refuses without it, so a token left in a
+// browser cannot wipe someone's account. No `confirm()` — the typed address is stronger.
+function closeAccount() {
+  if (!window.RM) return;
+  show(`<span class="eyebrow">CLOSE YOUR ACCOUNT</span><h2>This cannot be undone.</h2>
+    <p>Your name, email and brand profile are removed and the account stops signing in.
+    Purchases stay on record for accounting.</p>
+    <form onsubmit="event.preventDefault();submitCloseAccount(this)">
+      <label class="field">Type your email to confirm<input name="email" type="email" required autocomplete="off" placeholder="${esc(state.email || '')}"></label>
+      <label class="field">Your password<input name="password" type="password" required autocomplete="current-password"></label>
+      <p class="fine" role="status"></p>
+      <div class="modal-actions"><button type="submit">Close my account</button>
+      <button type="button" class="alt" onclick="modal.close()">Keep my account</button></div>
+    </form>`);
+}
+async function submitCloseAccount(form) {
+  var status = form.querySelector('[role="status"]');
+  var typed = (form.elements.email.value || '').trim().toLowerCase();
+  var password = form.elements.password.value || '';
+  if (typed !== String(state.email || '').toLowerCase()) {
+    status.textContent = 'That email does not match this account.';
+    return;
+  }
+  status.textContent = 'Closing…';
+  try {
+    await RM.deleteAccount(password);
+    state = { name: '', connected: false, campaigns: [] };
+    persist();
+    modal.close();
+    toast('Your account is closed.');
+    home();
+  } catch (err) {
+    status.textContent = (err && err.message) || 'Could not close the account.';
+  }
+}

@@ -351,7 +351,7 @@ tr.testrow td{background:#fbfdff;color:#849bae}
           <label class="chipbox"><input type="checkbox" id="showAllUsers"> Show every match</label>
           <span class="hint" id="userCount"></span>
         </div>
-        <div class="scrollx"><table id="usersTable"><thead><tr><th>id</th><th>email</th><th>name</th><th>active</th><th>subscription</th><th>campaigns</th><th>last login</th></tr></thead><tbody></tbody></table></div>
+        <div class="scrollx"><table id="usersTable"><thead><tr><th>id</th><th>email</th><th>name</th><th>active</th><th>subscription</th><th>campaigns</th><th>last login</th><th></th></tr></thead><tbody></tbody></table></div>
       </div>
     </details>
 
@@ -719,8 +719,9 @@ function renderUsers(){
       (u.is_admin ? ' <span class="pill ok">admin</span>' : '') + '</td><td>' + esc(u.name || '—') + '</td>' +
     '<td>' + (u.is_active ? '<span class="pill ok">yes</span>' : '<span class="pill bad">no</span>') + '</td>' +
     '<td><span class="pill ' + (u.subscription_status === 'active' ? 'ok' : 'warn') + '">' + esc(u.subscription_status) + '</span></td>' +
-    '<td>' + (u.campaign_count ?? 0) + '</td><td>' + fmt(u.last_login) + '</td></tr>').join('')
-    : '<tr><td colspan="7" class="hint">No account matches. Test accounts are hidden unless you ask for them.</td></tr>';
+    '<td>' + (u.campaign_count ?? 0) + '</td><td>' + fmt(u.last_login) + '</td>' +
+    '<td><button class="ghost tiny" data-resetlink="' + u.id + '" title="Create a one-time password reset link to send by hand">Reset link</button></td></tr>').join('')
+    : '<tr><td colspan="8" class="hint">No account matches. Test accounts are hidden unless you ask for them.</td></tr>';
   $('userCount').textContent = total + ' match(es)' + (rows.length < total ? ' · showing ' + rows.length : '') +
     (showTest ? '' : ' · test accounts hidden');
 }
@@ -729,7 +730,7 @@ async function loadUsers(){
     userRows = await api('/api/admin/users');
     renderUsers();
   } catch (err) {
-    $('usersTable').querySelector('tbody').innerHTML = '<tr><td colspan="7" class="msg bad">' + esc(err.message) + '</td></tr>';
+    $('usersTable').querySelector('tbody').innerHTML = '<tr><td colspan="8" class="msg bad">' + esc(err.message) + '</td></tr>';
   }
 }
 
@@ -1083,6 +1084,33 @@ if ($('cAdd')) {
 function refreshAll(){ loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); }
 
 $('loginBtn').addEventListener('click', login);
+
+// Password help while email is not connected: mint the one-time link here and send it to the
+// customer by hand. It works once and expires in an hour; nothing is exposed publicly.
+$('usersTable').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-resetlink]');
+  if (!btn) return;
+  const row = btn.closest('tr');
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await api('/api/admin/users/' + Number(btn.dataset.resetlink) + '/reset-link', { method: 'POST' });
+    const line = document.createElement('tr');
+    line.className = 'resetline';
+    line.innerHTML = '<td colspan="8" class="hint">' + (r.emailed
+      ? 'Reset link emailed to ' + esc(r.email) + '.'
+      : 'Send this link to ' + esc(r.email) + ' — works once, expires in ' + r.expires_minutes + ' min: ' +
+        '<input readonly value="' + esc(r.link) + '" style="width:70%;margin-left:6px" onclick="this.select()">') + '</td>';
+    row.after(line);
+  } catch (err) {
+    const line = document.createElement('tr');
+    line.innerHTML = '<td colspan="8" class="msg bad">' + esc(err.message) + '</td>';
+    row.after(line);
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+});
+
 $('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(e); });
 $('logout').addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); location.reload(); });
 $('checkBoost').addEventListener('click', checkBoost);

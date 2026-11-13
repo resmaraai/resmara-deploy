@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
-from app.db.session import get_db, User, AdAccount, Creative, Boost, Post, Ad, SupportTicket, Event, Asset
+from app.db.session import get_db, User, AdAccount, Creative, Boost, Post, Ad, SupportTicket, Event, Asset, PasswordReset
 from app.core.testdata import is_test_email
 from app.core.security import get_current_user, get_admin_user
 from app.schemas.resmara import (
@@ -14,8 +14,14 @@ from app.services import metrics as metrics_service
 # The launch gate (budget precheck + copy approval + state machine) and the Graph
 # client live in app/services/launch.py and app/services/ad_platforms.py, so both launch
 # entrypoints share one implementation.
-from datetime import datetime
+from datetime import datetime, timedelta
+import hashlib
 import json
+import secrets
+
+from app.core.config import settings
+from app.api.auth import reset_link, RESET_TTL_MINUTES
+from app.services import mail
 
 router = APIRouter()
 
@@ -296,7 +302,66 @@ def create_ticket(ticket: SupportTicketCreate, current_user=Depends(get_current_
                  payload={"ticket_id": new_ticket.id, "subject": ticket.subject[:120]}))
     db.commit()
     db.refresh(new_ticket)
+    # Tell the operators. A ticket that only lands in the console is a complaint in a drawer:
+    # nobody is looking at that page while a customer waits. With no mail provider this is a
+    # no-op (nothing is claimed as sent) and the console's Support count is the only signal.
+    notify_operators(new_ticket, current_user, db)
     return new_ticket
+
+
+def operator_addresses(db: Session) -> list[str]:
+    """Who hears about a new support request: RESMARA_ADMIN_EMAILS plus every admin row."""
+    from app.services.access import parse_allowlist
+    listed = sorted(parse_allowlist(settings.ADMIN_EMAILS))
+    rows = [u.email for u in db.query(User).filter(User.is_admin.is_(True), User.is_active.is_(True)).all()]
+    out: list[str] = []
+    for email in listed + rows:
+        email = (email or "").strip().lower()
+        if email and email not in out:
+            out.append(email)
+    return out
+
+
+def notify_operators(ticket: SupportTicket, author: User, db: Session) -> None:
+    if not mail.mail_configured():
+        return
+    first = (ticket.messages or [{}])[0] if ticket.messages else {}
+    body = ("A customer raised a support request.\n\n"
+            f"From: {author.email} ({author.name or 'no name'})\n"
+            f"Ticket: #{ticket.id}\n"
+            f"Subject: {ticket.subject}\n\n"
+            f"{first.get('text', '')}\n\n"
+            "Reply from the operator console: https://www.resmara.com/admin.html\n")
+    for address in operator_addresses(db):
+        mail.send_email(address, f"Resmara support #{ticket.id}: {ticket.subject}"[:180], body)
+
+
+
+@router.post("/admin/users/{user_id}/reset-link")
+def admin_reset_link(user_id: int, request: Request, current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Mint a password-reset link for one account and hand it to the operator.
+
+    This exists because email is not connected yet: a customer who cannot sign in is not
+    stuck waiting for a letter nobody can send. The link is single-use, expires in an hour,
+    and only an operator can ask for it, so nothing is exposed to the public. Once a mail
+    provider is configured the customer can do this themselves and this is the fallback.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="No such account")
+    raw = secrets.token_urlsafe(32)
+    db.add(PasswordReset(user_id=user.id, token_hash=hashlib.sha256(raw.encode()).hexdigest(),
+                         expires_at=datetime.utcnow() + timedelta(minutes=RESET_TTL_MINUTES)))
+    db.commit()
+    link = reset_link(raw, request)
+    sent = False
+    if mail.mail_configured():
+        sent = bool(mail.send_email(
+            user.email, "Reset your Resmara password",
+            f"Use this link within {RESET_TTL_MINUTES} minutes to choose a new password:\n{link}\n\n"
+            f"If you did not ask for this, ignore this email."))
+    return {"email": user.email, "link": link, "expires_minutes": RESET_TTL_MINUTES, "emailed": sent}
+
 
 @router.get("/support", response_model=list[SupportTicketOut])
 def list_tickets(current_user=Depends(get_current_user), db: Session = Depends(get_db)):

@@ -227,6 +227,25 @@
     return request('/api/auth/me');
   }
 
+  // Password recovery. The request call is deliberately unauthenticated and always answers
+  // the same way; the answer's `delivery` is what the page reports ("email" / "not_configured"),
+  // so a customer is never told a letter went out when no mail provider exists.
+  function requestPasswordReset(email) {
+    return request('/api/auth/password-reset/request?email=' + segment(String(email || '').trim()),
+      { method: 'POST' });
+  }
+
+  function confirmPasswordReset(token, newPassword) {
+    return request('/api/auth/password-reset/confirm?token=' + segment(token) +
+      '&new_password=' + segment(newPassword), { method: 'POST' });
+  }
+
+  // Closing the account needs the password typed again; the server refuses operator accounts.
+  function deleteAccount(password) {
+    return request('/api/auth/me?password=' + segment(password), { method: 'DELETE' })
+      .then(function (r) { logout(); return r; });
+  }
+
   // ---- boosts (campaigns) -------------------------------------------------
 
   function boosts() {
@@ -481,6 +500,9 @@
     login: login,
     register: register,
     me: me,
+    requestPasswordReset: requestPasswordReset,
+    confirmPasswordReset: confirmPasswordReset,
+    deleteAccount: deleteAccount,
     boosts: boosts,
     boost: boost,
     hideBoost: hideBoost,

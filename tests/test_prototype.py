@@ -38,9 +38,9 @@ def get_token(email, password):
 
 # --- 1. Register + Login ---
 print("=== 1. Register + Login ===")
-resp = client.post("/api/auth/register", json={"email": "agent@resmara.com", "password": "test123", "name": "Test Agent"})
+resp = client.post("/api/auth/register", json={"email": "agent@resmara.com", "password": "test12345", "name": "Test Agent"})
 print(f"Register: {resp.status_code}")
-token = get_token("agent@resmara.com", "test123")
+token = get_token("agent@resmara.com", "test12345")
 headers = {"Authorization": f"Bearer {token}"}
 print(f"Login: OK, token: {token[:20]}...")
 
@@ -118,7 +118,7 @@ print("\n=== 9. Admin Portal ===")
 db_user = db.query(User).filter(User.email == "agent@resmara.com").first()
 db_user.is_admin = True
 db.commit()
-admin_token = get_token("agent@resmara.com", "test123")
+admin_token = get_token("agent@resmara.com", "test12345")
 admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
 resp = client.get("/api/admin/users", headers=admin_headers)

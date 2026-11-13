@@ -78,4 +78,10 @@ def robots():
 
 # Serve static frontend at root (after API routes)
 if os.path.isdir("static"):
+    # The password-reset link is a real page (mail clients mangle fragments). It is the same
+    # single-page app; the script reads ?token= and shows the reset form.
+    @app.get("/reset", include_in_schema=False)
+    def reset_page():
+        return FileResponse(os.path.join("static", "index.html"))
+
     app.mount("/", StaticFiles(directory="static", html=True), name="static")

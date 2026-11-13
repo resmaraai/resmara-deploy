@@ -17,7 +17,7 @@ function home(){
  <section class="home-results"><div class="home-section home-results-layout"><div><span class="home-kicker">CLEAR RESULTS. BETTER CONVERSATIONS.</span><h2>Go back to your<br><span>seller with confidence.</span></h2><p>Know what your marketing delivered. Your day 7 and day 14 reports give you the numbers to make informed decisions with your client.</p><div class="home-report-moments"><div><span>07</span><div><h3>A confident check-in.</h3><p>At day 7, share the exposure, engagement and listing activity so far.</p></div></div><div><span>14</span><div><h3>A clear way forward.</h3><p>At day 14, review the full campaign together and decide what comes next.</p></div></div></div></div><div class="home-seller-preview"><div class="home-report-switch" role="tablist" aria-label="Seller report previews"><button role="tab" id="seller-tab-7" aria-selected="true" aria-controls="home-report-preview" onclick="homeSellerReport(7)">Day 7</button><button role="tab" id="seller-tab-14" aria-selected="false" aria-controls="home-report-preview" onclick="homeSellerReport(14)">Day 14</button></div><div id="home-report-preview" role="tabpanel" aria-labelledby="seller-tab-7"></div></div></div></section>
  <section class="home-section home-price" id="home-pricing"><div><span class="home-kicker">DONE FOR YOU. ON YOUR TERMS.</span><h2>All that.<br>$49 per campaign.<br><span>No subscription.</span></h2><p>One property, one campaign, one price: the creative, the calendar, the publishing and the seller reports. You pay when the campaign is built, and nothing renews.</p></div><div class="home-price-detail"><h3>Your listing launch includes</h3><ul><li>A branded 14-day social campaign</li><li>Digital ad creative and campaign setup</li><li>Your calendar, review and approval</li><li>Scheduled social publishing</li><li>Day 7 and day 14 seller reports</li></ul><p>You choose the ad budget. Meta ad spend is separate and goes to your own ad account.</p><button class="home-primary" onclick="pricing()">See what the $49 buys ↗</button></div></section>
  <section class="home-finish"><span class="home-mini-robot" aria-hidden="true"></span><h2>Let’s give your next listing<br>a proper launch.</h2><button class="home-primary" onclick="newCampaign()">Let’s get started ↗</button></section>
- </main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span><a href="#how-it-works" onclick="howItWorks();return false">How it works ↗</a></footer></div>`;
+ </main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
  homeCalendarState={start:new Date('2026-11-02T12:00:00'),month:new Date('2026-11-01T12:00:00'),selected:0};renderHomeMonth();homeSellerReport(7);if(window.sampleOutput)sampleOutput('social');
 }
 function homeWorld(){return `<div class="home-world" role="img" aria-label="Resmara orchestrating social posts, digital advertising, a campaign calendar and analytics around your property"><span class="home-world-card hw-social"></span><span class="home-world-card hw-ad"></span><span class="home-world-card hw-calendar"></span><span class="home-world-card hw-report"></span><img class="home-world-house" src="resmara-house-complete-v1.png" alt=""><img class="home-world-robot" src="resmara-robot-clean-v1.png" alt=""></div>`}
@@ -53,6 +53,9 @@ function siteNav(active){
  const links=[['home','Home','home'],['how-it-works','How it works','howItWorks'],['pricing','Pricing','pricing']];
  return `<header class="home-nav shared-nav">${logo}<nav aria-label="Main navigation">${links.map(([id,label,fn])=>`<a href="#${id==='home'?'':id}" ${active===id?'aria-current="page"':''} onclick="${fn}();return false">${label}</a>`).join('')}</nav><button class="alt" onclick="clientAccess()">${state.clientSignedIn?'My Dashboard':'Client Login'} ↗</button></header>`;
 }
+function footerLinks(){
+ return `<span style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;font-size:12px"><a href="#how-it-works" onclick="howItWorks();return false">How it works ↗</a><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="mailto:resmaraai@gmail.com">Contact</a></span>`;
+}
 function signOutDemo(){state.clientSignedIn=false;persist();home();window.scrollTo(0,0)}
 function clientAccess(mode='signin'){
  // state.clientSignedIn is a browser memory, not a session. Ask the API client whether the
@@ -60,7 +63,47 @@ function clientAccess(mode='signin'){
  if(state.clientSignedIn&&window.RM&&RM.isLoggedIn()){dashboard();return}
  if(state.clientSignedIn){state.clientSignedIn=false;persist()}
  const creating=mode==='create';
- show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>${creating?'Create an account':'Client Login'}</h2><p>${creating?'Resmara is in private beta. Use the invite code you were sent, or an invited email address.':'Enter your email and password.'}</p><form onsubmit="event.preventDefault();submitTestClient(this,${creating})">${creating?'<label class="field">Full name<input name="clientName" required maxlength="120" autocomplete="name"></label>':''}<label class="field">Email address<input name="clientEmail" type="email" required maxlength="254" autocomplete="email"></label><label class="field">Password<input name="clientPassword" type="password" required minlength="6" autocomplete="current-password" value="test123"></label>${creating?'<label class="field">Invite code<input name="inviteCode" maxlength="64" autocomplete="off" spellcheck="false" placeholder="From your invitation"></label>':''}<p class="fine" role="status"></p><div class="modal-actions"><button>${creating?'Create account →':'Sign in →'}</button><button type="button" class="alt" onclick="clientAccess('${creating?'signin':'create'}')">${creating?'Back to sign in':'Create an account'}</button></div></form>${state.name&&!state.email?'<button class="alt" onclick="resumeDemo()">Resume previous demo →</button>':''}<p class="fine">Connected to Resmara backend API.</p>`);
+ show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>${creating?'Create an account':'Client Login'}</h2><p>${creating?'Resmara is in private beta. Use the invite code you were sent, or an invited email address.':'Enter your email and password.'}</p><form onsubmit="event.preventDefault();submitTestClient(this,${creating})">${creating?'<label class="field">Full name<input name="clientName" required maxlength="120" autocomplete="name"></label>':''}<label class="field">Email address<input name="clientEmail" type="email" required maxlength="254" autocomplete="email"></label><label class="field">Password<input name="clientPassword" type="password" required minlength="${creating?8:1}" autocomplete="${creating?'new-password':'current-password'}"></label>${creating?'<label class="field">Invite code<input name="inviteCode" maxlength="64" autocomplete="off" spellcheck="false" placeholder="From your invitation"></label>':''}<p class="fine" role="status"></p><div class="modal-actions"><button>${creating?'Create account →':'Sign in →'}</button><button type="button" class="alt" onclick="clientAccess('${creating?'signin':'create'}')">${creating?'Back to sign in':'Create an account'}</button></div></form>${state.name&&!state.email?'<button class="alt" onclick="resumeDemo()">Resume previous demo →</button>':''}<p class="fine">${creating?'Passwords need at least 8 characters.':'<a href="#" onclick="forgotPassword();return false">Forgot your password?</a>'}</p>`);
+}
+function forgotPassword(){
+ show(`<span class="eyebrow">PASSWORD HELP</span><h2>Reset your password</h2><p>Enter the email address on your account and we will send a link to choose a new password.</p><form onsubmit="event.preventDefault();requestResetLink(this)"><label class="field">Email address<input name="email" type="email" required maxlength="254" autocomplete="email" value="${esc(state.email||'')}"></label><p class="fine" role="status"></p><div class="modal-actions"><button>Send reset link →</button><button type="button" class="alt" onclick="clientAccess()">Back to sign in</button></div></form><p class="fine">The link works once and expires in an hour.</p>`);
+}
+async function requestResetLink(form){
+ const status=form.querySelector('[role="status"]');
+ const email=form.elements.email.value.trim();
+ if(!window.RM){status.textContent='The API client is unavailable in this browser.';return}
+ status.textContent='Sending…';
+ try{
+  const reply=await RM.requestPasswordReset(email);
+  if(reply&&reply.delivery==='email'){
+   show(`<span class="eyebrow">CHECK YOUR EMAIL</span><h2>Link sent</h2><p>If an account exists for ${esc(email)}, a reset link is on its way. It expires in ${reply.expires_minutes||60} minutes.</p><div class="modal-actions"><button onclick="clientAccess()">Back to sign in</button></div>`);
+   return;
+  }
+  // No mail provider yet: say so plainly and give the customer a real way through, instead
+  // of a page that claims a letter was sent when nothing left the server.
+  show(`<span class="eyebrow">EMAIL NOT CONNECTED</span><h2>We cannot send the link yet</h2><p>Email is not connected to Resmara, so the reset link cannot be delivered automatically. Use the Contact link in the footer and we will send you a one-time link from the operator console.</p><div class="modal-actions"><button onclick="clientAccess()">Back to sign in</button><a class="alt" href="mailto:resmaraai@gmail.com?subject=Password%20reset%20request">Email us</a></div>`);
+ }catch(err){
+  status.textContent=(err&&err.message)||'Could not start the reset.';
+ }
+}
+function resetPasswordPage(token){
+ location.hash='';document.title='Choose a new password — Resmara';
+ app.innerHTML=`<div class="marketing-home">${siteNav('')}<main><section class="home-section package-page"><div><span class="home-kicker">PASSWORD RESET</span><h2>Choose a new password.</h2>${token?'<p>Type it twice. This link works once, so choose something you will remember.</p>':'<p>This link is missing its reset code. Ask for a new one from the sign-in page.</p>'}<form onsubmit="event.preventDefault();submitNewPassword(this)" data-token="${esc(token)}"><label class="field">New password<input name="password" type="password" required minlength="8" autocomplete="new-password"></label><label class="field">Type it again<input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label><p class="fine" role="status"></p><div class="modal-actions"><button${token?'':' disabled'}>Save new password →</button><button type="button" class="alt" onclick="clientAccess()">Back to sign in</button></div></form></div></section></main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
+ window.scrollTo(0,0);
+}
+async function submitNewPassword(form){
+ const status=form.querySelector('[role="status"]');
+ const password=form.elements.password.value, confirm=form.elements.confirm.value;
+ if(password!==confirm){status.textContent='Those two passwords do not match.';return}
+ if(password.length<8){status.textContent='Use at least 8 characters.';return}
+ if(!window.RM){status.textContent='The API client is unavailable in this browser.';return}
+ status.textContent='Saving…';
+ try{
+  await RM.confirmPasswordReset(form.dataset.token,password);
+  show(`<span class="eyebrow">PASSWORD CHANGED</span><h2>You're set</h2><p>Sign in with your new password.</p><div class="modal-actions"><button onclick="clientAccess()">Sign in →</button></div>`);
+ }catch(err){
+  status.textContent=(err&&err.message)||'This reset link is invalid or has expired.';
+ }
 }
 function resumeDemo(){state.clientSignedIn=true;persist();modal.close();dashboard()}
 function submitTestClient(form,creating){
@@ -256,7 +299,7 @@ function confirmMockHelp(slot){
 function pricing(){
  if(typeof stopResmaraGuide==='function')stopResmaraGuide();
  location.hash='pricing';document.title='Pricing — Resmara';
- app.innerHTML=`<div class="marketing-home">${siteNav('pricing')}<main><section class="home-section package-page"><div><span class="home-kicker">$49 PER CAMPAIGN</span><h1>One listing.<br><span>One campaign.</span><br>Forty-nine dollars.</h1><p>A 14-day branded campaign for one property: the creative, the calendar, the publishing and the day 7 and day 14 seller reports.</p><p>No subscription, no packs, nothing to top up. You pay the $49 when the campaign is ready to build, through Stripe Checkout. Meta ad spend is separate and goes to your own ad account.</p><p class="fine">Preparing a campaign — the scope, the captions, the calendar — costs nothing. You only pay to build it.</p></div><div class="home-price-detail"><h3>What the $49 buys</h3><ul><li>A 14-day social campaign for that listing</li><li>Caption and photo pairings from your own gallery</li><li>Digital ad creative and campaign setup</li><li>Your calendar, review and approval</li><li>Scheduled social publishing</li><li>Day 7 and day 14 seller reports</li></ul><button class="home-primary" onclick="newCampaign()">Start a campaign ↗</button></div></section></main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span></footer></div>`;
+ app.innerHTML=`<div class="marketing-home">${siteNav('pricing')}<main><section class="home-section package-page"><div><span class="home-kicker">$49 PER CAMPAIGN</span><h1>One listing.<br><span>One campaign.</span><br>Forty-nine dollars.</h1><p>A 14-day branded campaign for one property: the creative, the calendar, the publishing and the day 7 and day 14 seller reports.</p><p>No subscription, no packs, nothing to top up. You pay the $49 when the campaign is ready to build, through Stripe Checkout. Meta ad spend is separate and goes to your own ad account.</p><p class="fine">Preparing a campaign — the scope, the captions, the calendar — costs nothing. You only pay to build it.</p></div><div class="home-price-detail"><h3>What the $49 buys</h3><ul><li>A 14-day social campaign for that listing</li><li>Caption and photo pairings from your own gallery</li><li>Digital ad creative and campaign setup</li><li>Your calendar, review and approval</li><li>Scheduled social publishing</li><li>Day 7 and day 14 seller reports</li></ul><button class="home-primary" onclick="newCampaign()">Start a campaign ↗</button></div></section></main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
  window.scrollTo(0,0);
 }
 let workspaceTourCleanup;

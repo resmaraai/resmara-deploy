@@ -178,11 +178,13 @@ async def import_photos_endpoint(payload: PhotoImportRequest, current_user: User
             return {"boost_id": boost.id, "source": source, "found": 0, "imported": 0,
                     "assets": [], "skipped": [],
                     "tried": trace,
-                    "detail": "That page did not give up its photos. A listing dashboard that "
-                              "needs a sign-in (Fotello, an MLS, a Drive folder) keeps its "
-                              "gallery behind the login, and Zillow, Realtor, Redfin and "
-                              "Homes.com block server-side reads — upload the photo files, or "
-                              "paste direct image URLs, or use a Movoto or Trulia listing link."}
+                    "detail": "That page did not give up its photos. The link that does work is "
+                              "the listing's own public share link from the MLS — in Flexmls, "
+                              "open the listing and use Share → copy the permalink; in Matrix, "
+                              "Share Link. A dashboard that needs a sign-in (Fotello, an agent "
+                              "portal, a Drive folder) keeps its gallery behind the login, and "
+                              "Zillow, Realtor, Redfin and Homes.com block server-side reads. "
+                              "You can also upload the photo files or paste direct image URLs."}
 
     result = await photos.import_from_urls(
         db, user_id=current_user.id, boost_id=boost.id, urls=urls,
@@ -199,8 +201,8 @@ async def import_photos_endpoint(payload: PhotoImportRequest, current_user: User
         result["detail"] = (
             f"That link gave up only {result['imported']} photo(s) — the page keeps the rest "
             "of its gallery behind a sign-in, and the same property could not be matched on "
-            "Trulia from this address. Upload the photos, paste the direct image addresses, "
-            "or use the listing's public link (Trulia or Movoto).")
+            "Trulia from this address. Paste the MLS public share link for the listing (Flexmls: "
+            "Share → copy permalink), upload the photos, or paste the direct image addresses.")
     return result
 
 

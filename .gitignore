@@ -21,3 +21,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
+
+# Business paperwork: entity, partnership, banking. Never in the app repo.
+legal/

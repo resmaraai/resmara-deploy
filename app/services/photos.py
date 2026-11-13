@@ -16,7 +16,7 @@ import os
 import re
 import urllib.parse
 import uuid
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlsplit
 
 import httpx
 
@@ -93,11 +93,18 @@ USER_AGENT = (
 _SKIP_HINTS = (
     "logo", "sprite", "favicon", "avatar", "headshot", "badge", "placeholder",
     "spacer", "pixel", "icon-", "/icons/", "1x1", "transparent", "loading",
+    # MLS and portal chrome that a rendered page carries next to the property photos:
+    # flexmls in particular ships its own "no image available" card and an error glyph,
+    # and either one would be picked as photo one if it came first.
+    "no_img_available", "no-image-available", "noimage", "flexmls-ui", "/assets/error",
+    "error-", "coming-soon", "default-photo", "placeholder-", "apple-touch-icon",
+    "/css/", "/fonts/", "sprite-", "-logo.", "_logo.",
 )
 
 _META_RE = re.compile(r"<meta\b[^>]*>", re.I)
 _ATTR_RE = re.compile(r"""([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))""")
 _IMG_RE = re.compile(r"<img\b[^>]*>", re.I)
+_META_IMAGE_RE = re.compile(r"og:image|twitter:image", re.I)
 _LD_RE = re.compile(r'<script[^>]+type\s*=\s*["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.I | re.S)
 
 
@@ -216,6 +223,106 @@ def _gallery_group(urls: list[str]) -> list[str]:
         return []
     best = max(groups.values(), key=len)
     return best if len(best) >= 2 else urls
+
+
+# ---------------------------------------------------------------------------
+# The second URL behind a public listing link.
+#
+# An MLS "public link" is a shop window: one hero photo, a few facts, and a "view" control
+# that goes somewhere else — an iframe, a viewer app on another host, or a JSON blob holding
+# the listing's own URL. The gallery is on that second page, not on the shop window, so a
+# single fetch of the public link can only ever return one image. These helpers read the
+# pointers out of the page and hand them to the caller, which then fetches them properly.
+# ---------------------------------------------------------------------------
+
+_IFRAME_RE = re.compile(r"<iframe\b[^>]*>", re.I)
+_META_REFRESH_RE = re.compile(
+    r"<meta[^>]+http-equiv=[\"']?refresh[\"']?[^>]*content=[\"'][^\"']*?url=([^\"'>\s]+)", re.I)
+_JS_REDIRECT_RE = re.compile(
+    r"(?:window\.)?location(?:\.href)?\s*(?:=|\.replace\(|\.assign\()\s*[\"'](https?://[^\"']+|/[^\"']+)[\"']", re.I)
+_LINK_TAG_RE = re.compile(r"<link\b[^>]*>", re.I)
+# Keys a viewer/IDX page uses to name the real listing page. The value may sit in an inline
+# JSON blob, in a data-* attribute, or in a JS object — the pattern does not care which.
+_SECOND_URL_KEY_RE = re.compile(
+    r"[\"'](?:(?:listing|detail|public|share|viewer|embed|gallery|media|photos?|virtualTour|tour)?"
+    r"(?:url|link|href))[\"']\s*:\s*[\"'](https?://[^\"'\\]{10,600}|/[^\"'\\]{3,600})[\"']", re.I)
+_GALLERY_ANCHOR_RE = re.compile(r"<a\b[^>]*>", re.I)
+
+
+def _page_key(url: str) -> str:
+    """A URL reduced to host+path+query so tracking variants of one page collapse together."""
+    parts = urlsplit(url)
+    return f"{parts.netloc.lower()}{parts.path.rstrip('/')}{('?' + parts.query) if parts.query else ''}"
+
+
+def hidden_second_urls(html: str, page_url: str, limit: int = 3) -> list[str]:
+    """The URLs a public listing page points at for the real listing view, best first.
+
+    Reads, in order of trust: the page's own structured pointer (canonical / og:url when it
+    names a different page), an inline JSON "…Url" field, a meta refresh, a JS
+    ``location`` assignment, an iframe, then an anchor that says photos/gallery/view.
+
+    Everything comes back absolute, de-duplicated, and never the page itself. Image URLs are
+    excluded — they are not a second page. This is deliberately generic: MLS vendors ship a
+    new skin every few years, and a pointer is a pointer whichever attribute carries it.
+    """
+    html = html or ""
+    page_key = _page_key(page_url)
+    out: list[str] = []
+    seen = {page_key}
+
+    def offer(raw: str) -> None:
+        if not raw:
+            return
+        raw = raw.strip().replace("&amp;", "&")
+        url = urljoin(page_url, raw)
+        if not url.startswith(("http://", "https://")):
+            return
+        if _looks_like_image(url) or url.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+            return
+        key = _page_key(url)
+        if key in seen:
+            return
+        seen.add(key)
+        out.append(url)
+
+    for tag in _LINK_TAG_RE.findall(html):
+        a = _attrs(tag)
+        if (a.get("rel") or "").lower() in ("canonical", "alternate") and a.get("href"):
+            offer(a["href"])
+
+    for tag in _META_RE.findall(html):
+        a = _attrs(tag)
+        key = (a.get("property") or a.get("name") or "").lower()
+        if key in ("og:url", "twitter:url") and a.get("content"):
+            offer(a["content"])
+
+    for match in _META_REFRESH_RE.findall(html):
+        offer(match)
+
+    for raw in _SECOND_URL_KEY_RE.findall(html):
+        offer(raw)
+
+    for raw in _JS_REDIRECT_RE.findall(html):
+        offer(raw)
+
+    for tag in _IFRAME_RE.findall(html):
+        a = _attrs(tag)
+        for key in ("src", "data-src"):
+            if a.get(key):
+                offer(a[key])
+
+    for tag in _GALLERY_ANCHOR_RE.findall(html):
+        a = _attrs(tag)
+        href = a.get("href") or ""
+        label = (a.get("title") or a.get("aria-label") or "").lower()
+        if not href:
+            continue
+        if re.search(r"(photo|gallery|media|picture|tour|view)", href, re.I) or \
+           re.search(r"(photo|gallery|media|picture|tour)", label):
+            offer(href)
+
+    return out[:limit]
 
 
 def extract_image_urls(html: str, base_url: str, limit: int = DEFAULT_LIMIT) -> list[str]:
@@ -617,15 +724,56 @@ def _trulia_city_url(address: str, zipcode: str) -> str:
 READER_BASE = "https://r.jina.ai/"          # renders the page on their infrastructure
 READER_TIMEOUT = 90.0
 
+# Words that only appear on a wall, never on a listing. MLS portals (Flexmls, Matrix) and the
+# big consumer sites answer a bot with "200 OK" and a few kilobytes of JavaScript that then
+# asks for a challenge — so status alone says nothing, and treating it as success meant the
+# reader fallback below was never tried on exactly the pages that need it.
+_WALL_MARKERS = (
+    "client challenge",
+    "cf_chl_opt",
+    "just a moment",
+    "enable javascript and cookies to continue",
+    "javascript is disabled in your browser",
+    "please enable javascript to proceed",
+    "attention required! | cloudflare",
+    "checking your browser before accessing",
+    "are you a robot",
+    "px-captcha",
+    "captcha-delivery",
+    "request unsuccessful. incapsula",
+    "ddos protection by",
+)
+
+
+def _looks_like_a_wall(html: str) -> bool:
+    """True when this is a challenge/consent shell rather than the page that was asked for."""
+    if not html:
+        return False
+    low = html[:4000].lower()
+    if any(marker in low for marker in _WALL_MARKERS):
+        return True
+    # A shell with no content: short, scripted, and carrying no picture of a property at all.
+    # A short page that is nonetheless full of listing data — JSON-LD, a __NEXT_DATA__ blob, a
+    # gallery of .jpg URLs — is a real page in a thin wrapper, not a wall, and must not be
+    # thrown away.
+    _DATA_HINTS = ("application/ld+json", "__next_data__", "__initial_state__", '"photos"',
+                   ".jpg", ".jpeg", ".png", ".webp")
+    if len(html) < 12000 and not _META_IMAGE_RE.search(html) and html.count("<img") == 0:
+        if "<script" in low and not any(hint in html.lower() for hint in _DATA_HINTS):
+            return True
+    return False
+
 
 async def _fetch_html(client: httpx.AsyncClient, url: str, trace: list | None = None) -> str:
     """The page's HTML, direct if the site allows it, otherwise through a hosted reader.
 
     Zillow, Realtor, Redfin, Homes.com, Movoto and Trulia all answer 403 to a datacenter IP
     (Render is one) while answering 200 to a home connection — so a direct fetch works in
-    local development and fails in production, which is the worst possible split. The reader
-    fetches from its own browser fleet and returns the rendered HTML, scripts and all, so the
-    same parsers run on both. JINA_API_KEY raises the reader's rate limit when set.
+    local development and fails in production, which is the worst possible split. Flexmls and
+    Matrix go further and answer 200 with a challenge shell, which is why a direct answer is
+    checked for a wall before it is believed. The reader fetches from its own browser fleet
+    and returns the rendered HTML, scripts and all, so the same parsers run on both.
+    JINA_API_KEY raises the reader's rate limit when set.
     """
     def note(outcome):
         if trace is not None:
@@ -635,7 +783,9 @@ async def _fetch_html(client: httpx.AsyncClient, url: str, trace: list | None = 
         resp = await client.get(url, headers=_CHROME_HEADERS)
         note(resp.status_code)
         if resp.status_code == 200 and len(resp.text) > 2000:
-            return resp.text
+            if not _looks_like_a_wall(resp.text):
+                return resp.text
+            note("wall")
     except httpx.HTTPError as exc:
         status = getattr(getattr(exc, "response", None), "status_code", None)
         note(status or exc.__class__.__name__)
@@ -653,6 +803,45 @@ async def _fetch_html(client: httpx.AsyncClient, url: str, trace: list | None = 
     except httpx.HTTPError as exc:
         note("reader:%s" % exc.__class__.__name__)
     return ""
+
+
+async def _photos_from_second_pages(client: httpx.AsyncClient, urls: list[str], limit: int,
+                                   trace: list | None) -> list[str]:
+    """Photos found by following a public listing page's own pointer to the real listing.
+
+    One extra hop is allowed, not a crawl: a shop window often points at another shop
+    window (``share`` -> ``viewer`` -> gallery). Two hops covers the MLS layouts seen so far
+    and keeps a wrong guess from turning into a fetch storm.
+    """
+    out: list[str] = []
+    for target in urls:
+        html = await _fetch_html(client, target, trace)
+        if not html:
+            continue
+        host = _host(target)
+        if "trulia.com" in host:
+            found = trulia_photo_urls(html, full_res=False)
+        elif "movoto.com" in host:
+            found = movoto_photo_urls(html)
+        else:
+            found = extract_image_urls(html, target, limit=limit)
+        if len(found) < 4:
+            for deeper in hidden_second_urls(html, target, limit=1):
+                page = await _fetch_html(client, deeper, trace)
+                if not page:
+                    continue
+                more = extract_image_urls(page, deeper, limit=limit)
+                for u in more:
+                    if u not in found:
+                        found.append(u)
+                if len(found) >= 4:
+                    break
+        for url in found:
+            if url not in out:
+                out.append(url)
+        if len(out) >= limit:
+            break
+    return out[:limit]
 
 
 async def _photos_on_page(client: httpx.AsyncClient, url: str, limit: int,
@@ -679,7 +868,17 @@ async def _photos_on_page(client: httpx.AsyncClient, url: str, limit: int,
         if photos:
             return photos[:limit]
 
-    return extract_image_urls(html, url, limit=limit)
+    photos = extract_image_urls(html, url, limit=limit)
+    # A public MLS / IDX / share link is a shop window: the gallery lives one page deeper.
+    # Follow the page's own pointer before giving up on it — that is where the photos are.
+    if len(photos) < 4:
+        for extra in await _photos_from_second_pages(
+                client, hidden_second_urls(html, url), limit, trace):
+            if extra not in photos:
+                photos.append(extra)
+            if len(photos) >= limit:
+                break
+    return photos[:limit]
 
 
 def address_from_url(listing_url: str) -> str:
@@ -751,6 +950,9 @@ async def discover(listing_url: str, limit: int = DEFAULT_LIMIT, client: httpx.A
          Trulia ``__NEXT_DATA__``) with a generic og:image/JSON-LD/<img> pass for other hosts;
       2. the same page through a hosted reader, which is what makes production work at all —
          every listing portal answers 403 to a datacenter IP;
+      2b. the URL that page points at. An MLS / IDX "public link" shows one hero photo and
+         puts the gallery behind an iframe, a viewer app or a JSON ``…Url`` field, so the
+         page's own pointer is followed (one extra hop) before falling back;
       3. the same property on Trulia, found by the campaign's own address, because Trulia is
          the same inventory and its gallery survives the reader where Movoto's does not.
 
