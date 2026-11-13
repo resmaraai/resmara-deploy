@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The project's test suite: every isolated check, in one command.
 #
-#   ./scripts/run_tests.sh              # uses `python3`
+#   ./scripts/run_tests.sh              # the project's venv, else `python3`
 #   PYTHON=/path/to/.venv/bin/python ./scripts/run_tests.sh
 #
 # Exits non-zero on the first failure. Deliberately excludes tests/smoke_live.py,
@@ -10,7 +10,16 @@
 # `scripts/selfcheck.py --base <url>` is that check.
 set -uo pipefail
 cd "$(dirname "$0")/.."
-PY="${PYTHON:-python3}"
+
+# The app's own dependencies live in the project venv; the system interpreter has no fastapi, so
+# a bare `python3` fails at import and says nothing about the code. Prefer the venv that is here.
+if [ -n "${PYTHON:-}" ]; then
+  PY="$PYTHON"
+elif [ -x ./venv/bin/python3 ]; then
+  PY=./venv/bin/python3
+else
+  PY=python3
+fi
 export PYTHONPATH="$PWD"
 
 fail=0
