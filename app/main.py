@@ -78,10 +78,15 @@ def version():
     code arrived. This makes it a one-line check, with no secret in the answer.
     """
     import os as _os
+    from app.services import mail as _mail
     return {
         "commit": (_os.getenv("RENDER_GIT_COMMIT") or _os.getenv("GIT_COMMIT") or "unknown")[:12],
         "branch": _os.getenv("RENDER_GIT_BRANCH") or "",
         "env": settings.ENV,
+        # Whether transactional mail is connected. No key, no address, just yes or no — so
+        # "did the provider I just configured take effect?" is a curl, not a guess.
+        "mail": _mail.mail_configured(),
+        "alerts": bool((_os.getenv("RESMARA_ALERT_WEBHOOK") or "").strip()),
     }
 
 
