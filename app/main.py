@@ -69,6 +69,22 @@ app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads"
 app.include_router(api_router, prefix="/api")
 
 
+@app.get("/api/version", include_in_schema=False)
+def version():
+    """Which commit is actually running here.
+
+    Render answers the deploy hook with 202 and builds in the background, and a failed build
+    keeps serving the previous container — so "the push went through" is not evidence that the
+    code arrived. This makes it a one-line check, with no secret in the answer.
+    """
+    import os as _os
+    return {
+        "commit": (_os.getenv("RENDER_GIT_COMMIT") or _os.getenv("GIT_COMMIT") or "unknown")[:12],
+        "branch": _os.getenv("RENDER_GIT_BRANCH") or "",
+        "env": settings.ENV,
+    }
+
+
 @app.get("/robots.txt", include_in_schema=False)
 def robots():
     """A testing site should not be indexed. Remove this once the beta gate comes off."""
