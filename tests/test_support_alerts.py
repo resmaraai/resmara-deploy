@@ -29,7 +29,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.main import app  # noqa: E402
 from app.services import mail  # noqa: E402
 from app.api import resmara as api  # noqa: E402
-from app.db.session import Base, engine  # noqa: E402
+from app.db.session import Base, engine, SessionLocal, Event  # noqa: E402
 from app.db.migrate import migrate  # noqa: E402
 
 Base.metadata.create_all(bind=engine)
@@ -77,6 +77,18 @@ try:
     check("and nothing is mailed", sent == [], str(sent))
     ticket_id = r.json().get("id")
 
+    # The silence was the bug Dan could see: a ticket that reached nobody looked identical to
+    # one that was delivered. The outcome is now recorded against the ticket.
+    db = SessionLocal()
+    ev = (db.query(Event).filter(Event.event_type == "ticket_notified")
+          .order_by(Event.id.desc()).first())
+    check("the delivery outcome is recorded", ev is not None)
+    check("and it says the ticket reached nobody",
+          ev is not None and (ev.payload or {}).get("channel") == "none", ev and ev.payload)
+    check("with the reason spelled out",
+          ev is not None and "console" in ((ev.payload or {}).get("reason") or ""), ev and ev.payload)
+    db.close()
+
     # ---- with a provider: every operator address gets it ------------------------------
     mail.mail_configured = lambda: True
     api.mail.mail_configured = mail.mail_configured
@@ -92,6 +104,50 @@ try:
     check("what the customer wrote is in the mail", "gallery link shows one photo" in blob, blob[:200])
     check("the customer's address is in the mail", "client@example.com" in blob, blob[:200])
     check("the console link is in the mail", "admin.html" in blob, blob[:200])
+
+    db = SessionLocal()
+    ev = (db.query(Event).filter(Event.event_type == "ticket_notified")
+          .order_by(Event.id.desc()).first())
+    check("a delivered ticket is recorded as delivered",
+          ev is not None and (ev.payload or {}).get("channel") == "email", ev and ev.payload)
+    check("with both addresses in the record",
+          ev is not None and len((ev.payload or {}).get("delivered") or []) == 2, ev and ev.payload)
+    db.close()
+
+    # ---- no mail provider, but an alert webhook: the ticket still reaches a person --------
+    mail.mail_configured = lambda: False
+    api.mail.mail_configured = mail.mail_configured
+    os.environ["RESMARA_ALERT_WEBHOOK"] = "https://hooks.example.test/services/x"
+
+    class FakeResponse:
+        status_code = 200
+
+    posted: list[dict] = []
+
+    def fake_post(url, json=None, timeout=None, **kwargs):
+        posted.append({"url": url, "json": json})
+        return FakeResponse()
+
+    real_post = api.httpx.post
+    api.httpx.post = fake_post
+    try:
+        r = client.post("/api/support", json={"subject": "Webhook path",
+                                              "message": "Does this reach anyone?"},
+                        headers=headers)
+        check("a ticket is accepted with a webhook only", r.status_code == 201, r.text)
+        check("the webhook was called once", len(posted) == 1, str(len(posted)))
+        payload = (posted[0]["json"] if posted else {})
+        check("with the ticket in the body", "Does this reach anyone?" in str(payload.get("text")), str(payload)[:200])
+        check("and both vendor keys present", "content" in payload and "text" in payload, str(list(payload)))
+        db = SessionLocal()
+        ev = (db.query(Event).filter(Event.event_type == "ticket_notified")
+              .order_by(Event.id.desc()).first())
+        check("the webhook delivery is recorded",
+              ev is not None and (ev.payload or {}).get("channel") == "webhook", ev and ev.payload)
+        db.close()
+    finally:
+        api.httpx.post = real_post
+        os.environ.pop("RESMARA_ALERT_WEBHOOK", None)
 finally:
     mail.mail_configured = real_configured
     mail.send_email = real_send
