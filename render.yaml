@@ -54,3 +54,35 @@ services:
       #   python scripts/make_token_key.py  → paste the output into RESMARA_TOKEN_KEY
       # - key: RESMARA_TOKEN_KEY
       #   sync: false
+
+  # The scheduler. Without this service nothing calls the publisher: a post can be approved
+  # and scheduled and then sit there forever, because "scheduled" is a clock, and a clock
+  # needs someone to look at it. Every 15 minutes this container opens the database directly
+  # and publishes what is due, then exits — Render bills the run in seconds, ~$1/month floor.
+  - type: cron
+    name: resmara-publisher
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python scripts/publish_due.py
+    schedule: "*/15 * * * *"     # UTC, Render's cron dial is UTC: 15 minutes, always
+    plan: 0.5c-512mb            # cron jobs have no free plan; this is the cheapest ($1/mo floor)
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: resmara-db
+          property: connectionString
+      - key: RESMARA_ENV
+        value: production
+      # A cron container has no inbound request, so PUBLIC_BASE_URL cannot be inferred here the
+      # way it is in the web service. Instagram fetches post images by URL: without this the
+      # media URL would name the cron job's own host and every photo post would fail.
+      - key: RESMARA_PUBLIC_BASE_URL
+        value: https://www.resmara.com
+      # Ad-account tokens are encrypted with a key derived from SECRET_KEY, so this service must
+      # hold the same secret as the web service or every stored Meta token is unreadable.
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: resmara
+          envVarKey: SECRET_KEY
+
