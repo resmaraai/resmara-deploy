@@ -8,7 +8,7 @@ Running now on this machine: `http://127.0.0.1:8083` (public:
 `https://sport.taila73942.ts.net/resmara/`, operator console `/resmara/admin.html`,
 API explorer `/resmara/docs`).
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/dannyphantom303/resmara)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/resmaraai/resmara)
 
 **Hosting it somewhere else?** Read [`DEPLOY.md`](DEPLOY.md) — container/compose files,
 the `.env` values a real host must set, the two scheduled jobs, the Meta settings for a new
