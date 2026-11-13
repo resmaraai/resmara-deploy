@@ -37,4 +37,9 @@ jobs:
           fi
           code=$(curl -s -o /tmp/hook.out -w '%{http_code}' -X POST "$HOOK")
           echo "deploy hook answered HTTP $code"
-          [ "$code" = "200" ] || { cat /tmp/hook.out; exit 1; }
+          # Render answers 202 "Accepted" now that the hook only queues a build. Any 2xx is a
+          # queued deploy; the build's own result lives in the Render dashboard.
+          case "$code" in
+            2??) ;;
+            *) cat /tmp/hook.out; exit 1 ;;
+          esac
