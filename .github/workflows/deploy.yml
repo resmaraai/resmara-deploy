@@ -4,6 +4,13 @@
 # must be deployed manually"). This workflow restores the missing half of the
 # ship loop: every push to main calls the service's deploy hook, so a push is
 # still the deploy.
+#
+# Which repository deploys: the *mirror* (resmaraai/resmara-deploy), because that is the Git URL
+# Render builds. The source repository carries the same workflow so a push is still the whole
+# ship loop from here, but its copies of the hook secret are deliberately absent — two repos
+# calling one hook is two builds of the same commit. So on the source repository the job records
+# a skip rather than failing: a red X on every push trains everyone to ignore the one that
+# matters.
 name: Deploy to Render
 
 on:
@@ -24,8 +31,9 @@ jobs:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
           if [ -z "$HOOK" ]; then
-            echo "RENDER_DEPLOY_HOOK secret is not set" >&2
-            exit 1
+            echo "No RENDER_DEPLOY_HOOK secret on this repository — it does not deploy."
+            echo "The mirror (resmaraai/resmara-deploy) holds the hook and builds this commit."
+            exit 0
           fi
           code=$(curl -s -o /tmp/hook.out -w '%{http_code}' -X POST "$HOOK")
           echo "deploy hook answered HTTP $code"
