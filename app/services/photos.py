@@ -830,7 +830,8 @@ def _looks_like_a_wall(html: str) -> bool:
     return False
 
 
-async def _fetch_html(client: httpx.AsyncClient, url: str, trace: list | None = None) -> str:
+async def _fetch_html(client: httpx.AsyncClient, url: str, trace: list | None = None,
+                      force_reader: bool = False) -> str:
     """The page's HTML, direct if the site allows it, otherwise through a hosted reader.
 
     Zillow, Realtor, Redfin, Homes.com, Movoto and Trulia all answer 403 to a datacenter IP
@@ -845,16 +846,17 @@ async def _fetch_html(client: httpx.AsyncClient, url: str, trace: list | None = 
         if trace is not None:
             trace.append({"url": url, "outcome": outcome})
 
-    try:
-        resp = await client.get(url, headers=_CHROME_HEADERS)
-        note(resp.status_code)
-        if resp.status_code == 200 and len(resp.text) > 2000:
-            if not _looks_like_a_wall(resp.text):
-                return resp.text
-            note("wall")
-    except httpx.HTTPError as exc:
-        status = getattr(getattr(exc, "response", None), "status_code", None)
-        note(status or exc.__class__.__name__)
+    if not force_reader:
+        try:
+            resp = await client.get(url, headers=_CHROME_HEADERS)
+            note(resp.status_code)
+            if resp.status_code == 200 and len(resp.text) > 2000:
+                if not _looks_like_a_wall(resp.text):
+                    return resp.text
+                note("wall")
+        except httpx.HTTPError as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            note(status or exc.__class__.__name__)
 
     headers = dict(_CHROME_HEADERS)
     headers["X-Respond-With"] = "html"
@@ -934,12 +936,30 @@ async def _photos_on_page(client: httpx.AsyncClient, url: str, limit: int,
         if photos:
             return photos[:limit]
 
-    if "sparkplatform" in html or "flexmls" in host:
-        photos = spark_photo_urls(html, limit=limit)
-        if photos:
-            return photos[:limit]
+    spark_page = "sparkplatform" in html or "flexmls" in host
+    photos = spark_photo_urls(html, limit=limit) if spark_page else []
+    # One photo out of a Flexmls page is its hero, not a gallery: a real gallery is two or
+    # more, and anything less means this HTML is the app's shell rather than the listing.
+    if len(photos) >= 2:
+        return photos[:limit]
 
-    photos = extract_image_urls(html, url, limit=limit)
+    for url_ in extract_image_urls(html, url, limit=limit):
+        if url_ not in photos:
+            photos.append(url_)
+
+    # Production and development disagree about MLS portals: Render's IP is handed a thin
+    # shell where a home connection gets the whole listing. When the direct page gave up
+    # fewer photos than a gallery, ask the reader for the rendered page and read that too.
+    if len(photos) < 4:
+        rendered = await _fetch_html(client, url, trace, force_reader=True)
+        if rendered and rendered != html:
+            gallery = spark_photo_urls(rendered, limit=limit) if "sparkplatform" in rendered else []
+            if len(gallery) >= 2:
+                return gallery[:limit]
+            for url_ in extract_image_urls(rendered, url, limit=limit):
+                if url_ not in photos:
+                    photos.append(url_)
+
     # A public MLS / IDX / share link is a shop window: the gallery lives one page deeper.
     # Follow the page's own pointer before giving up on it — that is where the photos are.
     if len(photos) < 4:

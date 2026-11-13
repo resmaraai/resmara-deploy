@@ -287,6 +287,40 @@ def main() -> int:
     check("the direct request is reported, not hidden",
           any(t.get("outcome") == 403 for t in trace), str(trace))
 
+    # --- a thin Flexmls shell: the direct page holds the hero, the reader holds the gallery -
+    # This is the production split that made an MLS import bring back one photo: Render's IP
+    # gets 200 OK and an app shell, a home connection gets the listing. Status 200 with a
+    # single hero is not a gallery, so the reader has to be asked.
+    SPARK_SHELL = ("<html><head><meta property='og:image' "
+                   "'content='https://cdn.photos.sparkplatform.com/sha/2026013007084.jpg'>"
+                   "</head><body><div id='app'>Loading…</div></body></html>"
+                   + "<!-- " + "s" * 2400 + " -->")
+    SPARK_RENDERED = "".join(
+        f'<img src="https://cdn.resize.sparkplatform.com/sha/1280x1024/true/{mid}-o.jpg">'
+        for mid in ("20260730022520745558000000", "20260730022523103650000000",
+                    "20260730022525456578000000", "20260730022527408518000000"))
+    asked = []
+
+    def shell_handler(request: httpx.Request) -> httpx.Response:
+        asked.append("reader" if request.url.host == "r.jina.ai" else "direct")
+        if request.url.host == "r.jina.ai":
+            return httpx.Response(200, text=SPARK_RENDERED)
+        return httpx.Response(200, text=SPARK_SHELL)
+
+    async def run_shell():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(shell_handler),
+                                     follow_redirects=True) as mock:
+            return await photos.discover(
+                "https://my.flexmls.com/office/search/listings/20260729023949229931000000",
+                limit=20, client=mock, address="", trace=[])
+
+    shell = asyncio.run(run_shell())
+    check("a 200 shell with one hero is not accepted as a gallery", len(shell) == 4, str(shell))
+    check("the rendered page is asked for when the direct one is thin",
+          "reader" in asked, str(asked))
+    check("and every photo belongs to the one listing",
+          len({u.split("/")[-1][:8] for u in shell}) == 1, str(shell))
+
     # --- download + store, through a mock transport ---------------------------------------
     jpeg = b"\xff\xd8\xff\xe0" + b"0" * 2048
     png = b"\x89PNG\r\n\x1a\n" + b"0" * 1024
