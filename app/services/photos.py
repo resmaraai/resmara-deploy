@@ -16,6 +16,7 @@ import os
 import re
 import urllib.parse
 import uuid
+from datetime import datetime
 from urllib.parse import urljoin, urlparse, urlsplit
 
 import httpx
@@ -247,6 +248,7 @@ _SECOND_URL_KEY_RE = re.compile(
     r"[\"'](?:(?:listing|detail|public|share|viewer|embed|gallery|media|photos?|virtualTour|tour)?"
     r"(?:url|link|href))[\"']\s*:\s*[\"'](https?://[^\"'\\]{10,600}|/[^\"'\\]{3,600})[\"']", re.I)
 _GALLERY_ANCHOR_RE = re.compile(r"<a\b[^>]*>", re.I)
+_MD_LINK_RE = re.compile(r"\[([^\]\n]{1,80})\]\((https?://[^)\s]{8,500})\)")
 
 
 def _page_key(url: str) -> str:
@@ -322,7 +324,71 @@ def hidden_second_urls(html: str, page_url: str, limit: int = 3) -> list[str]:
            re.search(r"(photo|gallery|media|picture|tour)", label):
             offer(href)
 
+    # A page pulled through a reader (r.jina.ai and friends) comes back as markdown, so its
+    # pointer arrives as [View all 52 photos](https://...) and the tag scan above never sees
+    # it. Same intent, different skin - read the label the way the anchor scan reads title.
+    for label, href in _MD_LINK_RE.findall(html):
+        if re.search(r"(photo|gallery|media|picture|tour|slideshow|permalink|\bview all\b)", label, re.I) or \
+           re.search(r"(photos?|gallery|media|slideshow)(/|$|\?|=)", href, re.I):
+            offer(href)
+
     return out[:limit]
+
+
+_SPARK_URL_RE = re.compile(
+    r"https?://cdn(?:\.resize|\.photos)?\.sparkplatform\.com/[^\s\"'<>\\]+?(\d{20,})(?:-o)?\.jpg", re.I)
+_SPARK_SIZE_RE = re.compile(r"/(\d{3,5})x(\d{3,5})/")
+
+
+def _spark_id(url: str) -> tuple[str, int]:
+    """(media id, pixel width) for a Spark Platform photo URL, or ('', 0)."""
+    m = _SPARK_URL_RE.search(url or "")
+    if not m:
+        return "", 0
+    size = _SPARK_SIZE_RE.search(url)
+    return m.group(1), int(size.group(1)) if size else 0
+
+
+def spark_photo_urls(html: str, limit: int = DEFAULT_LIMIT) -> list[str]:
+    """One Flexmls listing's gallery out of a Spark Platform page.
+
+    A flexmls detail page is not one gallery. It carries the listing's own photos, the same
+    photos again at 640x480, and a carousel of *other* active listings - so a naive read of
+    every sparkplatform URL imports somebody else's house next to yours. Two facts sort it
+    out: Spark media ids are timestamped (``20260730022520745558000000`` is 30 Jul 2026
+    02:25:20 + a counter), and the photos of one listing are uploaded in one sitting, so they
+    land minutes apart. Keep the largest copy of each id, then keep the biggest cluster of
+    ids that sit within half an hour of each other - that cluster is the gallery.
+    """
+    best: dict[str, tuple[int, str]] = {}
+    order: list[str] = []
+    for m in _SPARK_URL_RE.finditer(html or ""):
+        media_id, width = _spark_id(m.group(0))
+        if not media_id:
+            continue
+        if media_id not in best:
+            order.append(media_id)
+            best[media_id] = (width, m.group(0))
+        elif width > best[media_id][0]:
+            best[media_id] = (width, m.group(0))
+    if not best:
+        return []
+
+    def stamp(media_id: str) -> float:
+        try:
+            return datetime.strptime(media_id[:14], "%Y%m%d%H%M%S").timestamp()
+        except ValueError:
+            return 0.0
+
+    clusters: list[list[str]] = []
+    for media_id in sorted(order, key=stamp):
+        when = stamp(media_id)
+        if clusters and when - stamp(clusters[-1][-1]) <= 1800:
+            clusters[-1].append(media_id)
+        else:
+            clusters.append([media_id])
+    gallery = max(clusters, key=len)
+    return [best[i][1] for i in gallery][:limit]
 
 
 def extract_image_urls(html: str, base_url: str, limit: int = DEFAULT_LIMIT) -> list[str]:
@@ -865,6 +931,11 @@ async def _photos_on_page(client: httpx.AsyncClient, url: str, limit: int,
         # wide, so the original is ~8x the bytes for detail nobody sees, and on a free
         # database every campaign's gallery is stored as bytes.
         photos = trulia_photo_urls(html, full_res=False)
+        if photos:
+            return photos[:limit]
+
+    if "sparkplatform" in html or "flexmls" in host:
+        photos = spark_photo_urls(html, limit=limit)
         if photos:
             return photos[:limit]
 

@@ -162,6 +162,38 @@ def main() -> int:
     check("another advertiser's image is not part of the gallery",
           not any("agent-ad" in u for u in mls), str(mls))
 
+    # --- a Flexmls page is not one gallery ------------------------------------------------
+    # A Spark Platform detail page carries the listing's photos twice (1280 and 640) and a
+    # carousel of other agents' listings beside them. Taking every URL imported somebody
+    # else's house into the gallery.
+    SPARK_PAGE = "".join(
+        f'<img src="https://cdn.resize.sparkplatform.com/sha/{w}x{h}/true/{mid}-o.jpg">'
+        for mid in ("20260730022520745558000000", "20260730022523103650000000",
+                    "20260730022525456578000000")
+        for w, h in ((1280, 1024), (640, 480))
+    ) + "".join(
+        f'<img src="https://cdn.resize.sparkplatform.com/sha/640x480/true/{mid}-o.jpg">'
+        for mid in ("20261106225325155892000000", "20260911212536072403000000")
+    )
+    spark = photos.spark_photo_urls(SPARK_PAGE, limit=20)
+    check("a Flexmls gallery keeps every photo of the listing", len(spark) == 3, str(spark))
+    check("the 640px copy of a photo is dropped for the 1280px one",
+          all("/1280x1024/" in u for u in spark), str(spark))
+    check("the carousel of other listings is not imported",
+          not any(mid in u for u in spark
+                  for mid in ("20261106225325155892000000", "20260911212536072403000000")),
+          str(spark))
+
+    # --- the page's own pointer to the gallery, however the page arrives ------------------
+    # A reader (r.jina.ai) hands markdown back, so the pointer is [View all 52 photos](...) —
+    # no tag to scan, which is how a page with a full gallery imported one photo.
+    MD_POINTER = ("# 892 Coggins St\n\n[View all 52 photos]"
+                  "(https://www.mls.example.test/listing/26-2848/photos)\n\n"
+                  "![Image 1](https://cdn.mls.example.test/hero-o.jpg)")
+    pointers = photos.hidden_second_urls(MD_POINTER, "https://www.mls.example.test/listing/26-2848")
+    check("a markdown gallery pointer is followed",
+          pointers and pointers[0].endswith("/26-2848/photos"), str(pointers))
+
     # --- the address, however it was typed ----------------------------------------------
     # Adam's campaign held "892 Coggins Street Redding CA". The old parser demanded commas,
     # answered "no city", and the Trulia top-up was skipped without a word.

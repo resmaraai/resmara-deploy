@@ -322,18 +322,75 @@ def operator_addresses(db: Session) -> list[str]:
     return out
 
 
-def notify_operators(ticket: SupportTicket, author: User, db: Session) -> None:
-    if not mail.mail_configured():
-        return
+def _ticket_body(ticket: SupportTicket, author: User) -> str:
     first = (ticket.messages or [{}])[0] if ticket.messages else {}
-    body = ("A customer raised a support request.\n\n"
+    return ("A customer raised a support request.\n\n"
             f"From: {author.email} ({author.name or 'no name'})\n"
             f"Ticket: #{ticket.id}\n"
             f"Subject: {ticket.subject}\n\n"
             f"{first.get('text', '')}\n\n"
             "Reply from the operator console: https://www.resmara.com/admin.html\n")
-    for address in operator_addresses(db):
-        mail.send_email(address, f"Resmara support #{ticket.id}: {ticket.subject}"[:180], body)
+
+
+def _alert_webhook() -> str:
+    """An optional second channel that needs no mail provider: any URL that accepts JSON.
+
+    Slack and Discord incoming webhooks both take a JSON object and both ignore the key they
+    do not know, so one body reaches either — which is the point: a ticket nobody is told
+    about is the failure mode being fixed here, and the channel should not depend on one
+    vendor's signup being finished.
+    """
+    return (os.getenv("RESMARA_ALERT_WEBHOOK") or "").strip()
+
+
+def notify_operators(ticket: SupportTicket, author: User, db: Session) -> dict:
+    """Tell the operators about a new ticket, and record what actually happened.
+
+    Returns {'channel': 'email'|'webhook'|'none', 'delivered': [...], 'failed': [...],
+    'reason': str}. The result is written to the event log so "did anyone get told?" has an
+    answer that is not a shrug — the previous version returned silently when no provider was
+    configured, which made a failed delivery look exactly like a successful one.
+    """
+    body = _ticket_body(ticket, author)
+    subject = f"Resmara support #{ticket.id}: {ticket.subject}"[:180]
+    outcome = {"channel": "none", "delivered": [], "failed": [], "reason": ""}
+
+    addresses = operator_addresses(db)
+    if mail.mail_configured():
+        outcome["channel"] = "email"
+        for address in addresses:
+            try:
+                ok = mail.send_email(address, subject, body)
+            except Exception:  # a broken relay must not lose the ticket itself
+                ok = False
+            (outcome["delivered"] if ok else outcome["failed"]).append(address)
+        if not outcome["delivered"]:
+            outcome["reason"] = "mail is configured but every send failed"
+    elif _alert_webhook():
+        outcome["channel"] = "webhook"
+        try:
+            resp = httpx.post(_alert_webhook(), json={"text": body, "content": body}, timeout=15)
+            if resp.status_code < 400:
+                outcome["delivered"].append("webhook")
+            else:
+                outcome["failed"].append(f"webhook HTTP {resp.status_code}")
+                outcome["reason"] = f"alert webhook answered HTTP {resp.status_code}"
+        except httpx.HTTPError as exc:
+            outcome["failed"].append(f"webhook {exc.__class__.__name__}")
+            outcome["reason"] = f"alert webhook failed: {exc.__class__.__name__}"
+    else:
+        outcome["reason"] = ("no mail provider and no RESMARA_ALERT_WEBHOOK: the ticket is "
+                             "only in the operator console")
+
+    try:
+        db.add(Event(user_id=author.id, event_type="ticket_notified",
+                     payload={"ticket_id": ticket.id, **outcome}))
+        db.commit()
+    except Exception:
+        db.rollback()
+    if not outcome["delivered"]:
+        print(f"[resmara] support #{ticket.id} reached nobody: {outcome['reason']}")
+    return outcome
 
 
 
