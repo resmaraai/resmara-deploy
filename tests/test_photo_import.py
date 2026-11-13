@@ -321,6 +321,38 @@ def main() -> int:
     check("and every photo belongs to the one listing",
           len({u.split("/")[-1][:8] for u in shell}) == 1, str(shell))
 
+    # --- a Flexmls share link: the HTML render holds a hero, the text render holds 52 photos -
+    # www.flexmls.com/share/<token>/<address> is CAPTCHA-walled, and the reader that gets past
+    # it hands back a 1.5 KB shell when asked for HTML and the whole gallery when asked for
+    # text. Asking only for HTML is exactly how this link imported one photo.
+    SHARE_HTML = ("<html><head><meta property='og:image' content='https://cdn0.photos."
+                  "sparkplatform.com/sha/20260603202905830159000000-o.jpg'></head>"
+                  "<body></body></html>" + "<!-- " + "h" * 2400 + " -->")
+    SHARE_TEXT = "Title: 892 Coggins Street, Redding, CA 96003\n\n" + "\n".join(
+        f"![Image](https://cdn.resize.sparkplatform.com/sha/1280x1024/true/{mid}-o.jpg)"
+        for mid in ("20260603202905830159000000", "20260603202910102143000000",
+                    "20260603202915876694000000", "20260603202928031394000000"))
+    formats: list[str] = []
+
+    def share_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "r.jina.ai":
+            fmt = request.headers.get("x-respond-with", "markdown")
+            formats.append(fmt)
+            return httpx.Response(200, text=SHARE_HTML if fmt == "html" else SHARE_TEXT)
+        return httpx.Response(200, text=SHARE_HTML)
+
+    async def run_share():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(share_handler),
+                                     follow_redirects=True) as mock:
+            return await photos.discover(
+                "https://www.flexmls.com/share/EpNjd/892-Coggins-Street,-Redding,-CA-96003",
+                limit=20, client=mock, address="", trace=[])
+
+    shared = asyncio.run(run_share())
+    check("a Flexmls share link imports the gallery, not its hero", len(shared) == 4, str(shared))
+    check("the text render is asked for when the HTML one is a shell",
+          "markdown" in formats, str(formats))
+
     # --- download + store, through a mock transport ---------------------------------------
     jpeg = b"\xff\xd8\xff\xe0" + b"0" * 2048
     png = b"\x89PNG\r\n\x1a\n" + b"0" * 1024

@@ -336,7 +336,7 @@ def hidden_second_urls(html: str, page_url: str, limit: int = 3) -> list[str]:
 
 
 _SPARK_URL_RE = re.compile(
-    r"https?://cdn(?:\.resize|\.photos)?\.sparkplatform\.com/[^\s\"'<>\\]+?(\d{20,})(?:-o)?\.jpg", re.I)
+    r"https?://cdn\d*(?:\.resize|\.photos)?\.sparkplatform\.com/[^\s\"'<>\\]+?(\d{20,})(?:-o)?\.jpg", re.I)
 _SPARK_SIZE_RE = re.compile(r"/(\d{3,5})x(\d{3,5})/")
 
 
@@ -831,7 +831,7 @@ def _looks_like_a_wall(html: str) -> bool:
 
 
 async def _fetch_html(client: httpx.AsyncClient, url: str, trace: list | None = None,
-                      force_reader: bool = False) -> str:
+                      force_reader: bool = False, reader_format: str = "html") -> str:
     """The page's HTML, direct if the site allows it, otherwise through a hosted reader.
 
     Zillow, Realtor, Redfin, Homes.com, Movoto and Trulia all answer 403 to a datacenter IP
@@ -859,7 +859,13 @@ async def _fetch_html(client: httpx.AsyncClient, url: str, trace: list | None = 
             note(status or exc.__class__.__name__)
 
     headers = dict(_CHROME_HEADERS)
-    headers["X-Respond-With"] = "html"
+    if reader_format == "html":
+        headers["X-Respond-With"] = "html"
+    # The reader keeps a snapshot of every page it has ever rendered, and for a listing it
+    # captured while the page was still a challenge shell that snapshot is empty (247 bytes:
+    # a title and nothing else). A cached empty page is worse than a miss because it looks
+    # like an answer - it is how a 52-photo Flexmls share link imported one photo.
+    headers["X-No-Cache"] = "true"
     key = os.getenv("JINA_API_KEY")
     if key:
         headers["Authorization"] = f"Bearer {key}"
@@ -951,12 +957,30 @@ async def _photos_on_page(client: httpx.AsyncClient, url: str, limit: int,
     # shell where a home connection gets the whole listing. When the direct page gave up
     # fewer photos than a gallery, ask the reader for the rendered page and read that too.
     if len(photos) < 4:
-        rendered = await _fetch_html(client, url, trace, force_reader=True)
-        if rendered and rendered != html:
-            gallery = spark_photo_urls(rendered, limit=limit) if "sparkplatform" in rendered else []
+        used_reader = any(isinstance(t.get("outcome"), str) and
+                          str(t.get("outcome")).startswith("reader:") and t.get("url") == url
+                          for t in (trace or []))
+        if not used_reader:
+            rendered = await _fetch_html(client, url, trace, force_reader=True)
+            if rendered and rendered != html:
+                gallery = (spark_photo_urls(rendered, limit=limit)
+                           if "sparkplatform" in rendered else [])
+                if len(gallery) >= 2:
+                    return gallery[:limit]
+                for url_ in extract_image_urls(rendered, url, limit=limit):
+                    if url_ not in photos:
+                        photos.append(url_)
+
+    # A Flexmls share link hands a *text* reader the whole gallery and an HTML reader a shell
+    # with one hero in it: the 52 photos live in the markdown render, not the tags. Ask for
+    # that render before deciding a link has one photo.
+    if len(photos) < 4:
+        text = await _fetch_html(client, url, trace, force_reader=True, reader_format="markdown")
+        if text:
+            gallery = spark_photo_urls(text, limit=limit) if "sparkplatform" in text else []
             if len(gallery) >= 2:
                 return gallery[:limit]
-            for url_ in extract_image_urls(rendered, url, limit=limit):
+            for url_ in extract_image_urls(text, url, limit=limit):
                 if url_ not in photos:
                     photos.append(url_)
 
