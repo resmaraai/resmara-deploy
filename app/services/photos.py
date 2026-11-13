@@ -11,6 +11,7 @@ network; only ``discover`` and ``import_from_urls`` touch HTTP.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -866,6 +867,9 @@ async def _fetch_html(client: httpx.AsyncClient, url: str, trace: list | None = 
     # a title and nothing else). A cached empty page is worse than a miss because it looks
     # like an answer - it is how a 52-photo Flexmls share link imported one photo.
     headers["X-No-Cache"] = "true"
+    # Their renderer gives up early and answers 200 with a few hundred bytes of nothing when
+    # it is busy, so ask it to wait for the page instead of snapshotting the wait screen.
+    headers["X-Timeout"] = "60"
     key = os.getenv("JINA_API_KEY")
     if key:
         headers["Authorization"] = f"Bearer {key}"
@@ -953,36 +957,25 @@ async def _photos_on_page(client: httpx.AsyncClient, url: str, limit: int,
         if url_ not in photos:
             photos.append(url_)
 
-    # Production and development disagree about MLS portals: Render's IP is handed a thin
-    # shell where a home connection gets the whole listing. When the direct page gave up
-    # fewer photos than a gallery, ask the reader for the rendered page and read that too.
+    # Render's IP is handed a thin shell where a home connection gets the listing, and the
+    # hosted reader that can see the page is flaky: the same URL came back as 349 bytes, then
+    # 176 KB, then 247 bytes on three consecutive asks. So a walled MLS page is asked again
+    # until a render actually carries a gallery, and a render that carries nothing is not an
+    # answer. Markdown, not HTML: a Flexmls share link's 52 photos are in the text render,
+    # while its HTML render is a shell holding the one hero image.
     if len(photos) < 4:
-        used_reader = any(isinstance(t.get("outcome"), str) and
-                          str(t.get("outcome")).startswith("reader:") and t.get("url") == url
-                          for t in (trace or []))
-        if not used_reader:
-            rendered = await _fetch_html(client, url, trace, force_reader=True)
-            if rendered and rendered != html:
-                gallery = (spark_photo_urls(rendered, limit=limit)
-                           if "sparkplatform" in rendered else [])
+        for attempt in range(3):
+            text = await _fetch_html(client, url, trace, force_reader=True, reader_format="markdown")
+            if text:
+                gallery = spark_photo_urls(text, limit=limit) if "sparkplatform" in text else []
                 if len(gallery) >= 2:
                     return gallery[:limit]
-                for url_ in extract_image_urls(rendered, url, limit=limit):
+                for url_ in extract_image_urls(text, url, limit=limit):
                     if url_ not in photos:
                         photos.append(url_)
-
-    # A Flexmls share link hands a *text* reader the whole gallery and an HTML reader a shell
-    # with one hero in it: the 52 photos live in the markdown render, not the tags. Ask for
-    # that render before deciding a link has one photo.
-    if len(photos) < 4:
-        text = await _fetch_html(client, url, trace, force_reader=True, reader_format="markdown")
-        if text:
-            gallery = spark_photo_urls(text, limit=limit) if "sparkplatform" in text else []
-            if len(gallery) >= 2:
-                return gallery[:limit]
-            for url_ in extract_image_urls(text, url, limit=limit):
-                if url_ not in photos:
-                    photos.append(url_)
+            if len(photos) >= 4 or attempt == 2:
+                break
+            await asyncio.sleep(2)
 
     # A public MLS / IDX / share link is a shop window: the gallery lives one page deeper.
     # Follow the page's own pointer before giving up on it — that is where the photos are.
