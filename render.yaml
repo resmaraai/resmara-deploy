@@ -3,6 +3,27 @@
 # Render reads this file, builds ./Dockerfile, creates the database, wires the connection
 # string in, and redeploys on every merge to main. Anything marked sync:false is asked for
 # once in the dashboard and never stored in git.
+# --- Pull-request preview environments -------------------------------------------------
+# One temporary copy of this stack per pull request, so a change can be clicked through on a
+# real host before it is merged. This block is the declaration; it does NOT turn previews on
+# by itself, and today nothing here is active. Two things have to be true first:
+#
+#   1. A Blueprint linked to this repo in the Render dashboard. There is none right now: the
+#      live `resmara` service and `resmara-db` were created by hand in the dashboard, so Render
+#      never reads this file. Until a Blueprint exists, render.yaml is documentation, not
+#      configuration — and syncing one over hand-made resources is a migration, not a click
+#      (it can try to create second copies of the service and database).
+#   2. A Pro workspace plan ($25/mo). Hobby includes only single-service previews, which reuse
+#      the production env — including DATABASE_URL — so a preview would read and write the live
+#      database. Full-stack previews (their own empty database) are Pro and above.
+#
+# Also true when it does go live: env vars marked `sync: false` (META_CLIENT_SECRET, the engine
+# keys) are NOT copied into a preview, so Meta login in a preview needs an environment group.
+# `expireAfterDays: 3` deletes a preview three days after its last commit.
+previews:
+  generation: automatic
+  expireAfterDays: 3
+
 databases:
   - name: resmara-db
     databaseName: resmara
