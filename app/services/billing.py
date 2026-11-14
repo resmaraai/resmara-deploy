@@ -42,6 +42,104 @@ def price_label(cents: int | None = None) -> str:
     return "$%d" % (cents // 100) if cents % 100 == 0 else "$%.2f" % (cents / 100.0)
 
 
+# ── campaign packs (the repeat purchase) ───────────────────────────────────────────────────
+# One campaign at a time is a one-off sale, and a one-off sale cannot pay for a customer: an
+# agent who buys once is worth $49 and a paid acquisition costs more than that. Agents list
+# several homes a year and run several campaigns on each, so the product sells a *pack* of
+# campaigns up front. Default is exactly pack x the single price — no discount invented — and
+# the size/price are env-overridable so an offer can change without a deploy.
+DEFAULT_PACK_SIZE = 4
+
+
+def pack_size() -> int:
+    raw = (os.getenv("STRIPE_PACK_SIZE") or "").strip()
+    try:
+        size = int(raw) if raw else DEFAULT_PACK_SIZE
+    except ValueError:
+        size = DEFAULT_PACK_SIZE
+    return size if 2 <= size <= 24 else DEFAULT_PACK_SIZE
+
+
+def pack_price_cents(size: int | None = None) -> int:
+    """What a pack costs. Default: the single price times the pack, i.e. no hidden discount."""
+    size = pack_size() if size is None else size
+    raw = (os.getenv("STRIPE_PACK_PRICE_CENTS") or "").strip()
+    if raw:
+        try:
+            cents = int(raw)
+            if cents > 0:
+                return cents
+        except ValueError:
+            pass
+    return price_cents() * size
+
+
+def pack_label(size: int | None = None) -> str:
+    size = pack_size() if size is None else size
+    return "%d campaigns for %s" % (size, price_label(pack_price_cents(size)))
+
+
+def _pack_success_url(base: str) -> str:
+    return "%s/?checkout=success&pack=1" % base.rstrip("/")
+
+
+def _pack_cancel_url(base: str) -> str:
+    return "%s/?checkout=cancelled&pack=1" % base.rstrip("/")
+
+
+def pack_checkout_payload(user_id: int, base_url: str, size: int | None = None,
+                          cents: int | None = None, customer_id: str | None = None,
+                          save_card: bool = True) -> list:
+    """Form body for a pack Checkout session. Same bracketed-pair rules as a single campaign."""
+    size = pack_size() if size is None else size
+    cents = pack_price_cents(size) if cents is None else cents
+    pairs = [
+        ("mode", "payment"),
+        ("success_url", _pack_success_url(base_url)),
+        ("cancel_url", _pack_cancel_url(base_url)),
+        ("client_reference_id", "pack-%d" % user_id),
+        ("line_items[0][quantity]", "1"),
+        ("line_items[0][price_data][currency]", CURRENCY),
+        ("line_items[0][price_data][unit_amount]", str(cents)),
+        ("line_items[0][price_data][product_data][name]",
+         ("Resmara campaign pack — %d campaigns" % size)[:250]),
+        # kind=pack is what makes the webhook add campaigns instead of looking for a boost.
+        ("metadata[kind]", "pack"),
+        ("metadata[user_id]", str(user_id)),
+        ("metadata[campaigns]", str(size)),
+        ("payment_intent_data[metadata][kind]", "pack"),
+        ("payment_intent_data[metadata][user_id]", str(user_id)),
+    ]
+    if customer_id:
+        pairs.append(("customer", customer_id))
+        pairs.append(("customer_update[address]", "auto"))
+        if save_card:
+            pairs.append(("payment_intent_data[setup_future_usage]", "off_session"))
+    return pairs
+
+
+async def create_pack_checkout_session(user_id: int, base_url: str,
+                                       size: int | None = None, cents: int | None = None,
+                                       client: httpx.AsyncClient | None = None,
+                                       customer_id: str | None = None,
+                                       save_card: bool = True) -> dict:
+    """Create the Checkout session for a campaign pack and return Stripe's JSON."""
+    if not billing_enabled():
+        raise RuntimeError("Stripe is not configured: set STRIPE_SECRET_KEY on the service.")
+    data = pack_checkout_payload(user_id, base_url, size, cents,
+                                 customer_id=customer_id, save_card=save_card)
+    body, headers = form_body(data)
+    owns = client is None
+    client = client or httpx.AsyncClient(timeout=30)
+    try:
+        resp = await client.post("%s/checkout/sessions" % STRIPE_API, content=body, headers=headers)
+        resp.raise_for_status()
+        return resp.json()
+    finally:
+        if owns:
+            await client.aclose()
+
+
 def secret_key() -> str:
     return (os.getenv("STRIPE_SECRET_KEY") or "").strip()
 
@@ -263,18 +361,25 @@ def checkout_outcome(event: dict) -> dict:
     """
     kind = (event or {}).get("type") or ""
     obj = ((event or {}).get("data") or {}).get("object") or {}
+    meta = obj.get("metadata") or {}
     if kind == "checkout.session.completed":
         paid = (obj.get("payment_status") or "").lower() in ("paid", "no_payment_required")
         return {"event": kind, "session_id": obj.get("id"), "paid": paid,
-                "boost_id": _as_int((obj.get("metadata") or {}).get("boost_id")),
-                "user_id": _as_int((obj.get("metadata") or {}).get("user_id")),
+                # A pack session carries no boost: kind=pack is what sends the webhook to
+                # credit_purchases instead of hunting for an order that cannot exist yet.
+                "kind": (meta.get("kind") or "campaign"),
+                "campaigns": _as_int(meta.get("campaigns")),
+                "boost_id": _as_int(meta.get("boost_id")),
+                "user_id": _as_int(meta.get("user_id")),
                 "amount_cents": _as_int(obj.get("amount_total")),
                 "payment_intent": obj.get("payment_intent"),
                 "customer": obj.get("customer")}
     if kind in ("checkout.session.expired", "checkout.session.async_payment_failed"):
         return {"event": kind, "session_id": obj.get("id"), "paid": False,
-                "boost_id": _as_int((obj.get("metadata") or {}).get("boost_id")),
-                "user_id": _as_int((obj.get("metadata") or {}).get("user_id")),
+                "kind": (meta.get("kind") or "campaign"),
+                "campaigns": _as_int(meta.get("campaigns")),
+                "boost_id": _as_int(meta.get("boost_id")),
+                "user_id": _as_int(meta.get("user_id")),
                 "amount_cents": _as_int(obj.get("amount_total")),
                 "payment_intent": obj.get("payment_intent")}
     return {"event": kind, "session_id": obj.get("id"), "paid": False, "ignored": True}

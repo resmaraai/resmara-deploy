@@ -13,6 +13,9 @@ ADDITIONS = {
     "users": [
         ("brand", "JSON"),
         ("stripe_customer_id", "VARCHAR"),
+        # Prepaid campaigns from a pack. An existing account keeps working with 0; the ALTER is
+        # what stops every build on an established database failing on a missing column.
+        ("campaign_credits", "INTEGER DEFAULT 0"),
     ],
     "ad_accounts": [
         ("refresh_token", "TEXT"),

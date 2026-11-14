@@ -34,6 +34,10 @@ class User(Base):
     # The Stripe Customer this account pays as. Created on the first checkout and reused after
     # that, so Checkout can show the saved card instead of asking for it again.
     stripe_customer_id = Column(String, nullable=True)
+    # Campaigns this account has already paid for and not yet built. A pack purchase is what
+    # makes this non-zero and building a campaign spends one (api/billing.require_paid). It is
+    # a pre-paid balance, not credit we invented: every unit arrived as a Stripe payment.
+    campaign_credits = Column(Integer, default=0, nullable=False)
 
 # --- Ad Account (OAuth) ---
 class AdAccount(Base):
@@ -251,6 +255,44 @@ class Order(Base):
     checkout_url = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     paid_at = Column(DateTime(timezone=True), nullable=True)
+
+# --- Campaign packs (repeat business) ---
+class CreditPurchase(Base):
+    """A prepaid pack of campaigns: "4 campaigns for $196", paid once, built later.
+
+    The whole point of the business is a repeat customer, and a repeat customer needs a way to
+    buy the second campaign without re-entering a card and without the operator doing anything.
+    A pack is a Stripe payment recorded here; the campaigns it buys land on
+    ``users.campaign_credits`` and each build spends one.
+
+    Its own table rather than a row in ``orders`` because an order is one campaign tied to one
+    boost (``orders.boost_id`` is NOT NULL); a pack exists before any campaign does.
+    """
+    __tablename__ = "credit_purchases"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    campaigns = Column(Integer, nullable=False, default=4)
+    amount_cents = Column(Integer, nullable=False)
+    currency = Column(String, default="usd")
+    status = Column(String, default="pending")   # pending | paid | expired | failed
+    stripe_session_id = Column(String, nullable=True, index=True)
+    stripe_payment_intent = Column(String, nullable=True)
+    checkout_url = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+
+# --- Finance model (the console's Finance tab) ---
+class FinanceSetting(Base):
+    """One row of operator-entered assumptions: what a campaign costs us, how often agents buy.
+
+    These are opinions (engine cost per build, hosting run-rate, campaigns per agent per year),
+    not measurements, so they live in the database where the operator can change them without a
+    deploy. Everything derived from them is arithmetic on this row plus real rows elsewhere.
+    """
+    __tablename__ = "finance_settings"
+    id = Column(Integer, primary_key=True)
+    payload = Column(JSON, default=dict)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 # --- Event Log (audit) ---
 class Event(Base):

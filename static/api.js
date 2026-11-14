@@ -390,6 +390,21 @@
     return request('/api/billing/boost/' + segment(boostId));
   }
 
+  function balance() {
+    // Campaigns already paid for and not yet built, plus the pack offer. A repeat customer
+    // sees this instead of being asked for a card every time.
+    return request('/api/billing/balance');
+  }
+
+  function packCheckout() {
+    return json('/api/billing/checkout/pack', 'POST', {});
+  }
+
+  function campaignAgain(boostId) {
+    // Start the next campaign on the same house: same address, facts, brand and photos.
+    return json('/api/boosts/' + segment(boostId) + '/again', 'POST', {});
+  }
+
   function launch(boostId, opts) {
     opts = opts || {};
     return json('/api/launch', 'POST', {
@@ -522,6 +537,9 @@
     checkout: checkout,
     orders: orders,
     boostBilling: boostBilling,
+    balance: balance,
+    packCheckout: packCheckout,
+    campaignAgain: campaignAgain,
     launch: launch,
     publishStatus: publishStatus,
     publishNow: publishNow,
