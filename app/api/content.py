@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db, User, Boost, Post, Ad, Creative, Asset, Event, AdAccount
 from app.core.security import get_current_user
 from app.core.config import settings
+from app.services import storage
 from datetime import datetime, timedelta
 import json
 
@@ -82,6 +83,21 @@ KEEP_IN_DB = ("image/", "video/")
 MAX_KEPT_BYTES = 24 * 1024 * 1024
 
 
+def _persist(filename: str, blob: bytes | None, ctype: str | None,
+             url: str) -> tuple[str, bytes | None]:
+    """Put the bytes in object storage and return (url to serve, nothing left to keep).
+
+    R2 when it is configured, the row itself when it is not — and the row itself the moment an
+    upload fails, because a photo the agent uploaded must never disappear into a misconfigured
+    bucket. Returns the /uploads URL unchanged when there are no bytes to store.
+    """
+    if blob:
+        remote = storage.put(filename, blob, ctype or "application/octet-stream")
+        if remote:
+            return remote, None
+    return url, blob
+
+
 def _blob_for(file: UploadFile, filename: str, size: int) -> tuple[bytes | None, str | None]:
     """The bytes to keep beside the row, and the content type to serve them back as."""
     ctype = (file.content_type or "").split(";")[0].strip().lower()
@@ -114,6 +130,7 @@ async def upload_photo(file: UploadFile = File(...), boost_id: int = Form(None),
     # Keep the bytes with the row as well: uploads/ is lost on the next deploy of a
     # free-tier instance, and a photo post then renders a broken image.
     blob, ctype = _blob_for(file, filename, size)
+    url, blob = _persist(filename, blob, ctype, url)
     asset = Asset(user_id=current_user.id, boost_id=boost_id, filename=filename, url=url,
                   original_name=os.path.basename(file.filename or ""), kind=kind,
                   data=blob, content_type=ctype)
@@ -135,6 +152,7 @@ async def upload_many(boost_id: int = Form(None), kind: str = Form("photo"),
     for f in files:
         filename, url, size = _save_upload(f)
         blob, ctype = _blob_for(f, filename, size)
+        url, blob = _persist(filename, blob, ctype, url)
         asset = Asset(user_id=current_user.id, boost_id=boost_id, filename=filename, url=url,
                       original_name=os.path.basename(f.filename or ""), kind=kind,
                       data=blob, content_type=ctype)

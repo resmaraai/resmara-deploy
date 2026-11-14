@@ -148,6 +148,43 @@ def create_boost(boost: BoostCreate, current_user=Depends(get_current_user), db:
     db.refresh(new_boost)
     return new_boost
 
+@router.post("/boosts/{boost_id}/again", response_model=BoostOut, status_code=201)
+def campaign_again(boost_id: int, current_user=Depends(get_current_user),
+                   db: Session = Depends(get_db)):
+    """Start the next campaign on the same house — the repeat purchase in one click.
+
+    Same address, property facts, brand profile and photos, but zero posts and no payment: the
+    new campaign is an ordinary unpaid campaign, so building it spends a prepaid credit or asks
+    for a fresh checkout. "Again" can therefore never hand out a free campaign.
+    """
+    src = db.query(Boost).filter(Boost.id == boost_id,
+                                 Boost.user_id == current_user.id).first()
+    if not src:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    fresh = Boost(user_id=current_user.id, address=src.address, tier=src.tier,
+                  campaign_days=src.campaign_days, ad_budget_usd=src.ad_budget_usd,
+                  property_facts=src.property_facts, brand_profile=src.brand_profile or {},
+                  main_status="In Progress", stage="PENDING")
+    db.add(fresh)
+    db.flush()
+    copied = 0
+    for a in db.query(Asset).filter(Asset.boost_id == src.id).all():
+        row = Asset(user_id=current_user.id, boost_id=fresh.id, filename=a.filename,
+                    url=a.url, original_name=a.original_name, kind=a.kind, room=a.room,
+                    social_score=a.social_score, shape=a.shape, see=a.see, story=a.story,
+                    tags=a.tags or [])
+        # A photo on the CDN is a URL, so copying the row is free. Bytes still in the database
+        # are copied with it — losing the photos would make "again" worse than starting over.
+        if a.data is not None:
+            row.data = a.data
+        db.add(row)
+        copied += 1
+    db.add(Event(user_id=current_user.id, boost_id=fresh.id, event_type="campaign_repeated",
+                 payload={"from_boost_id": src.id, "photos": copied}))
+    db.commit()
+    db.refresh(fresh)
+    return fresh
+
 @router.get("/boosts", response_model=list[BoostOut])
 def list_boosts(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
     """This client's campaigns, each with its real post counts (no invented progress)."""

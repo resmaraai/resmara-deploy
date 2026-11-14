@@ -223,6 +223,7 @@ tr.testrow td{background:#fbfdff;color:#849bae}
       <a href="#sec-support" data-go="support">Support</a>
       <a href="#sec-content" data-go="content">Content</a>
       <a href="#sec-campaigns" data-go="campaigns">Campaigns</a>
+      <a href="#sec-finance" data-go="finance">Finance</a>
       <a href="#sec-costs" data-go="costs">Start-up costs</a>
       <a href="#sec-users" data-go="users">Accounts</a>
       <a href="#sec-advertising" data-go="advertising">Connections</a>
@@ -307,6 +308,30 @@ tr.testrow td{background:#fbfdff;color:#849bae}
     <details class="card sec" data-sec="campaigns" id="sec-campaigns">
       <summary><h2>Campaigns</h2><span class="secsum" id="sum-campaigns">…</span><span class="chev">›</span></summary>
       <div class="body" id="campaignsBody"></div>
+    </details>
+
+    <details class="card sec" data-sec="finance" id="sec-finance">
+      <summary><h2>Finance</h2><span class="secsum" id="sum-finance">…</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div class="hint" style="margin:0 0 12px">What a campaign sells for, what it costs us to deliver, what we may spend to win an agent and still profit, and what has actually been collected. A square counts one thing and says which. Where a number is modelled rather than measured it says “assumed”.</div>
+        <div id="finSquares"><div class="hint">Working the numbers…</div></div>
+
+        <h3 style="margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)">What a repeat agent is worth</h3>
+        <div class="hint" style="margin:0 0 10px">One campaign at $49 has high margin and still cannot pay for a customer, because acquisition has to come out of that single sale. An agent who lists several homes a year and runs several campaigns on each is worth several campaigns — which is the only arithmetic that makes paid acquisition work.</div>
+        <div id="finRepeat"></div>
+
+        <h3 style="margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)">Assumptions</h3>
+        <div class="hint" style="margin:0 0 10px">Our numbers about the world, not measurements. Changing one changes the model, and the squares above recalculate on save.</div>
+        <div class="row" id="finForm"></div>
+        <div class="flex" style="margin-top:10px"><button id="finSave">Save and recalculate</button><span class="msg" id="finMsg"></span></div>
+
+        <h3 style="margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)">Who has paid, and who came back</h3>
+        <div class="scrollx"><table id="finCustomers">
+          <thead><tr><th>account</th><th>campaigns</th><th>packs</th><th>paid</th><th>last payment</th></tr></thead>
+          <tbody><tr><td colspan="5" class="hint">Loading…</td></tr></tbody>
+        </table></div>
+        <div class="hint" style="margin-top:8px">Two or more payments is the repeat business the pricing depends on. A pack counts as one payment that buys several campaigns.</div>
+      </div>
     </details>
 
     <details class="card sec" data-sec="costs" id="sec-costs">
@@ -505,6 +530,22 @@ const WHY = {
   'subscriptions running': 'Repeating costs with no end date. Ended ones stop counting.',
   'next renewal': 'The soonest subscription charge still to come.',
   'receipts on file': 'Costs with a photo or PDF attached. The rest have none yet.',
+  // finance — every square on that tab names what it counts
+  'hosting per month': 'Web service, database, publisher cron and domain, added up.',
+  'our cost per sale': 'Stripe’s cut, model cost, photo storage, hosting share and the refund buffer for one campaign.',
+  'we keep per campaign': 'What is left of one sale after it is delivered. Not profit yet: acquisition comes out of this.',
+  'sales to cover hosting': 'How many campaigns a month pay the fixed bill, before a single customer is bought.',
+  'price for target margin': 'The price that would leave the target margin at today’s volume. A floor, not a recommendation.',
+  'revenue collected': 'Paid orders plus paid packs, as Stripe reported them. Refunds are not netted out here.',
+  'customers who paid': 'Accounts with at least one paid campaign or pack.',
+  'repeat customers': 'Accounts with two or more payments — the repeat business the price relies on.',
+  'prepaid campaigns unspent': 'Campaigns bought in a pack and not yet built. Each one is a build we already have the money for.',
+  'one agent, one year': 'Contribution from an agent buying the assumed number of campaigns a year.',
+  'one agent, all years': 'That annual contribution times the assumed years they stay. Acquisition is budgeted against this.',
+  'most we may pay per customer': 'Lifetime contribution divided by three: $1 of acquisition has to buy $3 of contribution.',
+  'photo storage': 'Where listing photos live. R2 is free to 10 GB; the database is the fallback.',
+  'photos kept in the database': 'Bytes still stored in Postgres, which is the expensive place for them.',
+  'database size': 'Whole database as the server reports it, photos included.',
   // the work queue reads from the same dictionary
   'Waiting on us': 'A client wrote in and nobody has answered yet.',
   'Posts need us': 'Approved and due now, or Meta refused them.',
@@ -1081,7 +1122,118 @@ if ($('cAdd')) {
 }
 
 
-function refreshAll(){ loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); }
+function refreshAll(){ loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); loadFinance(); }
+
+// ── finance ───────────────────────────────────────────────────────────────────────
+// The business in money. Every figure is computed server-side in app/api/finance.py so this tab
+// and any other reader of the same endpoint cannot disagree; this only paints what it is sent.
+// Modelled numbers are labelled "assumed" rather than dressed up as measurements.
+let finData = null;
+
+function finDate(v){
+  if (!v) return '—';
+  const d = new Date(v);
+  return isNaN(d) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+async function loadFinance(){
+  try {
+    finData = await api('/api/admin/finance');
+    renderFinance();
+  } catch (err) {
+    const sq = $('finSquares');
+    if (sq) sq.innerHTML = '<div class="bad">Could not read the finance model — ' + esc(err.message) + '</div>';
+    const s = $('sum-finance'); if (s) s.textContent = 'unavailable';
+  }
+}
+
+function renderFinance(){
+  const d = finData; if (!d) return;
+  const sq = $('finSquares'); if (!sq) return;
+  const u = d.unit, a = d.actuals, f = d.fixed, b = d.breakeven, v = d.volume;
+  sq.innerHTML = '<div class="grid">' +
+    stat(d.price.label, 'price per campaign', '',
+         d.price.pack_size + ' for ' + d.price.pack_label + ' · ' + usd(d.price.per_campaign_in_pack) + ' each') +
+    stat(usd(f.total_monthly_usd), 'hosting per month', '', usd(f.annual_usd) + ' a year') +
+    stat(usd(u.costs_usd), 'our cost per sale', '',
+         'delivery ' + usd(u.delivery_usd) + ' + hosting ' + usd(u.hosting_usd) + ' + refund buffer') +
+    stat(usd(u.contribution_usd), 'we keep per campaign', u.contribution_usd > 0 ? 'good' : 'bad',
+         u.margin_pct + '% margin') +
+    stat(b.campaigns_per_month === null ? '—' : String(b.campaigns_per_month),
+         'sales to cover hosting', '',
+         v.used + ' a month right now (' + v.basis + ')') +
+    stat(d.price_floor.at_current_volume_usd === null ? '—' : usd(d.price_floor.at_current_volume_usd),
+         'price for target margin', '', d.price_floor.target_margin_pct + '% after delivery') +
+    stat(usd(a.gross_usd), 'revenue collected', '',
+         a.paid_campaigns + ' campaign(s), ' + a.paid_packs + ' pack(s), ' + usd(a.gross_last_30d_usd) + ' in 30 days') +
+    stat(String(a.customers), 'customers who paid', '',
+         a.repeat_customers + ' came back more than once') +
+    stat(String(a.repeat_customers), 'repeat customers', a.repeat_customers ? 'good' : '',
+         a.repeat_rate_pct + '% of buyers') +
+    stat(String(a.credits_outstanding), 'prepaid campaigns unspent', '',
+         'money in the bank, work still owed') +
+    stat(d.capacity.storage_mode === 'r2' ? 'R2' : 'Database', 'photo storage',
+         d.capacity.storage_mode === 'r2' ? 'good' : '', d.capacity.r2_note) +
+    stat(d.capacity.asset_mb + ' MB', 'photos kept in the database', '',
+         d.capacity.campaigns_built + ' campaign(s) built') +
+    stat(d.capacity.db_mb === null ? '—' : d.capacity.db_mb + ' MB', 'database size', '') +
+    '</div>';
+
+  const rep = $('finRepeat');
+  if (rep) rep.innerHTML = '<div class="grid">' +
+    stat(usd(d.repeat.annual_contribution_usd), 'one agent, one year', '',
+         d.repeat.campaigns_per_agent_per_year + ' campaigns') +
+    stat(usd(d.repeat.lifetime_contribution_usd), 'one agent, all years', '',
+         d.repeat.retention_years + ' year(s) staying') +
+    stat(usd(d.acquisition.max_cac_usd[3]), 'most we may pay per customer', 'good',
+         '3x: ' + usd(d.acquisition.max_cac_usd[3]) + ' · 2x: ' + usd(d.acquisition.max_cac_usd[2]) +
+         ' · 4x: ' + usd(d.acquisition.max_cac_usd[4])) +
+    '</div>';
+
+  const form = $('finForm');
+  if (form) {
+    form.innerHTML = (d.fields || []).map(f => {
+      const val = d.assumptions[f.key];
+      return '<div style="flex:0 0 200px">' +
+        '<label for="fin-' + esc(f.key) + '">' + esc(f.label) + ' <span class="hint">(' + esc(f.unit) + ')</span></label>' +
+        '<input id="fin-' + esc(f.key) + '" data-fin="' + esc(f.key) + '" type="number" step="' + esc(f.step) + '" value="' + esc(val) + '">' +
+        '<div class="hint" style="margin:4px 0 0;font-size:11px">' + esc(f.hint) + '</div></div>';
+    }).join('');
+  }
+
+  const tb = document.querySelector('#finCustomers tbody');
+  if (tb) {
+    tb.innerHTML = (d.customers && d.customers.length)
+      ? d.customers.map(c => '<tr><td>' + esc(c.email) + '</td><td>' + c.campaigns + '</td><td>' +
+          c.packs + '</td><td>' + usd(c.paid_usd) + '</td><td>' + finDate(c.last_paid) + '</td></tr>').join('')
+      : '<tr><td colspan="5" class="hint">Nobody has paid yet — the model above is what the pricing will do when they do.</td></tr>';
+  }
+
+  const s = $('sum-finance');
+  if (s) s.textContent = usd(u.contribution_usd) + ' kept per campaign · ' +
+    usd(d.repeat.lifetime_contribution_usd) + ' per agent';
+}
+
+async function saveFinance(){
+  const btn = $('finSave'), msg = $('finMsg');
+  if (!btn) return;
+  const values = {};
+  document.querySelectorAll('[data-fin]').forEach(i => { values[i.dataset.fin] = Number(i.value); });
+  btn.disabled = true;
+  if (msg) { msg.className = 'msg'; msg.textContent = 'Saving…'; }
+  try {
+    await api('/api/admin/finance/assumptions', { method: 'PUT', body: { values: values } });
+    await loadFinance();
+    if (msg) { msg.className = 'msg ok'; msg.textContent = 'Saved — the model recalculated.'; }
+  } catch (err) {
+    if (msg) { msg.className = 'msg bad'; msg.textContent = 'Could not save — ' + err.message; }
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { if (msg) { msg.textContent = ''; msg.className = 'msg'; } }, 6000);
+  }
+}
+
+if ($('finSave')) $('finSave').addEventListener('click', saveFinance);
 
 $('loginBtn').addEventListener('click', login);
 

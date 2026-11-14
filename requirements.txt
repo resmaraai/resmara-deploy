@@ -25,3 +25,10 @@ psycopg[binary]>=3.2.10
 
 # Not required by the app itself; used by tests/ and by the health sweep script.
 requests>=2.32.3
+
+# Object storage for listing photos (Cloudflare R2, S3-compatible). Only imported when the R2
+# environment is set (app/services/storage.py), so a deployment without R2 ignores it — but it is
+# installed here so flipping the switch is an env-var change, not a rebuild.
+boto3>=1.35
+# Imported directly for the S3 config object (signature version and retry policy for R2).
+botocore>=1.35

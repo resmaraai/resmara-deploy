@@ -9,6 +9,7 @@ from app.api import content
 from app.api import engine
 from app.api import billing
 from app.api import costs
+from app.api import finance
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(resmara.router, prefix="", tags=["resmara"])
@@ -20,3 +21,6 @@ api_router.include_router(engine.router, prefix="", tags=["engine"])
 api_router.include_router(billing.router, prefix="", tags=["billing"])
 # Start-up costs: /api/admin/costs — what the project cost, who paid, receipts, subscriptions.
 api_router.include_router(costs.router, prefix="", tags=["costs"])
+# Finance: /api/admin/finance — what a campaign sells for, what it costs us, what we may spend
+# to win a repeat agent, and what has actually been collected.
+api_router.include_router(finance.router, prefix="", tags=["finance"])
