@@ -196,8 +196,15 @@ ok("the console reports how many it is holding back",
 ok("the triage tiles come first, before any list", html.index('id="triage"') < html.index('id="sec-support"'))
 ok("the triage tile for support only counts real ones",
    "(s.waiting_on_us || 0) - (s.waiting_on_us_test || 0)" in html)
+# The mark-up moved behind split() (the numbers are still printed together, which is the point);
+# assert the behaviour rather than one line of the string it used to be written on.
 ok("the real number is printed beside the test share",
-   "u.real + ' real · ' + u.test_accounts + ' test'" in html)
+   "function split(real, test, label)" in html
+   and "esc(real) + ' ' + esc(label)" in html
+   and "· ' + esc(test) + ' test" in html
+   and "split(m.users ? m.users.real || 0 : 0, m.users ? m.users.test_accounts || 0 : 0" in html)
+ok("  ...and a zero test share is left out, not printed as noise",
+   "' test</span>' : '')" in html)
 ok("a half-written reply is never refreshed over", "value.trim()" in html and "ticket-detail:not(.hidden)" in html)
 
 db.close()

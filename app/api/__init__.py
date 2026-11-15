@@ -19,6 +19,12 @@ from app.api import onboarding
 # Ask Resmara: /api/help/misses|answers — the questions the chat could not answer, and the
 # answers the team approved from real support replies.
 from app.api import help
+# The Team room: /api/admin/campaigns|posts/failed|connections|activity, /api/admin/system-check|
+# releases, /api/admin/team. Each one asks app/services/team_access before it answers.
+from app.api import console
+from app.api import system
+from app.api import team
+from app.api import marketing
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(resmara.router, prefix="", tags=["resmara"])
@@ -42,3 +48,9 @@ from app.api import boost_control
 api_router.include_router(help.router, prefix="", tags=["help"])
 api_router.include_router(boost_control.router, prefix="", tags=["campaign control"])
 api_router.include_router(onboarding.router, prefix="", tags=["onboarding"])
+# The Team room's data. Mounted after everything else because the paths are all under
+# /api/admin/* except the help chat, and nothing here shadows an existing route.
+api_router.include_router(console.router, prefix="", tags=["console"])
+api_router.include_router(system.router, prefix="", tags=["console"])
+api_router.include_router(team.router, prefix="", tags=["console"])
+api_router.include_router(marketing.router, prefix="", tags=["console"])

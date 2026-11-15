@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Resmara — Operator Console</title>
+<title>Resmara — Team room</title>
+<script>try{if(localStorage.getItem('resmara_theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Archivo+Black&display=swap');
 /* Same family as the buildroom tracker and the customer site: DM Sans on warm paper,
@@ -212,32 +213,487 @@ tr.testrow td{background:#fbfdff;color:#849bae}
   .rows .k{flex:0 0 120px}
 }
 </style>
+
+<style id="brand-views">
+/* Resmara brand + one section at a time — matches the agent dashboard (Nov 2026) */
+body,.main{background:#f5f9fc}
+.side{background:#fff;color:var(--ink);border-right:1px solid #e3eef6;padding:28px 18px 20px}
+.brand-logo{display:block;text-align:center;margin:0 0 22px}
+.brand-logo img{width:150px;height:auto;display:block;margin:0 auto}
+.brand-logo small{color:#6f8ba0;letter-spacing:2.4px;margin-top:8px}
+nav#index{gap:4px;overflow-y:auto}
+nav#index .nav-group{font-size:10.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#6f8ba0;margin:12px 12px 2px}
+nav#index a{color:#12354d;font-size:14px;font-weight:500;padding:7px 16px;border-radius:999px}
+.side-foot{display:none}
+nav#index a:hover{background:#eef6fb;color:#12354d}
+nav#index a[aria-current="true"]{background:#e2f0f8;color:#087db6}
+.side-foot{border-top:1px solid #e3eef6;color:#6f8ba0}
+.side-foot b{color:#12354d}
+.topbar{background:#f5f9fc;border-bottom:0;padding:16px 40px}
+#collapseAll{display:none}
+main{max-width:1180px;padding:6px 40px 64px}
+.pagehead h1,.view-title{font-family:'DM Sans',sans-serif;font-weight:400;font-size:30px;letter-spacing:-.5px;color:#12354d;margin:4px 0 14px}
+.pagehead .sub{background:#12354d;color:#fff;border-radius:14px;padding:16px 20px;max-width:none;font-size:15px}
+/* one view at a time */
+body.views details.sec{display:none}
+body.views details.sec.is-view{display:block;border:0;background:transparent;box-shadow:none;overflow:visible}
+body.views details.sec.is-view>summary{pointer-events:none;padding:4px 0 14px;background:transparent}
+body.views details.sec.is-view>summary h2{font-family:'DM Sans',sans-serif;font-weight:400;font-size:30px;letter-spacing:-.5px;color:#12354d}
+body.views details.sec.is-view>summary .chev{display:none}
+body.views details.sec.is-view>summary .secsum{margin-left:auto}
+body.views details.sec.is-view>.body{background:#fff;border:1px solid #e3eef6;border-radius:18px;padding:22px 24px}
+body.views.on-section .pagehead,body.views.on-section #triage{display:none}
+body.views:not(.on-section) #overviewList{display:grid}
+#overviewList{display:none;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:6px}
+#overviewList button{all:unset;cursor:pointer;background:#fff;border:1px solid #e3eef6;border-radius:18px;padding:18px 20px;display:flex;flex-direction:column;gap:4px}
+#overviewList button:hover{border-color:#c7e2f2}
+#overviewList .og{font-size:10.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#6f8ba0}
+#overviewList b{font-size:17px;font-weight:600;color:#12354d}
+#overviewList span.s{font-size:13px;color:#52778f}
+.tile{border-color:#e3eef6;border-radius:18px}
+/* solid buttons only: orange = main action, dark blue = everything else */
+button{border-radius:999px}
+button.ghost,button.ghost.tiny{background:#12354d;color:#fff;border:0;font-weight:600}
+button.ghost:hover{background:#0d2a3e}
+.chip{background:#e2f0f8;border:0;color:#12354d}
+.chip[aria-pressed="true"]{background:#12354d;color:#fff}
+#logout{background:#12354d}
+
+/* readability pass: dashboard headings, dark text, white cards on the light page */
+.pagehead h1,.view-title,body.views details.sec.is-view>summary h2{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:28px;letter-spacing:-.98px;color:#12354d;text-transform:none}
+.card-title,#overviewList b{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:18px;letter-spacing:-.63px;color:#12354d;margin:0 0 12px;text-transform:none}
+.view-intro{background:#12354d;color:#fff;border-radius:14px;padding:16px 20px;font-size:15px;line-height:1.55;margin:0 0 18px}
+body.views details.sec.is-view>.body{background:transparent;border:0;padding:0}
+.br-card{background:#fff;border:1px solid #dcebf5;border-radius:18px;padding:22px 24px;margin:18px 0 0}
+.tile{background:#fff;border:1px solid #dcebf5;box-shadow:none}
+.tile .n,.tile.zero .n{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;color:#12354d}
+.tile .l,.tile.zero .l{color:#12354d;font-size:12px}
+.tile .s,.tile .w{color:#3d5f75;font-size:13px;line-height:1.5}
+.hint,.secsum,.crumb,.topbar .who,#overviewList span.s{color:#3d5f75}
+.hint{font-size:13px}
+label{color:#12354d}
+th{color:#3d5f75}
+td{color:#12354d;font-size:14px}
+input,select,textarea{color:#12354d;border-color:#c7e2f2}
+input::placeholder,textarea::placeholder{color:#6f8ba0}
+
+/* dark sidebar: navy with white logo and white text */
+.side{background:#12354d;border-right:0;color:#fff}
+.brand-logo small{color:#a7d5ed}
+nav#index .nav-group{color:#8fbfdb}
+nav#index a{color:#fff}
+nav#index a:hover{background:rgba(255,255,255,.08);color:#fff}
+nav#index a[aria-current="true"]{background:#fff;color:#12354d;font-weight:700}
+/* filter tabs: pill track like the dashboard */
+.pilltrack,[data-pt]{display:inline-flex!important;flex-wrap:wrap;gap:4px;background:#e2eff7;border-radius:999px;padding:5px;margin:18px 0 0}
+.pilltrack .chip,[data-pt] .chip{background:transparent;color:#57768d;font-weight:700;font-size:14px;padding:10px 20px;border-radius:999px}
+.pilltrack .chip[aria-pressed="true"],[data-pt] .chip[aria-pressed="true"]{background:#12354d;color:#fff}
+[data-pt] .chipbox{padding:0 14px}
+
+/* brand orange: sidebar group titles and Sign out */
+nav#index .nav-group{color:#a7d5ed;font-weight:900;font-size:13px;letter-spacing:2px;margin:16px 12px 4px}
+#logout,#logout:hover{background:#d94c0d;color:#fff;border:0}
+#logout:hover{background:#bd400b}
+
+/* Campaigns / Content tiles: white, readable, orange when something needs us */
+.stat{background:#fff;border:1px solid #dcebf5;box-shadow:none}
+.stat .n{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;color:#12354d}
+.stat .l{color:#12354d}
+.stat .s,.stat .w{color:#3d5f75;font-size:13px}
+.stat.alert{background:#fff4ee;border-color:#f2b999}
+.stat.alert .n{color:#d94c0d}
+.stat.good .n{color:#087db6}
+.side{position:sticky;top:0;height:100vh;overflow-y:auto}
+
+/* needs attention + sidebar badges */
+.attn{margin:0 0 18px}
+.attn-card{background:#fff4ee;border:1px solid #f2b999;border-radius:18px;padding:20px 24px}
+.attn-card .card-title{color:#b23c08}
+.attn-card ul{margin:0;padding-left:18px;color:#12354d;font-size:15px;line-height:1.7}
+.attn-card table{background:#fff;border-radius:12px}
+.attn-lead{margin:0 0 10px;color:#12354d;font-size:15px}
+.attn-ok{background:#fff;border:1px solid #dcebf5;border-radius:14px;padding:14px 18px;color:#12354d;font-weight:600}
+nav#index a{display:flex;align-items:center}
+.nav-badge{margin-left:auto;background:#d94c0d;color:#fff;font-size:12px;font-weight:700;min-width:22px;height:22px;padding:0 7px;border-radius:999px;display:inline-grid;place-items:center}
+
+/* ── restructure: calculator, detail pages, lists, checks, log ── */
+#sec-checks,#sec-notes{display:none!important}
+.calc{display:grid;grid-template-columns:1.35fr 1fr;gap:0;margin-top:22px;background:#fff;border:1px solid #dcebf5;border-radius:22px;overflow:hidden}
+.calc-in{padding:26px 28px}
+.calc-lead{margin:-4px 0 16px;color:#3d5f75;font-size:14px}
+.calc-group{border:0;margin:0 0 16px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px 14px}
+.calc-group legend{font-size:11px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#087db6;margin-bottom:8px;padding:0}
+.calc-field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:#12354d;margin:0}
+.calc-input{display:flex;align-items:center;background:#f5f9fc;border:1px solid #c7e2f2;border-radius:12px;padding:0 12px}
+.calc-input input{border:0;background:transparent;padding:11px 0;margin:0;font-size:16px;font-weight:600;color:#12354d;min-width:0;flex:1}
+.calc-input input:focus{outline:none}
+.calc-input:focus-within{border-color:#087db6;background:#fff}
+.calc-input i{font-style:normal;font-size:12px;color:#57768d;font-weight:700;margin-left:6px}
+.calc-actions{display:flex;align-items:center;gap:14px;margin-top:6px}
+#finSave{background:#d94c0d;color:#fff;padding:13px 26px;font-size:15px}
+.calc-out{background:#12354d;color:#fff;padding:26px 28px;display:flex;flex-direction:column;gap:2px}
+.calc-eyebrow{font-size:11px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#a7d5ed;margin-bottom:10px}
+.calc-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.12);font-size:14px;color:#d6e9f5}
+.calc-row b{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:18px;color:#fff;white-space:nowrap}
+.calc-row b small{font-family:'DM Sans',sans-serif;font-size:12px;color:#a7d5ed;margin-left:4px}
+.calc-row.big b{font-size:26px;color:#7fd0f5}
+.calc-row:last-child{border-bottom:0}
+@media(max-width:900px){.calc{grid-template-columns:1fr}}
+.add-box{background:#fff;border:2px solid #c7e2f2}
+.attn-list{display:flex;flex-direction:column;gap:8px}
+.attn-row{display:flex;justify-content:space-between;align-items:center;gap:14px;background:#fff;border-radius:12px;padding:12px 16px}
+.attn-row b{display:block;color:#12354d;font-size:15px}
+.attn-row span{display:block;color:#3d5f75;font-size:13px;margin-top:2px}
+.rowlink{cursor:pointer}
+.rowlink:hover td{background:#eef6fb!important}
+.back{background:transparent!important;color:#087db6!important;padding:6px 0!important;font-weight:700}
+.detail-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.eyebrow-s{font-size:11px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#087db6}
+.detail-title{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:24px;letter-spacing:-.8px;color:#12354d;margin:6px 0 4px}
+.detail-sub{color:#3d5f75;font-size:14px}
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid #e3eef6}
+.facts.one{border-top:0;margin-top:0;padding-top:0}
+.facts span{display:block;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#57768d}
+.facts b{display:block;font-size:15px;color:#12354d;margin-top:3px}
+.grid2c{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid2c .br-card{margin-top:18px}
+@media(max-width:900px){.grid2c{grid-template-columns:1fr}}
+#campSearch{max-width:340px;margin:0 0 12px}
+.bad-t{color:#d94c0d}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.check{display:flex;gap:12px;align-items:flex-start;background:#f5f9fc;border-radius:12px;padding:12px 14px}
+.check i{flex:0 0 12px;height:12px;border-radius:50%;margin-top:4px;background:#2e9d5b}
+.check.c-warn i{background:#e8a33b}.check.c-fail i{background:#d94c0d}
+.check.c-fail{background:#fff4ee}
+.check b{display:block;color:#12354d;font-size:14px}
+.check span{display:block;color:#3d5f75;font-size:12.5px;margin-top:2px}
+.spark{height:120px}
+.spark i{cursor:pointer;background:#087db6!important;opacity:.8}
+.spark i:hover,.spark i.on{opacity:1;background:#d94c0d!important}
+.log{display:flex;flex-direction:column}
+.log-row{display:flex;align-items:center;gap:14px;padding:11px 4px;border-bottom:1px solid #eef6fb;font-size:14px;color:#12354d}
+.log-when{flex:0 0 130px;color:#57768d;font-size:13px}
+.log-kind{flex:0 0 auto;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:999px;background:#e2f0f8;color:#12354d}
+.log-kind.k-error,.log-kind.k-failed{background:#fde3d6;color:#b23c08}
+.log-kind.k-posted{background:#dff3e6;color:#1f7a45}
+.log-text{flex:1}.log-text i{font-style:normal;color:#57768d}
+.stat{cursor:default}
+.detail-title,.card-title{text-transform:none!important}
+#overviewList .og{display:flex;align-items:center;justify-content:space-between}
+
+/* support: ticket cards */
+.tk-list{display:flex;flex-direction:column;gap:12px;margin-top:18px}
+.tk{background:#fff;border:1px solid #dcebf5;border-radius:18px;overflow:hidden}
+.tk.open{border-color:#9fd2ea;box-shadow:0 10px 30px rgba(18,53,77,.07)}
+.tk-head{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 22px}
+.tk-main b{display:block;font-size:16px;color:#12354d}
+.tk-main span{display:block;font-size:13px;color:#3d5f75;margin-top:4px}
+.tk-side{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.tk-turn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px}
+.tk-turn.us{background:#fde3d6;color:#b23c08}
+.tk-turn.them{background:#e2f0f8;color:#12354d}
+.tk-status{font-size:12px;font-weight:700;color:#3d5f75;padding:6px 12px;border-radius:999px;background:#f2f6f9}
+.tk-status.s-resolved,.tk-status.s-closed{background:#dff3e6;color:#1f7a45}
+.tk-toggle{background:#12354d;color:#fff;padding:9px 20px;font-size:13px;font-weight:700;min-width:84px}
+.tk-body{border-top:1px solid #e3eef6;background:#f8fbfd;padding:22px}
+.tk-thread{display:flex;flex-direction:column;gap:12px;margin-bottom:22px}
+.tk-msg{max-width:72%;padding:14px 18px;border-radius:16px}
+.tk-msg span{display:block;font-size:12px;font-weight:700;margin-bottom:6px}
+.tk-msg p{margin:0;font-size:15px;line-height:1.55}
+.tk-msg.agent{align-self:flex-start;background:#fff;border:1px solid #dcebf5;color:#12354d}
+.tk-msg.agent span{color:#087db6}
+.tk-msg.team{align-self:flex-end;background:#12354d;color:#fff}
+.tk-msg.team span{color:#a7d5ed}
+.tk-reply{background:#fff;border:1px solid #dcebf5;border-radius:16px;padding:18px 20px}
+.tk-reply>label{margin:0 0 8px;color:#12354d}
+.tk-reply textarea{width:100%;min-height:110px;border-radius:12px;font-size:15px;padding:12px 14px;box-sizing:border-box}
+.tk-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-top:16px}
+.tk-statuspick{display:flex;flex-direction:column;gap:6px;margin:0;color:#12354d}
+.tk-statuspick select{min-width:200px;margin:0}
+.tk-btns{display:flex;gap:12px;flex-wrap:wrap}
+.tk-kb{background:#e2f0f8!important;color:#12354d!important;padding:12px 20px;font-weight:700}
+.tk-send{background:#d94c0d!important;color:#fff!important;padding:12px 26px;font-weight:700;font-size:15px}
+@media(max-width:800px){.tk-head{flex-direction:column;align-items:flex-start}.tk-msg{max-width:100%}}
+.tk-statuspick select{font-size:14px;padding:10px 12px;border-radius:12px}
+.ok-t{color:#1f7a45}
+.facts em{font-style:normal;font-size:13px}
+.inline-link{display:inline-block;margin-left:8px;font-size:13px;color:#087db6;cursor:pointer;font-weight:700}
+.agent-warn{margin-top:16px;background:#fff4ee;border:1px solid #f2b999;color:#b23c08;border-radius:12px;padding:12px 16px;font-size:14px;font-weight:600}
+.facts b.bad-t{color:#d94c0d}.facts b.ok-t{color:#1f7a45}
+
+#sec-content{display:none!important}
+.grid.g4{grid-template-columns:repeat(4,1fr)}
+#campaignsBody{margin-bottom:18px}
+.row-btns{display:flex;gap:10px;flex-shrink:0}
+.posts{display:flex;flex-direction:column;gap:8px}
+.post{border:1px solid #e3eef6;border-radius:14px;background:#fff;overflow:hidden}
+.post.is-failed{border-color:#f2b999}
+.post.open{box-shadow:0 8px 24px rgba(18,53,77,.07)}
+.post-line{display:grid;grid-template-columns:70px 1fr 160px 110px 20px;align-items:center;gap:14px;padding:12px 16px;cursor:pointer;color:#12354d}
+.post-line span{color:#3d5f75;font-size:14px}
+.post-line:hover{background:#f5f9fc}
+.chev-s{font-style:normal;color:#57768d;transition:transform .2s}
+.post.open .chev-s{transform:rotate(90deg)}
+.post-open{display:grid;grid-template-columns:260px 1fr;gap:22px;padding:18px;border-top:1px solid #e3eef6;background:#f8fbfd}
+.post-open.hidden{display:none}
+.post-media img,.post-noimg{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:12px;background:#dcebf5;display:grid;place-items:center;color:#57768d;font-weight:700}
+.post-copy p{color:#12354d;font-size:15px;line-height:1.6;margin:6px 0 0}
+.fail-log{margin-top:18px;background:#fff4ee;border:1px solid #f2b999;border-radius:14px;padding:16px 18px}
+.fail-log>b{color:#b23c08;font-size:15px}
+.fail-log p{margin:6px 0 10px!important}
+.fail-log ul{margin:0 0 14px;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.fail-log li{font-size:13px;color:#12354d;background:#fff;border-radius:10px;padding:8px 12px}
+.fail-log li span{color:#57768d;margin-right:10px;font-weight:700}
+.reset-out{margin-top:14px;background:#e2f0f8;border-radius:12px;padding:12px 16px;color:#12354d;font-size:14px}
+.reset-out input{width:100%;margin-top:8px}
+@media(max-width:800px){.grid.g4{grid-template-columns:1fr 1fr}.post-open{grid-template-columns:1fr}.post-line{grid-template-columns:60px 1fr 100px}.post-when,.chev-s{display:none}}
+.post-line .pill{justify-self:start}
+.row-btns .ghost.tiny,.row-btns .tk-toggle{padding:9px 20px;font-size:13px;font-weight:700;min-width:84px}
+
+/* finance tidy */
+.grid.g3{grid-template-columns:repeat(3,1fr)}
+.spark.fin i{background:#1f7a45!important;opacity:.75}
+.spark.fin i.on,.spark.fin i:hover{background:#d94c0d!important;opacity:1}
+.day-sum{display:flex;gap:18px;align-items:baseline;margin:16px 0 8px;padding-top:14px;border-top:1px solid #e3eef6;color:#12354d;font-size:15px}
+.day-sum b{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:18px}
+.calc-card{margin-top:24px;background:#fff;border:1px solid #dcebf5;border-radius:18px;overflow:hidden}
+.calc-head{all:unset;box-sizing:border-box;width:100%;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 22px;cursor:pointer}
+.calc-head b{display:block;font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:18px;color:#12354d}
+.calc-head span span{display:block;color:#3d5f75;font-size:13px;margin-top:3px}
+.calc-card .calc{margin:0;border:0;border-top:1px solid #e3eef6;border-radius:0}
+.calc.hidden{display:none}
+.calc-in{padding:20px 22px}
+.calc-in .card-title,.calc-lead{display:none}
+#finForm{display:grid;grid-template-columns:1fr 1fr;gap:4px 28px}
+.calc-group{display:block;margin:0 0 12px}
+.calc-group legend{margin-bottom:6px}
+.calc-field{flex-direction:row;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;font-weight:500;font-size:13.5px}
+.calc-input{width:120px;flex:0 0 120px;border-radius:10px;padding:0 10px}
+.calc-input input{padding:7px 0;font-size:14px}
+.calc-out{padding:20px 22px}
+.calc-row{padding:8px 0;font-size:13.5px}
+.calc-row b{font-size:16px}
+.calc-row.big b{font-size:20px}
+#finSave{padding:11px 22px;font-size:14px}
+/* growth */
+.goal-card{background:#12354d;color:#fff;border-radius:22px;padding:26px 28px}
+.goal-card .eyebrow-s{color:#a7d5ed}
+.goal-num{font-family:'Archivo Black','Arial Black',sans-serif;font-size:40px;letter-spacing:-1px;margin:6px 0 14px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.goal-num small{font-family:'DM Sans',sans-serif;font-size:18px;color:#a7d5ed}
+.goal-input{display:inline-flex;align-items:baseline;gap:2px;margin:0;color:#fff;font-size:40px;letter-spacing:-1px;text-transform:none;font-weight:400}
+.goal-input input{width:170px;background:rgba(255,255,255,.1);border:1px dashed rgba(255,255,255,.4);border-radius:10px;color:#fff;font:inherit;padding:0 8px;margin:0}
+.goal-bar{height:12px;background:rgba(255,255,255,.15);border-radius:99px;overflow:hidden}
+.goal-bar i{display:block;height:100%;background:#d94c0d;border-radius:99px}
+.goal-pct{margin-top:8px;color:#d6e9f5;font-size:14px}
+.goal-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:22px}
+.goal-step{background:rgba(255,255,255,.08);border-radius:14px;padding:14px 16px}
+.goal-step b{display:block;font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:28px}
+.goal-step span{display:block;font-weight:700;font-size:14px;margin-top:2px}
+.goal-step small{display:block;color:#a7d5ed;font-size:12.5px;margin-top:2px}
+.goal-step.alert{background:#d94c0d}.goal-step.alert small{color:#ffe1d3}
+.goal-step.good b{color:#7fd0f5}
+.weeks{display:grid;grid-template-columns:repeat(8,1fr);gap:12px;height:180px;align-items:end}
+.wk{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px}
+.wk i{width:100%;background:#087db6;border-radius:8px 8px 0 0;min-height:4px}
+.wk b{color:#12354d;font-size:14px}.wk span{color:#57768d;font-size:12px}
+@media(max-width:900px){#finForm{grid-template-columns:1fr}.grid.g3,.goal-steps{grid-template-columns:1fr 1fr}}
+
+/* the dark card on every page */
+.goal-card.hero{margin-bottom:18px}
+.goal-card.hero .goal-num{font-size:36px}
+.goal-step[data-go]{cursor:pointer;transition:transform .15s}
+.goal-step[data-go]:hover{transform:translateY(-2px);background:rgba(255,255,255,.14)}
+.goal-step.alert[data-go]:hover{background:#c24409}
+#triage{display:block}
+body.views.on-section #triage{display:none}
+.pagehead .sub{display:none}
+.spark.fin i{background:#087db6!important}
+.view-intro{display:none}
+
+.attn-row .row-btns{display:flex;gap:10px;margin:0}
+
+/* start-up costs: tidy rows */
+.cost-list{display:flex;flex-direction:column;gap:10px}
+.cost{border:1px solid #e3eef6;border-radius:14px;overflow:hidden;background:#fff}
+.cost.open{border-color:#9fd2ea;box-shadow:0 8px 24px rgba(18,53,77,.07)}
+.cost-line{display:grid;grid-template-columns:1.6fr 1fr 1fr .9fr .9fr auto;align-items:center;gap:16px;padding:14px 18px}
+.cost-main b{display:block;color:#12354d;font-size:15px}
+.cost-main span,.cost-meta span{display:block;color:#3d5f75;font-size:13px}
+.cost-meta span:first-child{color:#12354d;font-weight:600}
+.cost-amt b{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:18px;color:#12354d}
+.cost-amt b small{font-family:'DM Sans',sans-serif;font-size:13px;color:#57768d;margin-left:2px}
+.cost-amt span{display:block;font-size:12.5px;color:#57768d}
+.cost-chip{display:inline-block;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;background:#f2f6f9;color:#3d5f75;white-space:nowrap}
+.cost-chip.on{background:#e2f0f8;color:#087db6}
+.cost-chip.ok{background:#dff3e6;color:#1f7a45}
+.cost-chip.bad{background:#fde3d6;color:#b23c08}
+.cost-actions{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-top:1px solid #e3eef6;background:#f8fbfd}
+.cost-actions.hidden{display:none}
+.cost-btns{display:flex;gap:12px;flex-wrap:wrap}
+.cb{border-radius:999px;padding:10px 18px;font-size:13px;font-weight:700;border:0}
+.cb.light{background:#12354d;color:#fff}
+.cb.danger{background:#fde3d6;color:#b23c08}
+.cb.danger:hover{background:#d94c0d;color:#fff}
+@media(max-width:900px){.cost-line{grid-template-columns:1fr 1fr}.cost-actions{flex-direction:column;align-items:flex-start}}
+@media(min-width:901px){.cost-line{grid-template-columns:minmax(160px,1fr) 130px 220px 140px 140px 100px}}
+.cost-line .tk-toggle{justify-self:end}
+
+/* needs attention: folds open and closed */
+.attn-card.fold{padding:0;overflow:hidden}
+.attn-head{all:unset;box-sizing:border-box;width:100%;display:flex;align-items:center;gap:14px;padding:16px 22px;cursor:pointer}
+.attn-head b{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:18px;color:#b23c08;flex:1}
+.attn-count{background:#d94c0d;color:#fff;font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px}
+.attn-body{padding:0 22px 20px}
+.attn-body.hidden{display:none}
+.tk-toggle.light{background:#e2f0f8;color:#12354d}
+.attn-row .tk-toggle{white-space:nowrap}
+#connHero .goal-card,#supportHero .goal-card{margin-bottom:18px}
+.flag{display:inline-block;background:#fde3d6;color:#b23c08;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;margin:2px 4px 2px 0}
+#usersTable td{vertical-align:middle}
+span.tk-toggle{display:inline-block;border-radius:999px;padding:9px 20px;background:#12354d;color:#fff;font-size:13px;font-weight:700;text-align:center;min-width:84px;box-sizing:border-box}
+span.tk-toggle.light{background:#e2f0f8;color:#12354d}
+.agent-warn b{display:block;margin-bottom:4px}.agent-warn ul{margin:0;padding-left:18px;font-weight:500}
+#usersTable .tiny{margin-top:3px}
+.attn-row>button,.attn-row>.row-btns{flex-shrink:0}
+.attn-row>div{min-width:0}
+
+.verdict{border-radius:14px;padding:16px 20px;display:flex;flex-direction:column;gap:6px}
+.verdict.ok{background:#dff3e6}.verdict.ok>b{color:#1f7a45;font-size:17px}
+.verdict.bad{background:#fde3d6}.verdict.bad>b{color:#b23c08;font-size:17px}
+.verdict span{color:#12354d;font-size:15px}
+.funnel{display:flex;align-items:stretch;gap:8px}
+.funnel>i{align-self:center;font-style:normal;color:#9fb6c6;font-size:22px}
+.fn{flex:1;background:#f5f9fc;border-radius:14px;padding:14px 16px}
+.fn b{display:block;font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:24px;color:#12354d}
+.fn span{display:block;font-weight:700;color:#12354d;font-size:14px;margin-top:2px}
+.fn small{display:block;color:#57768d;font-size:12px;margin-top:2px}
+@media(max-width:900px){.funnel{flex-direction:column}.funnel>i{display:none}}
+
+.hbars{display:flex;flex-direction:column;gap:10px}
+.hb{display:grid;grid-template-columns:140px 1fr 70px;align-items:center;gap:12px;font-size:14px;color:#12354d}
+.hb i{display:block;height:10px;background:#eef6fb;border-radius:99px;overflow:hidden}
+.hb em{display:block;height:100%;background:#087db6;border-radius:99px}
+.hb b{text-align:right}
+.br-card.heat{display:flex;justify-content:space-between;align-items:center;gap:20px}
+.heat-btn{display:inline-block;border-radius:999px;text-decoration:none;white-space:nowrap}
+
+/* sign-in: same card as the client login */
+.login-card{max-width:440px;margin:12vh auto 0;background:#fff;border:1px solid #dcebf5;border-radius:22px;padding:32px 30px;box-shadow:0 20px 50px rgba(18,53,77,.08)}
+.login-card .eyebrow{color:#087db6;font-size:11px;letter-spacing:2px}
+.login-card h2{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:30px;letter-spacing:-.9px;color:#12354d;margin:8px 0 4px}
+.login-lead{color:#3d5f75;font-size:14px;margin:0 0 14px}
+.login-card input{border-radius:12px;padding:13px 14px;font-size:15px}
+#loginBtn{background:#d94c0d;color:#fff;padding:13px 28px;font-size:15px;font-weight:700}
+#loginMsg{margin-top:14px;font-size:14px}
+body:has(#loginCard:not(.hidden)) .crumb{visibility:hidden}
+
+/* sign-in screen: just the card, no sidebar or breadcrumb */
+body:has(#loginCard:not(.hidden)) .side,body:has(#loginCard:not(.hidden)) .topbar{display:none}
+body:has(#loginCard:not(.hidden)) .main{min-height:100vh;display:flex;align-items:flex-start;justify-content:center}
+.login-logo{display:block;width:150px;margin:0 0 18px}
+.login-back{display:inline-block;margin-top:18px;font-size:13px;color:#087db6;font-weight:600;text-decoration:none}
+
+/* settings: team members and access */
+.access-pick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+.access-pick.small{grid-template-columns:repeat(6,auto);justify-content:start}
+.ap{display:flex;gap:10px;align-items:flex-start;background:#f5f9fc;border:1px solid #dcebf5;border-radius:12px;padding:12px 14px;margin:0;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:500}
+.ap:has(input:checked){background:#e2f0f8;border-color:#9fd2ea}
+.ap input{width:auto;margin:3px 0 0}
+.ap b{display:block;color:#12354d;font-size:14px}
+.ap small{display:block;color:#3d5f75;font-size:12.5px;margin-top:2px}
+.owner-pick{display:flex;gap:10px;align-items:center;margin:14px 0 0;text-transform:none;letter-spacing:0;font-weight:500;color:#12354d;font-size:14px}
+.owner-pick input{width:auto;margin:0}
+.tm-foot{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:18px;flex-wrap:wrap}
+#tmAdd{padding:12px 26px}
+.team-line{grid-template-columns:minmax(180px,1.2fr) 1.6fr 220px 140px 100px!important}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+@media(max-width:900px){.access-pick{grid-template-columns:1fr 1fr}.access-pick.small{grid-template-columns:1fr 1fr}.team-line{grid-template-columns:1fr!important}}
+.cost-main b .cost-chip{display:inline-block;margin-left:8px;padding:3px 9px;font-size:11px;vertical-align:middle;color:#087db6;background:#e2f0f8}
+
+/* appearance switch */
+.appearance{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:18px}
+.seg{display:inline-flex;background:#e2eff7;border-radius:999px;padding:5px;gap:4px}
+.seg button{background:transparent;color:#57768d;font-weight:700;padding:10px 22px;border-radius:999px}
+.seg button[aria-pressed="true"]{background:#12354d;color:#fff}
+/* ── dark mode ── */
+html.dark body,html.dark .main,html.dark main,html.dark .topbar{background:#0b1a26!important;color:#d6e6f1}
+html.dark .side{background:#081520}
+html.dark .pagehead h1,html.dark .view-title,html.dark body.views details.sec.is-view>summary h2,html.dark .card-title,html.dark .detail-title,html.dark h2,html.dark h3{color:#f2f8fc!important}
+html.dark .br-card,html.dark .stat,html.dark .tk,html.dark .cost,html.dark .post,html.dark .attn-ok,html.dark .calc-card,html.dark .calc-in,html.dark #overviewList button,html.dark .login-card,html.dark .tile,html.dark .tk-reply,html.dark .attn-row,html.dark .ap,html.dark .fn,html.dark .check,html.dark .log-row{background:#13283a!important;border-color:#23425a!important;color:#d6e6f1}
+html.dark .tk-body,html.dark .cost-actions,html.dark .post-open,html.dark .tk-msg.agent,html.dark .calc-input,html.dark .goal-card .goal-step{background:#0f2231!important;border-color:#23425a!important}
+html.dark .stat .n,html.dark .stat .l,html.dark .facts b,html.dark .cost-main b,html.dark .tk-main b,html.dark .attn-row b,html.dark .post-line,html.dark .fn b,html.dark .fn span,html.dark .check b,html.dark .log-row,html.dark .day-sum,html.dark .hb,html.dark td,html.dark label,html.dark .tk-msg.agent,html.dark .calc-field,html.dark .ap b,html.dark .owner-pick,html.dark .wk b,html.dark #overviewList b,html.dark .crumb b{color:#eef6fb!important}
+html.dark .hint,html.dark .stat .s,html.dark .secsum,html.dark .crumb,html.dark th,html.dark .facts span,html.dark .cost-main span,html.dark .cost-meta span,html.dark .tk-main span,html.dark .attn-row span,html.dark .post-line span,html.dark .check span,html.dark .log-when,html.dark .ap small,html.dark .fn small,html.dark .wk span,html.dark .topbar .who,html.dark #overviewList span.s,html.dark #overviewList .og,html.dark .tiny,html.dark .detail-sub,html.dark .login-lead{color:#9db6c8!important}
+html.dark input,html.dark select,html.dark textarea{background:#0f2231!important;border-color:#2a4a63!important;color:#eef6fb!important}
+html.dark input::placeholder,html.dark textarea::placeholder{color:#6f8ba0!important}
+html.dark tbody tr:hover td,html.dark .rowlink:hover td,html.dark .post-line:hover{background:#18324a!important}
+html.dark th,html.dark td{border-color:#1d3a50!important}
+html.dark .attn-card{background:#2a160d!important;border-color:#7a3412!important}
+html.dark .attn-card .card-title,html.dark .attn-head b{color:#ff9a6a!important}
+html.dark .pilltrack,html.dark [data-pt],html.dark .seg{background:#13283a}
+html.dark .pilltrack .chip,html.dark [data-pt] .chip,html.dark .seg button{color:#9db6c8}
+html.dark .pilltrack .chip[aria-pressed="true"],html.dark [data-pt] .chip[aria-pressed="true"],html.dark .seg button[aria-pressed="true"]{background:#2d6a92;color:#fff}
+html.dark .tk-toggle,html.dark .cb.light,html.dark button.ghost{background:#2d6a92!important;color:#fff!important}
+html.dark .tk-toggle.light,html.dark span.tk-toggle.light,html.dark .tk-kb{background:#1f3d52!important;color:#d6e6f1!important}
+html.dark .cost-chip,html.dark .tk-status{background:#1f3d52;color:#cfe6f5}
+html.dark .goal-card{background:#12354d;box-shadow:0 0 0 1px #23425a}
+html.dark .spark-axis,html.dark .goal-pct{color:#9db6c8}
+html.dark .msg.ok{color:#7ed6a0}
+html.dark .agent-warn,html.dark .fail-log{background:#2a160d;border-color:#7a3412;color:#ffb48f}
+html.dark .verdict.ok{background:#12331f}.verdict.ok>b{}
+html.dark .verdict span{color:#d6e6f1}
+html.dark .hb i,html.dark .goal-bar{background:#0f2231}
+html.dark .tk-msg.team{background:#2d6a92}
+html.dark .goal-card .goal-step.alert{background:#d94c0d!important}
+html.dark .goal-card .goal-step.alert small{color:#ffe1d3}
+
+.theme-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#eef6fb;color:#12354d;border:0;border-radius:999px;padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer}
+.theme-switch i{position:relative;width:38px;height:22px;border-radius:99px;background:#c7dbe8;flex-shrink:0;transition:background .2s}
+.theme-switch i:after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s}
+.theme-switch[aria-checked="true"] i{background:#d94c0d}.theme-switch[aria-checked="true"] i:after{left:19px}
+.side-switch{margin:18px 6px 0;background:rgba(255,255,255,.08);color:#d6e6f1;width:calc(100% - 12px)}
+.side-switch i{background:rgba(255,255,255,.25)}
+html.dark .theme-switch:not(.side-switch){background:#13283a;color:#d6e6f1}
+@media(max-width:900px){.side-switch{display:none}}
+.rel-line{grid-template-columns:minmax(220px,1fr) 230px 150px 130px!important}
+.rel-body{flex:1;color:#12354d;font-size:14px}.rel-body ul{margin:6px 0 10px;padding-left:18px}.rel-body b{display:block;margin-top:6px;color:#b23c08}
+a.cb{text-decoration:none;display:inline-block;white-space:nowrap;align-self:flex-start}
+html.dark .rel-body{color:#d6e6f1}
+</style>
 </head>
 <body>
 <div class="shell">
   <aside class="side">
-    <a class="mark" href="admin.html">RESMARA<span>.</span><small>Buildroom</small></a>
-    <div class="side-eyebrow">Workspace</div>
+    <a class="mark brand-logo" href="#overview" data-go="overview"><img src="resmara-logo-white.png" alt="Resmara"><small>Team room</small></a>
     <nav id="index" class="hidden">
+      <a href="#overview" data-go="overview">Overview</a>
+      <div class="nav-group">Build</div>
       <a href="#sec-buildroom" data-go="buildroom">Build room</a>
+      <a href="#sec-releases" data-go="releases">Releases</a>
+      <div class="nav-group">Agents</div>
+      <a href="#sec-users" data-go="users">Accounts</a>
       <a href="#sec-support" data-go="support">Support</a>
-      <a href="#sec-content" data-go="content">Content</a>
+      <a href="#sec-advertising" data-go="advertising">Connections</a>
+      <div class="nav-group">Campaigns</div>
       <a href="#sec-campaigns" data-go="campaigns">Campaigns</a>
+      <div class="nav-group">Money</div>
       <a href="#sec-finance" data-go="finance">Finance</a>
       <a href="#sec-costs" data-go="costs">Start-up costs</a>
-      <a href="#sec-users" data-go="users">Accounts</a>
-      <a href="#sec-advertising" data-go="advertising">Connections</a>
+      <div class="nav-group">Business</div>
+      <a href="#sec-growth" data-go="growth">Growth</a>
+      <a href="#sec-marketing" data-go="marketing">Marketing</a>
+      <a href="#sec-website" data-go="website">Website</a>
+      <div class="nav-group">System</div>
+      <a href="#sec-health" data-go="health">System check</a>
       <a href="#sec-activity" data-go="activity">Activity</a>
-      <a href="#sec-health" data-go="health">Health</a>
-      <a href="#sec-checks" data-go="checks">Checks</a>
-      <a href="#sec-notes" data-go="notes">Notes</a>
+      <a href="#sec-settings" data-go="settings">Settings</a>
     </nav>
+    <button class="theme-switch side-switch" role="switch" aria-checked="false"><span>Dark mode</span><i></i></button>
     <div class="side-foot"><b>Operator console</b>Every figure is read from the database. Where one cannot be read, the section says why.</div>
   </aside>
 
   <div class="main">
     <div class="topbar">
-      <div class="crumb"><span>Console</span><i>/</i><b id="crumbNow">Overview</b></div>
+      <div class="crumb"><span>Team room</span><i>/</i><b id="crumbNow">Overview</b></div>
       <span class="sp"></span>
       <span id="statusPill"></span>
       <span class="who" id="who"></span>
@@ -247,39 +703,38 @@ tr.testrow td{background:#fbfdff;color:#849bae}
 
 <main>
   <!-- ── login ─────────────────────────────────────────────────────────── -->
-  <section id="loginCard" class="card" style="max-width:420px;margin:48px auto">
-    <div class="eyebrow">Operators only</div>
+  <section id="loginCard" class="card login-card">
+    <img class="login-logo" src="resmara-logo-navy.png" alt="Resmara">
+    <div class="eyebrow">Resmara Team room</div>
     <h2>Sign in</h2>
+    <p class="login-lead">Manage Resmara: the build, agents, campaigns and money.</p>
     <label for="email">Email</label>
     <input id="email" type="email" autocomplete="username" placeholder="you@example.com">
     <label for="password">Password</label>
     <input id="password" type="password" autocomplete="current-password">
-    <div style="margin-top:14px"><button id="loginBtn">Sign in</button></div>
+    <div style="margin-top:18px"><button id="loginBtn">Sign in →</button></div>
     <div class="msg" id="loginMsg"></div>
-    <p class="hint" style="margin:12px 0 0">Operators only. <a href="docs">Raw API (Swagger)</a></p>
+    <a class="login-back" href="/">← Back to resmara.com</a>
   </section>
 
   <!-- ── console ───────────────────────────────────────────────────────── -->
   <div id="console" class="hidden">
     <div class="pagehead">
-      <div class="eyebrow">Project pulse</div>
-      <h1>Operator console</h1>
-      <p class="sub">Accounts, campaigns, the content pipeline and the money — each figure read from the database, with the reason stated wherever one could not be read.</p>
+      <h1>Overview</h1>
+      <p class="sub">What needs us is at the top. Click any box or card to open it.</p>
       <div class="stamp" id="stamp"></div>
     </div>
     <!-- What is actually waiting on a human, above the fold, before any list. -->
     <div class="triage" id="triage"></div>
+    <div id="overviewList"></div>
 
     <details class="card sec" data-sec="buildroom" id="sec-buildroom">
       <summary><h2>Build room</h2><span class="secsum" id="sum-buildroom">…</span><span class="chev">›</span></summary>
       <div class="body">
-        <div class="hint" style="margin:0 0 12px">Who is on what, and who has it claimed. Adam works the front end
-          (<code>static/</code>), Dan works the back end (<code>app/</code>, <code>render.yaml</code>). A claim is a lock:
-          while somebody holds a task, anyone else's edit is refused and the refusal names the holder and how long they
-          have had it. It lives here now — the ChatGPT Sites tracker is retired.</div>
+        <div class="view-intro">Every job on Resmara and where it stands. Claim a task before you start it, so nobody else changes it while you work.</div>
         <div id="brSquares"><div class="hint">Reading the board…</div></div>
 
-        <h3 style="margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)">Add a task</h3>
+        <div class="br-card"><h3 class="card-title">Add a task</h3>
         <div class="row" id="brForm" style="align-items:flex-end">
           <div style="flex:1 1 220px;min-width:180px"><label for="brTitle">What needs doing</label><input id="brTitle" placeholder="Homepage hero: new headline and a wider photo"></div>
           <div style="flex:0 0 140px"><label for="brArea">Which half</label>
@@ -301,85 +756,129 @@ tr.testrow td{background:#fbfdff;color:#849bae}
           <label for="brNotes">Description — what exactly, and anything the other person needs to know</label>
           <textarea id="brNotes" rows="3" placeholder="The whole thing in plain words: what changes, what it should look like when it is right, and what it touches. Readable in full from the board."></textarea>
         </div>
-        <div class="msg" id="brMsg"></div>
+        <div class="msg" id="brMsg"></div></div>
 
-        <div class="brfilters" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+        <div class="brfilters pilltrack">
           <button class="chip brchip" data-brf="open" aria-pressed="true">Still open</button>
           <button class="chip brchip" data-brf="unclaimed" aria-pressed="false">Nobody has it</button>
           <button class="chip brchip" data-brf="claimed" aria-pressed="false">Claimed</button>
           <button class="chip brchip" data-brf="blocked" aria-pressed="false">Blocked</button>
           <button class="chip brchip" data-brf="all" aria-pressed="false">Everything</button>
         </div>
-        <div class="scrollx"><table id="brTable" style="min-width:820px">
+        <div class="br-card"><h3 class="card-title">Tasks</h3><div class="scrollx"><table id="brTable" style="min-width:820px">
           <thead><tr><th style="min-width:260px">task</th><th>status</th><th>assigned</th><th>claimed by</th><th>due</th><th>tested</th><th></th></tr></thead>
           <tbody><tr><td colspan="7" class="hint">Loading…</td></tr></tbody>
         </table></div>
-        <div class="hint" id="brCount" style="margin-top:6px"></div>
+        <div class="hint" id="brCount" style="margin-top:6px"></div></div>
       </div>
     </details>
 
     <details class="card sec" data-sec="support" id="sec-support">
       <summary><h2>Support</h2><span class="secsum" id="sum-support">…</span><span class="chev">›</span></summary>
       <div class="body">
-        <p class="hint" style="margin-top:0">Reply or change status — the client sees it on their Support page.</p>
-        <div class="filters">
+        <div id="supportHero"></div>
+        <div class="attn" id="attn-support"></div>
+        <div data-pt="1" class="filters">
           <button class="chip" data-filter="waiting" aria-pressed="true">Waiting on us</button>
           <button class="chip" data-filter="all" aria-pressed="false">All</button>
           <button class="chip" data-filter="open" aria-pressed="false">Open</button>
           <button class="chip" data-filter="resolved" aria-pressed="false">Resolved</button>
           <label class="chipbox"><input type="checkbox" id="showTestTickets"> Show <span id="testTicketCount">0</span> test ticket(s)</label>
         </div>
-        <div class="scrollx"><table id="ticketsTable"><thead><tr><th>id</th><th>client</th><th>subject</th><th>status</th><th>raised</th><th>updated</th><th>whose turn</th><th></th></tr></thead><tbody></tbody></table></div>
+        <div id="ticketsTable" class="tk-list"></div>
         <div class="hint" id="ticketCount" style="margin-top:6px"></div>
         <div class="msg" id="ticketMsg"></div>
-        <p class="hint" style="margin:18px 0 6px">Questions the Ask Resmara chat couldn&#39;t answer <span id="helpMissCount"></span>
-          — add one and the next agent who asks gets it, without a ticket.</p>
-        <div id="helpMisses" class="hint">Loading…</div>
+        <div class="br-card"><h3 class="card-title">Questions the chat couldn&#39;t answer <span id="helpMissCount"></span></h3>
+          <p class="hint" style="margin:-6px 0 10px">Add an answer and the next agent who asks gets it right away.</p>
+        <div id="helpMisses" class="hint">Loading…</div></div>
       </div>
     </details>
 
     <div id="metricsBody">
     <details class="card sec" data-sec="content" id="sec-content">
       <summary><h2>Content</h2><span class="secsum" id="sum-content">…</span><span class="chev">›</span></summary>
+      <div class="attn" id="attn-content"></div>
       <div class="body" id="contentBody"></div>
     </details>
 
     <details class="card sec" data-sec="campaigns" id="sec-campaigns">
       <summary><h2>Campaigns</h2><span class="secsum" id="sum-campaigns">…</span><span class="chev">›</span></summary>
       <div class="body" id="campaignsBody"></div>
+      <div class="attn" id="attn-campaigns"></div>
+      <div id="campaignDetail" class="hidden"></div>
+      <div class="br-card camp-list" style="margin-top:0"><h3 class="card-title">Every campaign</h3>
+        <input id="campSearch" type="search" placeholder="Search by ID, address or agent">
+        <div id="campList" class="hint">Loading…</div></div>
     </details>
 
     <details class="card sec" data-sec="finance" id="sec-finance">
       <summary><h2>Finance</h2><span class="secsum" id="sum-finance">…</span><span class="chev">›</span></summary>
       <div class="body">
-        <div class="hint" style="margin:0 0 12px">What a campaign sells for, what it costs us to deliver, what we may spend to win an agent and still profit, and what has actually been collected. A square counts one thing and says which. Where a number is modelled rather than measured it says “assumed”.</div>
+        <div id="finOrders"></div>
+        <div class="br-card"><h3 class="card-title">Sales each day</h3><div id="finDaily" class="hint">Loading…</div><div id="finDay"></div></div>
+        <h3 class="card-title" style="margin-top:24px">What each sale is worth</h3>
         <div id="finSquares"><div class="hint">Working the numbers…</div></div>
-
-        <h3 style="margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)">What a repeat agent is worth</h3>
-        <div class="hint" style="margin:0 0 10px">One campaign at $49 has high margin and still cannot pay for a customer, because acquisition has to come out of that single sale. An agent who lists several homes a year and runs several campaigns on each is worth several campaigns — which is the only arithmetic that makes paid acquisition work.</div>
+        <h3 class="card-title" style="margin-top:24px">What an agent is worth</h3>
         <div id="finRepeat"></div>
-
-        <h3 style="margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)">Assumptions</h3>
-        <div class="hint" style="margin:0 0 10px">Our numbers about the world, not measurements. Changing one changes the model, and the squares above recalculate on save.</div>
-        <div class="row" id="finForm"></div>
-        <div class="flex" style="margin-top:10px"><button id="finSave">Save and recalculate</button><span class="msg" id="finMsg"></span></div>
-
-        <h3 style="margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)">Who has paid, and who came back</h3>
+        <div class="calc-card" id="calcCard">
+          <button class="calc-head" id="calcToggle" type="button"><span><b>Pricing calculator</b><span id="calcSum">Try different prices and costs.</span></span><span class="tk-toggle" id="calcBtn">Open</span></button>
+        <div class="calc hidden" id="calcBody">
+          <div class="calc-in">
+            <h3 class="card-title">Pricing calculator</h3>
+            <p class="calc-lead">Change any number, then press Recalculate.</p>
+            <div id="finForm"></div>
+            <div class="calc-actions"><button id="finSave">Recalculate</button><span class="msg" id="finMsg"></span></div>
+          </div>
+          <div class="calc-out" id="finResults"></div>
+        </div></div>
+        <div class="br-card"><h3 class="card-title">Who has paid</h3>
         <div class="scrollx"><table id="finCustomers">
-          <thead><tr><th>account</th><th>campaigns</th><th>paid</th><th>last payment</th></tr></thead>
+          <thead><tr><th>agent</th><th>campaigns</th><th>paid</th><th>last payment</th></tr></thead>
           <tbody><tr><td colspan="4" class="hint">Loading…</td></tr></tbody>
-        </table></div>
-        <div class="hint" style="margin-top:8px">Two or more paid campaigns is the repeat business the pricing depends on — a second campaign on the same listing counts.</div>
+        </table></div></div>
+      </div>
+    </details>
+
+    <details class="card sec" data-sec="marketing" id="sec-marketing">
+      <summary><h2>Marketing</h2><span class="secsum" id="sum-marketing">…</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div id="mkHero"><div class="hint">Loading…</div></div>
+        <div class="br-card" style="margin-top:0"><h3 class="card-title">Is it worth it?</h3><div id="mkVerdict" class="hint">Loading…</div></div>
+        <div class="br-card"><h3 class="card-title">From ad to paying agent</h3><div id="mkFunnel" class="hint">Loading…</div></div>
+        <div class="br-card"><h3 class="card-title">Each week</h3><div id="mkWeeks" class="hint">Loading…</div></div>
+      </div>
+    </details>
+
+    <details class="card sec" data-sec="website" id="sec-website">
+      <summary><h2>Website</h2><span class="secsum" id="sum-website">…</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div id="webHero"><div class="hint">Loading…</div></div>
+        <div class="attn" id="attn-website"></div>
+        <div class="br-card" style="margin-top:0"><h3 class="card-title">Is it working?</h3><div id="webChecks" class="hint">Loading…</div></div>
+        <div class="grid2c">
+          <div class="br-card"><h3 class="card-title">Where visitors come from</h3><div id="webSources" class="hint">Loading…</div></div>
+          <div class="br-card"><h3 class="card-title">Top pages</h3><div id="webPages" class="hint">Loading…</div></div>
+        </div>
+        <div class="br-card heat"><div><h3 class="card-title">Heat maps and recordings</h3><p id="webHeatTxt" class="hint" style="margin:0">See where people click, scroll and give up, in Microsoft Clarity.</p></div><span id="webHeatBtn"></span></div>
+      </div>
+    </details>
+
+    <details class="card sec" data-sec="growth" id="sec-growth">
+      <summary><h2>Growth</h2><span class="secsum" id="sum-growth">…</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div class="goal-card" id="goalCard"><div class="hint">Working it out…</div></div>
+        <div id="growthSquares" style="margin-top:18px"></div>
+        <div class="br-card"><h3 class="card-title">Campaigns each week</h3><div id="growthWeeks" class="hint">Loading…</div></div>
       </div>
     </details>
 
     <details class="card sec" data-sec="costs" id="sec-costs">
       <summary><h2>Start-up costs</h2><span class="secsum" id="sum-costs">…</span><span class="chev">›</span></summary>
       <div class="body">
-        <div class="hint" style="margin:0 0 12px">What this project has cost so far, who put the money down, and what keeps charging every month. Nothing here is customer revenue — that is the Money band above.</div>
+        <div class="view-intro">What building Resmara has cost so far, who paid, and what keeps charging every month.</div>
         <div id="costSquares"><div class="hint">Reading the ledger…</div></div>
 
-        <h3 style="margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)">Add a cost</h3>
+        <div class="br-card add-box"><h3 class="card-title">Add a cost</h3>
         <div class="row" id="costForm">
           <div style="flex:0 0 140px"><label for="cDate">Paid on</label><input type="date" id="cDate"></div>
           <div style="flex:1 1 150px"><label for="cPayer">Who paid</label><input id="cPayer" placeholder="Dan"></div>
@@ -396,46 +895,86 @@ tr.testrow td{background:#fbfdff;color:#849bae}
           <div style="flex:0 0 auto"><label for="cReceipt">Receipt (photo or PDF)</label><input type="file" id="cReceipt" accept="image/*,application/pdf"></div>
           <div style="flex:0 0 auto"><button id="cAdd">Add it</button></div>
         </div>
-        <div class="msg" id="costMsg" style="margin-top:8px"></div>
+        <div class="msg" id="costMsg" style="margin-top:8px"></div></div>
 
-        <div class="scrollx" style="margin-top:16px"><table id="costsTable">
-          <thead><tr><th>paid on</th><th>who paid</th><th>paid to</th><th>what for</th><th>amount</th><th>repeats</th><th>charged so far</th><th>next</th><th>receipt</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table></div>
-        <div class="hint" style="margin-top:8px">A repeating cost counts itself once per month (or year) from the day it started. Ending one stops the clock and keeps what it already cost.</div>
+        <div class="br-card"><h3 class="card-title">Every cost</h3><div id="costsTable" class="cost-list"></div>
+        <div class="hint" style="margin-top:8px">A repeating cost counts once a month (or year) from the day it started. Ending one stops it.</div></div>
       </div>
     </details>
 
     <details class="card sec" data-sec="users" id="sec-users">
       <summary><h2>Accounts</h2><span class="secsum" id="sum-users">…</span><span class="chev">›</span></summary>
       <div class="body">
-        <div class="filters">
+        <div id="accountsHero"></div>
+        <div id="agentPage" class="hidden"></div>
+        <div class="filters" id="usersFilters">
           <input id="userSearch" type="search" placeholder="Search email, name or id">
           <label class="chipbox"><input type="checkbox" id="showTestUsers"> Show <span id="testUserCount">0</span> test account(s)</label>
           <label class="chipbox"><input type="checkbox" id="showAllUsers"> Show every match</label>
           <span class="hint" id="userCount"></span>
         </div>
-        <div class="scrollx"><table id="usersTable"><thead><tr><th>id</th><th>email</th><th>name</th><th>active</th><th>subscription</th><th>campaigns</th><th>last login</th><th></th></tr></thead><tbody></tbody></table></div>
+        <div class="scrollx" id="usersWrap"><table id="usersTable"><thead><tr><th>id</th><th>agent</th><th>status</th><th>needs attention</th><th>campaigns</th><th>last sign-in</th><th></th></tr></thead><tbody></tbody></table></div>
       </div>
     </details>
 
     <details class="card sec" data-sec="advertising" id="sec-advertising">
       <summary><h2>Connections</h2><span class="secsum" id="sum-advertising">…</span><span class="chev">›</span></summary>
+      <div id="connHero"></div>
+      <div class="attn" id="attn-advertising"></div>
       <div class="body" id="advertisingBody"></div>
+    </details>
+
+    <details class="card sec" data-sec="releases" id="sec-releases">
+      <summary><h2>Releases</h2><span class="secsum" id="sum-releases">…</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div id="relHero"></div>
+        <div class="br-card" style="margin-top:0"><h3 class="card-title">Waiting to go live</h3><div id="relOpen" class="hint">Loading…</div></div>
+        <div class="br-card"><h3 class="card-title">Live on resmara.com</h3><div id="relDone" class="hint">Loading…</div></div>
+      </div>
+    </details>
+
+    <details class="card sec" data-sec="settings" id="sec-settings">
+      <summary><h2>Settings</h2><span class="secsum" id="sum-settings">…</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div class="br-card appearance" style="margin-top:0"><div><h3 class="card-title">Your appearance</h3><p class="hint" style="margin:0">Just for you, on this device.</p></div>
+          <button class="theme-switch" role="switch" aria-checked="false"><span>Dark mode</span><i></i></button></div>
+        <div id="teamHero"></div>
+        <div id="teamAdmin">
+        <div class="br-card add-box" style="margin-top:0"><h3 class="card-title">Add a team member</h3>
+          <div class="row">
+            <div style="flex:1 1 200px"><label for="tmName">Name</label><input id="tmName" placeholder="John Doe"></div>
+            <div style="flex:1 1 240px"><label for="tmEmail">Email</label><input id="tmEmail" type="email" placeholder="john@example.com"></div>
+          </div>
+          <label style="margin-top:16px">What they can see</label>
+          <div class="access-pick" id="tmAccess"></div>
+          <label class="owner-pick"><input type="checkbox" id="tmOwner"> <span><b>Super admin</b> · sees everything, and is the only level that can add people or change who sees what</span></label>
+          <div class="tm-foot"><span class="hint">They get an email with a link to choose their own password and sign in to the Team room.</span><button id="tmAdd" class="tk-send">Send invite</button></div>
+          <div class="msg" id="tmMsg"></div>
+        </div>
+        <div class="br-card"><h3 class="card-title">Team members</h3><div id="teamList" class="hint">Loading…</div></div>
+        </div>
+      </div>
     </details>
 
     <details class="card sec" data-sec="activity" id="sec-activity">
       <summary><h2>Activity</h2><span class="secsum" id="sum-activity">…</span><span class="chev">›</span></summary>
-      <div class="body" id="activityBody"></div>
+      <div class="body">
+        <div class="br-card" style="margin-top:0"><h3 class="card-title">Last 14 days</h3><div id="activityBody"></div></div>
+        <div class="br-card"><h3 class="card-title" id="actLogTitle">Activity log</h3><div id="actLog" class="hint">Loading…</div></div>
+      </div>
     </details>
 
     </div>
 
     <details class="card sec" data-sec="health" id="sec-health">
-      <summary><h2>System health</h2><span class="secsum" id="sum-health">…</span><span class="chev">›</span></summary>
+      <summary><h2>System check</h2><span class="secsum" id="sum-health">…</span><span class="chev">›</span></summary>
+      <div class="attn" id="attn-health"></div>
       <div class="body">
-        <div class="rows" id="healthRows"></div>
-        <div class="hint" id="healthNote" style="margin-top:10px"></div>
+        <div class="br-card" style="margin-top:0"><h3 class="card-title">Every part of Resmara</h3><div id="sysChecks" class="hint">Checking…</div></div>
+        <div class="br-card"><h3 class="card-title">This server</h3><div class="rows" id="healthRows"></div>
+        <div class="hint" id="healthNote" style="margin-top:10px"></div></div>
+        <h3 class="card-title" style="margin-top:22px">Storage</h3>
+        <div id="sysStorage"></div>
       </div>
     </details>
 
@@ -547,6 +1086,29 @@ const WHY = {
   'campaigns paid for': 'Orders Stripe reports as paid.',
   'last order': 'Newest payment. Blank means nobody has bought yet.',
   'posts': 'Every post written, across every campaign.',
+  'connected accounts': 'Agents who connected a Facebook Page and Instagram account.',
+  'working': 'Meta still accepts the login, so posts and the ad can go out.',
+  'expiring soon': 'The login runs out soon. The agent should reconnect before it does.',
+  'test logins': 'No real Meta login behind it, so nothing is really posted.',
+  'live now': 'Running right now: posts going out and the ad on.',
+  'built, not launched': 'Plan written, not launched yet. Usually waiting on the agent to review.',
+  'not built yet': 'Created, but the engine has not written its plan yet.',
+  'finished': 'The 14 days are over.',
+  'failed posts': 'Posts that did not go live. Each one is listed below with why.',
+  'failed to post': 'Meta refused it or its photo was missing. These need someone to look.',
+  'waiting on review': 'Written, but the agent has not approved it yet.',
+  'scheduled': 'Approved and dated for later.',
+  'posting now': 'Approved and due, waiting for the publisher to send it.',
+  'posted': 'Meta returned a post id, the only proof it really went out.',
+  'next post goes out': 'The soonest date on the queue.',
+  'posts written': 'Every post written, across every campaign.',
+  'money collected': 'Card payments Stripe has recorded, all time.',
+  'agents': 'Everyone who has signed up, not counting us or test accounts.',
+  'new this month': 'Agents who signed up since the 1st.',
+  'active this month': 'Agents who started at least one campaign since the 1st.',
+  'left': 'Agents who closed their account or were switched off.',
+  'repeat agents': 'Agents who have run two or more campaigns. Growth comes from these.',
+  'checkouts not finished': 'Someone started paying and did not finish.',
   'due for the publisher': 'Approved and dated on or before now, waiting to send.',
   'waiting on a human': 'Written, but nobody has approved or rejected it yet.',
   'approved by a human': 'A person approved it; it has no publish date yet.',
@@ -597,13 +1159,28 @@ const WHY = {
   'Awaiting build': 'Waiting on the engine to write a plan for this campaign.',
   'Reconnect': 'Meta rejected the token; nothing publishes until it is renewed.'
 };
-function whyFor(l){ return WHY[l] ? '<div class="w">' + esc(WHY[l]) + '</div>' : ''; }
+function whyFor(l){ return ''; }
+// The explanation of a box lives in its hover text, so the page shows numbers, not paragraphs.
+function tip(l){ return WHY[l] ? ' title="' + esc(WHY[l]) + '"' : ''; }
 // Everything below interpolates API values through esc() (or through fmt(), which escapes)
 // before it reaches innerHTML, so a crafted name, subject or reply cannot inject markup.
-function stat(n, l, cls, sub){ return '<div class="stat ' + (cls||'') + '"><div class="n">' + (n === null || n === undefined ? '—' : esc(n)) + '</div><div class="l">' + esc(l) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + whyFor(l) + '</div>'; }
+// Friendly date for people: "Nov 16, 9:00 AM" in the viewer's own time zone.
+function when(iso){ if (!iso) return '—'; const s = /[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z';
+  const d = new Date(s); return isNaN(d) ? String(iso) : d.toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}); }
+
+// ── the dark card at the top of a page: one headline, an optional bar, four numbers ──
+function hero(o){
+  return '<div class="goal-card hero">' +
+    '<span class="eyebrow-s">' + esc(o.eyebrow) + '</span>' +
+    '<div class="goal-num">' + o.big + (o.small ? ' <small>' + o.small + '</small>' : '') + '</div>' +
+    (o.bar ? '<div class="goal-bar"><i style="width:' + Math.max(0, Math.min(100, o.bar.pct)) + '%"></i></div><div class="goal-pct">' + esc(o.bar.label) + '</div>' : '') +
+    '<div class="goal-steps">' + o.steps.map(s => '<div class="goal-step ' + (s.cls || '') + '"' + (s.go ? ' data-go="' + s.go + '" role="button"' : '') + '>' +
+      '<b>' + esc(s.n) + '</b><span>' + esc(s.l) + '</span>' + (s.s ? '<small>' + esc(s.s) + '</small>' : '') + '</div>').join('') + '</div></div>';
+}
+function stat(n, l, cls, sub){ return '<div class="stat ' + (cls||'') + '"' + tip(l) + '><div class="n">' + (n === null || n === undefined ? '—' : esc(n)) + '</div><div class="l">' + esc(l) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + whyFor(l) + '</div>'; }
 // For tiles whose value is already safe HTML built by pills() (each value escaped there):
 // escaping the whole thing again would print the markup instead of the pills.
-function statRaw(html, l, cls, sub){ return '<div class="stat ' + (cls||'') + '"><div class="n">' + (html || '—') + '</div><div class="l">' + esc(l) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + whyFor(l) + '</div>'; }
+function statRaw(html, l, cls, sub){ return '<div class="stat ' + (cls||'') + '"' + tip(l) + '><div class="n">' + (html || '—') + '</div><div class="l">' + esc(l) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + whyFor(l) + '</div>'; }
 function kv(k, v, cls){ return '<div><span class="k">' + esc(k) + '</span><span class="v ' + (cls||'') + '">' + v + '</span></div>'; }
 function pills(obj){
   const parts = Object.entries(obj || {}).map(([k,v]) => '<span class="pill">' + esc(k) + ' ' + esc(v) + '</span>');
@@ -633,18 +1210,18 @@ function pending(m){
   };
 }
 function renderTriage(m){
-  const p = pending(m);
-  const tiles = [
-    ['support', 'Waiting on us', p.support, 'Reply to a client'],
-    ['content', 'Posts need us', p.content, 'Due for the publisher, or failed'],
-    ['campaigns', 'Awaiting build', p.campaigns, 'No plan generated yet'],
-    ['advertising', 'Reconnect', p.advertising, 'Tokens Meta has rejected'],
-  ];
-  $('triage').innerHTML = tiles.map(([sec, label, d, note]) =>
-    '<button class="tile ' + (d.n ? 'on' : 'zero') + '" data-go="' + sec + '">' +
-      '<div class="n">' + esc(d.n) + '</div><div class="l">' + esc(label) + '</div>' +
-      '<div class="s">' + esc(d.n ? note : 'nothing waiting') + (d.hidden ? ' · ' + esc(d.hidden) + ' test hidden' : '') + '</div>' + whyFor(label) +
-    '</button>').join('');
+  // The same four numbers as the orange badges in the sidebar, so the two never disagree.
+  const s = m.support || {}, c = m.campaigns || {}, ct = m.content || {}, ad = m.advertising || {};
+  const w = (s.waiting_on_us || 0) - (s.waiting_on_us_test || 0), f = (ct.failed || 0) - (ct.failed_test || 0),
+        nb = (c.awaiting_build || 0) - (c.awaiting_build_test || 0), cn = (ad.needs_reconnect || 0) + (ad.expiring || 0);
+  const total = w + f + nb + cn;
+  $('triage').innerHTML = hero({eyebrow: 'Right now', big: total ? esc(total) + ' thing' + (total === 1 ? '' : 's') + ' need us' : 'All clear',
+    small: total ? 'Click one to go straight to it.' : 'Nothing is waiting on us.',
+    steps: [
+      {n: w, l: 'Waiting on us', s: 'Tickets to reply to', cls: w ? 'alert' : '', go: 'support'},
+      {n: f, l: 'Failed posts', s: 'Posts that did not go live', cls: f ? 'alert' : '', go: 'campaigns'},
+      {n: nb, l: 'Not built yet', s: 'Campaigns the engine has not built', cls: nb ? 'alert' : '', go: 'campaigns'},
+      {n: cn, l: 'Connections', s: 'Logins broken or expiring', cls: cn ? 'alert' : '', go: 'advertising'}]});
 }
 
 // ── section summaries (read while folded) ─────────────────────────────────────────
@@ -652,20 +1229,22 @@ function renderSums(m){
   const s = m.support || {}, c = m.campaigns || {}, ct = m.content || {}, a = m.advertising || {}, act = m.activity || {};
   const wait = (s.waiting_on_us || 0) - (s.waiting_on_us_test || 0);
   $('sum-support').innerHTML = wait ? '<b>' + esc(wait) + ' waiting on us</b> · ' + esc(s.open || 0) + ' open' : esc(s.open || 0) + ' open · nothing waiting';
-  $('sum-content').innerHTML = split(ct.real_posts || 0, ct.test_posts || 0, 'real posts') + ' · ' +
-    esc((ct.due_now || 0) - (ct.due_now_test || 0)) + ' due now · ' + esc(ct.published || 0) + ' published';
-  $('sum-campaigns').innerHTML = split(c.real || 0, c.test_campaigns || 0, 'real') + ' · ' +
-    esc((c.awaiting_build || 0) - (c.awaiting_build_test || 0)) + ' awaiting build · ' +
-    esc('$' + Number((m.revenue && m.revenue.paid_usd) || 0).toFixed(2)) + ' collected';
+  const failedReal = (ct.failed || 0) - (ct.failed_test || 0);
+  $('sum-content').innerHTML = (failedReal ? '<b>' + esc(failedReal) + ' failed to post</b> · ' : '0 failed · ') +
+    esc(ct.scheduled || 0) + ' scheduled · ' + esc(ct.published || 0) + ' posted';
+  $('sum-campaigns').innerHTML = split(c.real || 0, c.test_campaigns || 0, 'campaigns') + ' · ' +
+    esc(c.live || 0) + ' live · ' + esc((c.awaiting_build || 0) - (c.awaiting_build_test || 0)) + ' not built yet';
   $('sum-users').innerHTML = split(m.users ? m.users.real || 0 : 0, m.users ? m.users.test_accounts || 0 : 0, 'real account(s)');
-  $('sum-advertising').innerHTML = esc(a.accounts || 0) + ' account(s) · ' + esc(a.live_accounts || 0) + ' live token(s)' +
-    (a.needs_reconnect ? ' · <b>' + esc(a.needs_reconnect) + ' need reconnect</b>' : '');
+  const cAttn = (a.needs_reconnect || 0) + (a.expiring || 0);
+  $('sum-advertising').innerHTML = esc(a.live_accounts || 0) + ' of ' + esc(a.accounts || 0) + ' active' +
+    (cAttn ? ' · <b>' + esc(cAttn) + ' need attention</b>' : '');
   $('sum-activity').innerHTML = esc(act.total_14d || 0) + ' event(s) in ' + esc(act.days || 14) + ' days';
 }
 
 async function loadHealth(){
   try {
     const h = await api('/api/admin/health');
+    lastHealth = h;
     const okPill = h.status === 'healthy' ? '<span class="pill ok">healthy</span>' : '<span class="pill bad">' + esc(h.status) + '</span>';
     $('healthRows').innerHTML =
       kv('status', okPill) +
@@ -692,8 +1271,8 @@ function sparkline(days){
   if (!days || !days.length) return '<div class="hint">No events recorded yet.</div>';
   const max = Math.max(1, ...days.map(d => d.events));
   return '<div class="spark">' + days.map(d =>
-      '<i style="height:' + Math.round((d.events / max) * 100) + '%" title="' + esc(d.date) + ': ' + esc(d.events) + ' event(s)"></i>').join('') +
-    '</div><div class="spark-axis"><span>' + esc(days[0].date) + '</span><span>' + esc(days[days.length-1].date) + '</span></div>';
+      '<i data-day="' + esc(d.date) + '" style="height:' + Math.round((d.events / max) * 100) + '%" title="' + esc(dateOnly(d.date)) + ': ' + esc(d.events) + ' event(s). Click to see them."></i>').join('') +
+    '</div><div class="spark-axis"><span>' + esc(dateOnly(days[0].date)) + '</span><span>' + esc(dateOnly(days[days.length-1].date)) + '</span></div>';
 }
 
 // A section the server could not compute says so, in its own square, with the reason.
@@ -702,7 +1281,747 @@ function groupError(what, reason){
     '</div><div class="hint">The other sections still loaded — this one is named in “Not measured” below.</div>';
 }
 
-let lastMetrics = null;
+
+// ── needs attention: the first thing on every view, and the orange number in the sidebar ──
+const attnOpen = new Set();
+function attnBox(id, items, extra, count){
+  const el = $(id); if (!el) return;
+  const live = items.filter(x => x.n > 0);
+  const n = count != null ? count : live.reduce((t, x) => t + x.n, 0);
+  if (!(live.length || extra) || !n) { el.innerHTML = '<div class="attn-ok">✓ Nothing needs attention here.</div>'; return; }
+  const open = attnOpen.has(id);
+  el.innerHTML = '<div class="attn-card fold' + (open ? ' open' : '') + '">' +
+    '<button class="attn-head" data-attn-toggle="' + id + '" type="button"><b>Needs attention</b>' +
+      '<span class="attn-count">' + esc(n) + ' need' + (n === 1 ? 's' : '') + ' attention</span><span class="tk-toggle">' + (open ? 'Close' : 'Open') + '</span></button>' +
+    '<div class="attn-body' + (open ? '' : ' hidden') + '">' +
+      (live.length ? '<ul>' + live.map(x => '<li><b>' + esc(x.n) + '</b> ' + esc(x.text) + '</li>').join('') + '</ul>' : '') + (extra || '') +
+    '</div></div>';
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-attn-toggle]'); if (!t) return;
+  const id = t.dataset.attnToggle, card = t.closest('.attn-card'), body = card.querySelector('.attn-body');
+  const now = body.classList.toggle('hidden');
+  if (now) attnOpen.delete(id); else attnOpen.add(id);
+  card.classList.toggle('open', !now); t.querySelector('.tk-toggle').textContent = now ? 'Open' : 'Close';
+});
+function navBadge(sec, n){
+  const link = document.querySelector('#index a[data-go="' + sec + '"]'); if (!link) return;
+  let b = link.querySelector('.nav-badge');
+  if (!n) { if (b) b.remove(); return; }
+  if (!b) { b = document.createElement('span'); b.className = 'nav-badge'; link.appendChild(b); }
+  b.textContent = n;
+}
+let failedPosts = null;
+function paintAttention(m){
+  const s = m.support || {}, c = m.campaigns || {}, ct = m.content || {}, a = m.advertising || {};
+  const waiting = (s.waiting_on_us || 0) - (s.waiting_on_us_test || 0);
+  const failed = (ct.failed || 0) - (ct.failed_test || 0);
+  const notBuilt = (c.awaiting_build || 0) - (c.awaiting_build_test || 0);
+  const conn = (a.needs_reconnect || 0) + (a.expiring || 0);
+  // Support: the waiting tickets themselves, each one opens in place.
+  const wt = (ticketRows || []).filter(t => !t.is_test && waitingOnUs(t));
+  attnBox('attn-support', wt.length ? [] : [{n: waiting, text: 'ticket(s) waiting on our reply'}],
+    wt.length ? attnList(wt.map(t => ({main: t.subject, sub: (t.client_email || '') + ' · waiting since ' + when(t.updated_at || t.created_at),
+      btn: '<button class="tk-toggle" data-open-ticket="' + esc(t.id) + '">Open</button>'}))) : '', wt.length || waiting);
+  paintSupportHero(m);
+  attnBox('attn-campaigns', [], (failed ? '<div id="failedList" class="hint">Loading the failed posts…</div>' : '') +
+    (notBuilt ? '<div id="campAttn" class="hint" style="margin-top:8px">Loading…</div>' : ''), failed + notBuilt);
+  attnBox('attn-advertising', [], conn ? '<div id="connAttn" class="hint">Loading…</div>' : '', conn);
+  paintConnHero(m);
+  navBadge('support', waiting); navBadge('campaigns', failed + notBuilt); navBadge('advertising', conn);
+  if (failed) loadFailedPosts(failed);
+  paintCampAttn(); paintConnAttn();
+  paintSystemAttn(m);
+}
+function attnList(items){
+  return '<div class="attn-list">' + items.map(x => '<div class="attn-row"><div><b>' + esc(x.main) + '</b><span>' + esc(x.sub || '') + '</span></div>' + (x.btn || '') + '</div>').join('') + '</div>';
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-open-ticket]'); if (!b) return;
+  const id = b.dataset.openTicket;
+  ticketFilter = 'all'; document.querySelectorAll('[data-filter]').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.filter === 'all')));
+  renderTickets();
+  const open = document.querySelector('#ticketsTable [data-ticket="' + id + '"]');
+  if (open) { if (!openTickets.has(String(id))) open.click(); $('tk-' + id).scrollIntoView({behavior: 'smooth', block: 'start'}); }
+});
+
+// ── campaigns: every campaign, searchable, each one opens with its posts ──
+// Needs GET /api/admin/campaigns and GET /api/admin/campaigns/{id} from the back end.
+let campRows = null;
+const STAGE = {PENDING: 'Not launched', LIVE: 'Live', COMPLETE: 'Finished'};
+function stageLabel(r){ return r.stage === 'PENDING' && !r.built ? 'Not built yet' : (STAGE[r.stage] || r.stage); }
+function stagePill(r){ const l = stageLabel(r); const cls = l === 'Live' ? 'ok' : l === 'Not built yet' ? 'bad' : l === 'Finished' ? '' : 'warn';
+  return '<span class="pill ' + cls + '">' + esc(l) + '</span>'; }
+function campTable(rows, withAgent){
+  return '<div class="scrollx"><table><thead><tr><th>ID</th><th>property</th>' + (withAgent ? '<th>agent</th>' : '') +
+    '<th>status</th><th>day</th><th>posts</th><th>goes live</th></tr></thead><tbody>' +
+    rows.map(r => '<tr class="rowlink" data-campaign="' + esc(r.id) + '"><td><b>#' + esc(r.id) + '</b></td><td>' + esc(r.address) + '</td>' +
+      (withAgent ? '<td>' + esc(r.agent_name || r.agent_email || '') + '</td>' : '') +
+      '<td>' + stagePill(r) + '</td><td>' + (r.stage === 'LIVE' && r.day ? 'Day ' + esc(r.day) + ' of 14' : '—') + '</td>' +
+      '<td>' + esc(r.posts_published || 0) + ' of ' + esc(r.posts_total || 0) + ' posted' + (r.posts_failed ? ' · <b class="bad-t">' + esc(r.posts_failed) + ' failed</b>' : '') + '</td>' +
+      '<td>' + esc(dateOnly(r.go_live_date)) + '</td></tr>').join('') + '</tbody></table></div>';
+}
+function dateOnly(iso){ if (!iso) return '—'; const d = new Date(/T/.test(iso) ? (/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z') : iso + 'T12:00:00'); return isNaN(d) ? String(iso) : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}); }
+async function loadCampaigns(){
+  try { campRows = await api('/api/admin/campaigns'); } catch (err) { campRows = null; }
+  paintCampList(); paintCampAttn(); paintConnAttn(); paintGrowth(); if (!agentOpen) renderUsers();
+  if (agentOpen) paintAgent(agentOpen);
+}
+function paintCampList(){
+  const el = $('campList'); if (!el) return;
+  if (!campRows) { el.className = 'hint'; el.textContent = 'The list of every campaign appears here once the back end sends it.'; return; }
+  const q = ($('campSearch').value || '').trim().toLowerCase().replace(/^#/, '');
+  const rows = campRows.filter(r => !q || String(r.id) === q || (r.address || '').toLowerCase().includes(q) ||
+    (r.agent_name || '').toLowerCase().includes(q) || (r.agent_email || '').toLowerCase().includes(q));
+  el.className = '';
+  el.innerHTML = rows.length ? campTable(rows, true) : '<div class="hint">No campaign matches.</div>';
+}
+function paintCampAttn(){
+  const el = $('campAttn'); if (!el) return;
+  if (!campRows) { el.textContent = 'The engine has not built ' + (lastMetrics ? (lastMetrics.campaigns.awaiting_build - (lastMetrics.campaigns.awaiting_build_test || 0)) : '') + ' campaign(s) yet. Which ones appears here once the back end sends the campaign list.'; return; }
+  const rows = campRows.filter(r => r.stage === 'PENDING' && !r.built);
+  el.className = '';
+  el.innerHTML = attnList(rows.map(r => ({main: '#' + r.id + ' · ' + r.address, sub: (r.agent_name || r.agent_email || '') + ' · created ' + when(r.created_at) + ' · not built yet',
+    btn: '<button class="tk-toggle" data-campaign="' + esc(r.id) + '">Open</button>'})));
+}
+document.addEventListener('input', e => { if (e.target.id === 'campSearch') paintCampList(); });
+async function openCampaign(id, focusPost){
+  // From an agent's page, a campaign opens in the Campaigns view.
+  if (!document.getElementById('sec-campaigns').classList.contains('is-view')) window.openSection('campaigns');
+  const box = $('campaignDetail'); box.classList.remove('hidden');
+  document.querySelector('.camp-list').classList.add('hidden'); $('attn-campaigns').classList.add('hidden'); $('campaignsBody').classList.add('hidden');
+  box.innerHTML = '<div class="br-card" style="margin-top:0">Loading campaign #' + esc(id) + '…</div>';
+  window.scrollTo({top: 0});
+  let c;
+  try { c = await api('/api/admin/campaigns/' + encodeURIComponent(id)); }
+  catch (err) { c = (campRows || []).find(r => String(r.id) === String(id)) || {id: id}; c._noPosts = true; }
+  const posts = c.posts || [];
+  box.innerHTML = '<button class="back" data-close-campaign>← All campaigns</button>' +
+    '<div class="br-card" style="margin-top:12px"><div class="detail-head"><div><span class="eyebrow-s">Campaign #' + esc(c.id) + '</span>' +
+      '<h3 class="detail-title">' + esc(c.address || '') + '</h3><div class="detail-sub">' + esc(c.agent_name || '') + (c.agent_email ? ' · ' + esc(c.agent_email) : '') + '</div></div>' +
+      (c.stage ? stagePill(c) : '') + '</div>' +
+      '<div class="facts">' + fact('Goes live', dateOnly(c.go_live_date)) + fact('Launched', c.launched_at ? when(c.launched_at) : '—') +
+        fact('Created', when(c.created_at)) + fact('Ad budget', c.ad_budget_usd != null ? usd(c.ad_budget_usd) : '—') +
+        fact('Meta campaign ID', c.meta_campaign_id || '—') + '</div></div>' +
+    '<div class="br-card"><h3 class="card-title">Posts</h3>' + (c._noPosts ? '<div class="hint">Its posts appear here once the back end sends them.</div>' :
+      posts.length ? '<p class="hint" style="margin:-6px 0 10px">Click a post to see it.</p><div class="posts">' + posts.map(p => postRow(p)).join('') + '</div>' : '<div class="hint">No posts written yet.</div>') + '</div>';
+  if (focusPost) { const r = document.querySelector('[data-post="' + focusPost + '"]'); if (r) { togglePost(r); setTimeout(() => r.scrollIntoView({behavior: 'smooth', block: 'center'}), 50); } }
+}
+function postRow(p){
+  const failed = p.publish_status === 'failed';
+  return '<div class="post' + (failed ? ' is-failed' : '') + '" data-post="' + esc(p.id) + '">' +
+    '<div class="post-line"><b>Day ' + esc(p.day) + '</b><span>' + esc(p.kind || 'post') + ' · ' + esc(p.target || '') + '</span>' +
+      '<span class="post-when">' + esc(when(p.scheduled_at)) + '</span>' + postPill(p.publish_status) + '<i class="chev-s">›</i></div>' +
+    '<div class="post-open hidden">' +
+      '<div class="post-media">' + (p.image_url ? '<img src="' + esc(p.image_url) + '" alt="">' : '<div class="post-noimg">' + esc(p.kind === 'video' ? 'Video' : 'Photo') + '</div>') + '</div>' +
+      '<div class="post-copy"><span class="eyebrow-s">Caption</span><p>' + esc(p.caption || 'No caption saved.') + '</p>' +
+        (failed ? '<div class="fail-log"><b>Why it failed</b><p>' + esc(p.reason || p.last_error || 'Meta gave no reason.') + '</p>' +
+          ((p.fail_log || []).length ? '<ul>' + p.fail_log.map(f => '<li><span>' + esc(when(f.at)) + '</span>' + esc(f.error) + '</li>').join('') + '</ul>' : '') +
+          '<div class="row-btns"><button class="tk-send" data-retry="' + esc(p.id) + '">Retry post</button></div></div>' : '') +
+      '</div></div></div>';
+}
+function togglePost(row){
+  const open = row.querySelector('.post-open'); const now = open.classList.toggle('hidden');
+  row.classList.toggle('open', !now);
+}
+document.addEventListener('click', e => {
+  const op = e.target.closest('[data-open-post]');
+  if (op) { const [cid, pid] = op.dataset.openPost.split(':'); window.openSection('campaigns'); openCampaign(cid, pid); return; }
+  if (e.target.closest('button')) return;
+  const line = e.target.closest('.post-line'); if (line) togglePost(line.closest('.post'));
+});
+function fact(k, v){ return '<div><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>'; }
+function postPill(s){ const st = s || 'scheduled'; const cls = st === 'published' || st === 'posted' ? 'ok' : st === 'failed' ? 'bad' : 'warn';
+  return '<span class="pill ' + cls + '">' + esc(st === 'published' ? 'posted' : st) + '</span>'; }
+function closeCampaign(){ $('campaignDetail').classList.add('hidden');
+  document.querySelector('.camp-list').classList.remove('hidden'); $('attn-campaigns').classList.remove('hidden'); $('campaignsBody').classList.remove('hidden'); }
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-close-campaign]')) { closeCampaign(); return; }
+  if (e.target.closest('[data-retry]')) return;
+  const r = e.target.closest('[data-campaign]'); if (r) openCampaign(r.dataset.campaign);
+});
+
+// ── an agent's own page: their campaigns, connection, payments and tickets ──
+let agentOpen = null;
+function paintAgent(id){
+  const u = (userRows || []).find(x => String(x.id) === String(id)); if (!u) return;
+  agentOpen = id;
+  const page = $('agentPage');
+  const camps = campRows ? campRows.filter(r => String(r.user_id) === String(u.id) || r.agent_email === u.email) : null;
+  const conn = connRows ? connRows.filter(r => r.agent_email === u.email || String(r.user_id) === String(u.id)) : null;
+  const paid = finData && finData.customers ? finData.customers.find(c => c.email === u.email) : null;
+  const tix = (ticketRows || []).filter(t => String(t.user_id) === String(u.id) || t.client_email === u.email);
+  const c1 = conn && conn.length ? conn[0] : null;
+  const active = c1 && c1.status === 'working';
+  const connVal = conn === null ? '—' : !c1 ? 'Not connected' : active ? 'Active' : 'Inactive';
+  const connWhy = conn === null || active ? '' : !c1 ? 'They have not connected Facebook and Instagram yet, so nothing can post.' :
+    (c1.status === 'expiring soon' ? 'Their Meta login runs out ' + when(c1.expires_at) + '. They should reconnect before then.' :
+     'Their Meta login stopped working ' + (c1.expires_at ? when(c1.expires_at) : '') + '. Posts can’t go out until they reconnect.');
+  const waitingT = tix.filter(t => !t.is_test && waitingOnUs(t)).length;
+  page.innerHTML = '<button class="back" data-close-agent>← All accounts</button>' +
+    '<div class="br-card" style="margin-top:12px"><div class="detail-head"><div><span class="eyebrow-s">Agent #' + esc(u.id) + '</span>' +
+      '<h3 class="detail-title">' + esc(u.name || u.email) + '</h3><div class="detail-sub">' + esc(u.email) + '</div></div>' +
+      '<button class="ghost tiny" data-resetlink="' + esc(u.id) + '" title="Makes a one-time link you send them if they are locked out">Password reset link</button></div>' +
+      '<div id="resetOut"></div>' +
+      '<div class="facts">' + fact('Joined', when(u.created_at)) + fact('Last sign-in', when(u.last_login)) +
+        fact('Paid', paid ? usd(paid.paid_usd) : '$0.00') +
+        '<div><span>Meta connection</span><b class="' + (connVal === 'Active' ? 'ok-t' : connVal === '—' ? '' : 'bad-t') + '">' + esc(connVal) + '</b></div>' +
+        '<div><span>Support tickets</span><b>' + esc(tix.length) + (waitingT ? ' <em class="bad-t">· ' + esc(waitingT) + ' waiting on us</em>' : '') +
+          (tix.length ? ' <a class="inline-link" data-go="support">Open Support</a>' : '') + '</b></div>' +
+      '</div>' +
+      (function(){ const fl = agentFlags(u).filter(x => !/^Login/.test(x)); const all = (connWhy ? [connWhy] : []).concat(fl);
+        return all.length ? '<div class="agent-warn"><b>Needs attention</b><ul>' + all.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : ''; })() + '</div>' +
+    '<div class="br-card"><h3 class="card-title">Campaigns</h3>' +
+      (camps === null ? '<div class="hint">Their campaigns appear here once the back end sends the campaign list.</div>' :
+       camps.length ? campTable(camps, false) : '<div class="hint">No campaigns yet.</div>') + '</div>';
+  page.classList.remove('hidden'); $('usersFilters').classList.add('hidden'); $('usersWrap').classList.add('hidden'); $('accountsHero').classList.add('hidden');
+  const uc = $('userCount'); if (uc) uc.classList.add('hidden');
+  window.scrollTo({top: 0});
+}
+function closeAgent(){ agentOpen = null; $('accountsHero').classList.remove('hidden'); $('agentPage').classList.add('hidden'); $('usersFilters').classList.remove('hidden'); $('usersWrap').classList.remove('hidden'); }
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-close-agent]')) { closeAgent(); return; }
+  const tk = e.target.closest('[data-agent-ticket]');
+  if (tk) { window.openSection('support'); setTimeout(() => { const b = document.createElement('button'); b.dataset.openTicket = tk.dataset.agentTicket; document.body.appendChild(b); b.click(); b.remove(); }, 50); return; }
+  const em = e.target.closest('[data-agent-email]');
+  if (em) { const u = (userRows || []).find(x => x.email === em.dataset.agentEmail);
+    if (u) { window.openSection('users'); paintAgent(u.id); } else { window.openSection('users'); }
+    return; }
+  if (e.target.closest('button')) return;
+  const r = e.target.closest('[data-agent]');
+  if (r) { paintAgent(r.dataset.agent); return; }
+});
+
+// ── activity: a bar a day, then the running log ──
+// Needs GET /api/admin/activity from the back end.
+let actRows = null, actDay = null;
+async function loadActivity(){
+  try { actRows = await api('/api/admin/activity'); } catch (err) { actRows = null; }
+  paintActivityLog();
+}
+function paintActivityLog(){
+  const el = $('actLog'); if (!el) return;
+  const t = $('actLogTitle');
+  if (t) t.innerHTML = actDay ? 'Activity on ' + esc(dateOnly(actDay)) + ' <button class="ghost tiny" data-act-all>Show every day</button>' : 'Activity log';
+  if (!actRows) { el.className = 'hint'; el.textContent = 'The running log of what agents and the system did appears here once the back end sends it.'; return; }
+  const rows = actRows.filter(r => !actDay || (r.at || '').slice(0, 10) === actDay);
+  el.className = '';
+  el.innerHTML = rows.length ? '<div class="log">' + rows.map(r => '<div class="log-row"><span class="log-when">' + esc(when(r.at)) + '</span>' +
+    '<span class="log-kind k-' + esc(r.kind || 'other') + '">' + esc(r.kind_label || r.kind || '') + '</span>' +
+    '<span class="log-text">' + esc(r.text || '') + (r.agent ? ' <i>' + esc(r.agent) + '</i>' : '') + '</span>' +
+    (r.campaign_id ? '<button class="ghost tiny" data-campaign="' + esc(r.campaign_id) + '">#' + esc(r.campaign_id) + '</button>' : '') + '</div>').join('') + '</div>'
+    : '<div class="hint">Nothing recorded on this day.</div>';
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-act-all]')) { actDay = null; paintActivityLog(); return; }
+  const bar = e.target.closest('[data-day]'); if (!bar) return;
+  actDay = bar.dataset.day; paintActivityLog();
+  document.querySelectorAll('[data-day]').forEach(x => x.classList.toggle('on', x === bar));
+});
+
+// ── system check: every part of Resmara, green or red ──
+// Needs GET /api/admin/system-check from the back end (runs every 15 minutes there).
+let sysRows = null;
+async function loadSystemCheck(){
+  try { sysRows = await api('/api/admin/system-check'); } catch (err) { sysRows = null; }
+  paintSystemChecks(); if (lastMetrics) paintSystemAttn(lastMetrics);
+}
+function paintSystemChecks(){
+  const el = $('sysChecks'); if (!el) return;
+  let rows = sysRows;
+  if (!rows) {
+    const h = lastHealth || {};
+    rows = [
+      {name: 'Build room', status: 'ok', detail: 'This page loaded'},
+      {name: 'API', status: h.status ? (h.status === 'healthy' ? 'ok' : 'fail') : 'warn', detail: h.status || 'not checked yet'},
+      {name: 'Database', status: h.db_ok ? 'ok' : 'fail', detail: h.db_ok ? 'reachable' : 'down'},
+      {name: 'Content engine', status: h.ai_mode === 'live' ? 'ok' : 'warn', detail: h.ai_note || h.ai_mode || ''},
+      {name: 'Meta ads', status: h.platform_mode === 'live' ? 'ok' : 'warn', detail: h.platform_note || h.platform_mode || ''},
+    ];
+    el.className = '';
+    el.innerHTML = checkGrid(rows) + '<p class="hint" style="margin:12px 0 0">The full check (website, agent dashboard, publisher, Meta logins, OpenAI, Stripe, email and GitHub) appears here once the back end runs it.</p>';
+    return;
+  }
+  el.className = ''; el.innerHTML = checkGrid(rows);
+}
+function checkGrid(rows){
+  const last = rows.map(r => r.checked_at).filter(Boolean).sort().pop();
+  return (last ? '<p class="hint" style="margin:-4px 0 12px">Last full check ' + esc(when(last)) + '. Runs every 15 minutes.</p>' : '') + '<div class="checks">' + rows.map(r => '<div class="check c-' + esc(r.status) + '"><i></i><div><b>' + esc(r.name) + '</b><span>' + esc(r.detail || '') +
+    '</span></div></div>').join('') + '</div>';
+}
+function paintSystemAttn(m){
+  const h = lastHealth || {};
+  const items = [];
+  if (h.errors_24h) items.push({main: h.errors_24h + ' error(s) in the last 24 hours', sub: h.last_error_at ? 'last one ' + when(h.last_error_at) : ''});
+  if (lastHealth && !h.db_ok) items.push({main: 'The database is not reachable', sub: ''});
+  (sysRows || []).filter(r => r.status === 'fail').forEach(r => items.push({main: r.name + ' is failing', sub: r.detail || ''}));
+  (m.unavailable || []).forEach(x => items.push({main: 'Can\u2019t measure ' + String(x.metric).replace(/_/g, ' ') + ' yet', sub: x.reason}));
+  attnBox('attn-health', [], items.length ? attnList(items) : '', items.length);
+  navBadge('health', items.length);
+}
+
+// Needs GET /api/admin/posts/failed from the back end (Build room task for Dan).
+async function loadFailedPosts(count){
+  const el = $('failedList'); if (!el) return;
+  try {
+    const rows = await api('/api/admin/posts/failed');
+    el.className = '';
+    el.innerHTML = attnList(rows.map(r => ({
+      main: (r.agent_name || r.agent_email || '') + ' · ' + (r.address || '') + ' · Day ' + r.day + ' on ' + (r.target || ''),
+      sub: 'Failed ' + when(r.failed_at) + ' · ' + (r.reason || r.error || ''),
+      btn: '<span class="row-btns"><button class="tk-toggle light" data-retry="' + esc(r.post_id) + '">Retry</button>' +
+        '<button class="tk-toggle" data-open-post="' + esc(r.campaign_id) + ':' + esc(r.post_id) + '">Open</button></span>'})));
+  } catch (err) {
+    el.innerHTML = '<b>' + esc(count) + ' post(s) failed to go live.</b> Which ones, and why, appears here once the back end sends them.';
+  }
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-retry]'); if (!b) return;
+  b.disabled = true; b.textContent = 'Retrying…';
+  try { await api('/api/admin/posts/' + b.dataset.retry + '/retry', {method: 'POST'}); b.textContent = 'Sent again'; }
+  catch (err) { b.disabled = false; b.textContent = 'Retry'; alertMsg && alertMsg(err); }
+});
+function alertMsg(err){ console.warn(err); }
+// Needs GET /api/admin/connections from the back end (Build room task for Dan).
+let connRows = null;
+function connPill(st){ const l = st === 'working' ? 'Active' : st === 'expiring soon' ? 'Expiring soon' : 'Inactive';
+  return '<span class="pill ' + (l === 'Active' ? 'ok' : 'bad') + '">' + l + '</span>'; }
+function connProblem(r){
+  return r.status === 'expiring soon' ? 'Login runs out ' + dateOnly(r.expires_at) + '. They need to reconnect before then.'
+    : 'Login stopped working ' + dateOnly(r.expires_at) + '. Nothing can post until they reconnect.';
+}
+function paintConnAttn(){
+  const el = $('connAttn'); if (!el) return;
+  if (!connRows) { const a = (lastMetrics && lastMetrics.advertising) || {}; el.textContent = (a.needs_reconnect || 0) + ' connection(s) Meta refused and ' + (a.expiring || 0) + ' expiring soon. Which agents appears here once the back end sends the connection list.'; return; }
+  const bad = connRows.filter(r => r.status !== 'working');
+  el.className = '';
+  el.innerHTML = attnList(bad.map(r => {
+    const live = (campRows || []).filter(c => (c.agent_email === r.agent_email || String(c.user_id) === String(r.user_id)) && c.stage === 'LIVE');
+    return {main: (r.agent_name || r.agent_email) + ' · ' + (r.status === 'expiring soon' ? 'expiring soon' : 'login stopped working'),
+      sub: connProblem(r) + (live.length ? ' Blocking ' + live.length + ' live campaign(s): ' + live.map(c => c.address).join(', ') + '.' : ''),
+      btn: '<button class="tk-toggle" data-agent-email="' + esc(r.agent_email) + '">Open agent</button>'};
+  }));
+}
+async function loadConnections(){
+  const el = $('connList'); if (!el) return;
+  try {
+    const rows = await api('/api/admin/connections');
+    connRows = rows; if (!agentOpen) renderUsers();
+    const bad = r => r.status !== 'working';
+    rows.sort((x, y) => bad(y) - bad(x));
+    el.className = '';
+    el.innerHTML = rows.length ? '<div class="scrollx"><table><thead><tr><th>agent</th><th>status</th><th>facebook page</th><th>instagram</th><th>login runs out</th></tr></thead><tbody>' +
+      rows.map(r => { const u = (userRows || []).find(x => x.email === r.agent_email);
+        return '<tr class="rowlink"' + (u ? ' data-agent-email="' + esc(r.agent_email) + '"' : '') + '><td><b>' + esc(r.agent_name || r.agent_email || '') + '</b></td>' +
+        '<td>' + connPill(r.status) + '</td><td>' + esc(r.page_name || '—') + '</td><td>' + esc(r.ig_username ? '@' + r.ig_username : '—') + '</td>' +
+        '<td>' + esc(dateOnly(r.expires_at)) + '</td></tr>'; }).join('') +
+      '</tbody></table></div>' : 'No agent has connected Meta yet.';
+    paintConnAttn();
+  } catch (err) {
+    el.innerHTML = 'The list of each agent’s connection appears here once the back end sends it.';
+  }
+}
+
+
+// ── finance: a bar a day, click one to see that day's orders ──
+// Needs GET /api/admin/finance/daily from the back end.
+let finDays = null, finDaySel = null;
+async function loadFinanceDaily(){
+  try { finDays = await api('/api/admin/finance/daily'); } catch (err) { finDays = null; }
+  paintFinanceDaily();
+}
+
+
+function paintSupportHero(m){
+  const el = $('supportHero'); if (!el) return;
+  const rows = (ticketRows || []).filter(t => !t.is_test);
+  const openT = rows.filter(isOpen), ours = openT.filter(waitingOnUs).length, theirs = openT.length - ours;
+  const week = Date.now() - 7 * 864e5;
+  const newWeek = rows.filter(t => t.created_at && new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(t.created_at) ? t.created_at : t.created_at + 'Z') >= week).length;
+  el.innerHTML = hero({eyebrow: 'Support', big: ours ? esc(ours) + ' waiting on us' : 'All answered', small: esc(openT.length) + ' open ticket' + (openT.length === 1 ? '' : 's'),
+    steps: [
+      {n: ours, l: 'Waiting on us', s: 'we owe a reply', cls: ours ? 'alert' : ''},
+      {n: theirs, l: 'Waiting on the agent', s: 'we replied, they haven’t'},
+      {n: openT.length, l: 'Open', s: 'not resolved yet'},
+      {n: newWeek, l: 'New this week', s: 'tickets opened'}]});
+}
+function paintConnHero(m){
+  const el = $('connHero'); if (!el) return;
+  const a = m.advertising || {};
+  const bad = (a.needs_reconnect || 0) + (a.expiring || 0);
+  el.innerHTML = hero({eyebrow: 'Connections', big: esc(a.live_accounts || 0) + ' <small>of</small> ' + esc(a.accounts || 0) + ' active',
+    small: bad ? esc(bad) + ' need attention' : 'every login is working',
+    bar: {pct: a.accounts ? (a.live_accounts || 0) / a.accounts * 100 : 0, label: (a.accounts ? Math.round((a.live_accounts || 0) / a.accounts * 100) : 0) + '% of agents can post right now'},
+    steps: [
+      {n: a.accounts || 0, l: 'Connected', s: 'agents with Meta linked'},
+      {n: a.live_accounts || 0, l: 'Active', s: 'posting normally', cls: 'good'},
+      {n: a.expiring || 0, l: 'Expiring soon', s: 'reconnect before it runs out', cls: a.expiring ? 'alert' : ''},
+      {n: a.needs_reconnect || 0, l: 'Inactive', s: 'nothing can post', cls: a.needs_reconnect ? 'alert' : ''}]});
+}
+
+// What is wrong for one agent, in a few words each. Same facts as the attention lists.
+function agentFlags(u){
+  const f = [];
+  const tix = (ticketRows || []).filter(t => !t.is_test && (String(t.user_id) === String(u.id) || t.client_email === u.email) && waitingOnUs(t));
+  if (tix.length) f.push(tix.length + ' ticket' + (tix.length > 1 ? 's' : '') + ' waiting');
+  const c = (connRows || []).find(r => r.agent_email === u.email || String(r.user_id) === String(u.id));
+  if (c && c.status !== 'working') f.push(c.status === 'expiring soon' ? 'Login expiring' : 'Login stopped');
+  const camps = (campRows || []).filter(r => String(r.user_id) === String(u.id) || r.agent_email === u.email);
+  const failed = camps.reduce((t, r) => t + (r.posts_failed || 0), 0);
+  if (failed) f.push(failed + ' failed post' + (failed > 1 ? 's' : ''));
+  if (camps.some(r => r.stage === 'PENDING' && !r.built)) f.push('Campaign not built');
+  return f;
+}
+function flagCell(f){
+  if (!f.length) return '<span class="tiny">All good</span>';
+  if (f.length === 1) return '<span class="flag">' + esc(f[0]) + '</span>';
+  return '<span class="flag" title="' + esc(f.join(' · ')) + '">' + f.length + ' things</span><div class="tiny">' + esc(f[0]) + ' + ' + (f.length - 1) + ' more</div>';
+}
+function paintAccountsHero(){
+  const el = $('accountsHero'); if (!el) return;
+  const agents = (userRows || []).filter(u => !u.is_test && !u.is_admin);
+  const flagged = agents.filter(u => agentFlags(u).length).length;
+  const inactive = agents.filter(u => !u.is_active).length;
+  const since = Date.now() - 30 * 864e5;
+  const recent = agents.filter(u => u.last_login && new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(u.last_login) ? u.last_login : u.last_login + 'Z') >= since).length;
+  el.innerHTML = hero({eyebrow: 'Accounts', big: esc(agents.length) + ' agent' + (agents.length === 1 ? '' : 's'),
+    small: flagged ? esc(flagged) + ' need attention' : 'nobody needs attention',
+    steps: [
+      {n: flagged, l: 'Need attention', s: 'flagged in the list below', cls: flagged ? 'alert' : ''},
+      {n: agents.length - inactive, l: 'Active', s: 'account switched on', cls: 'good'},
+      {n: recent, l: 'Signed in lately', s: 'in the last 30 days'},
+      {n: inactive, l: 'Inactive', s: 'closed or switched off', cls: inactive ? 'alert' : ''}]});
+}
+
+// ── marketing: is our own advertising bringing in agents for less than they are worth? ──
+// Needs GET /api/admin/marketing from the back end (Resmara's own ad account + sign-ups).
+let mkData = null;
+async function loadMarketing(){
+  try { mkData = await api('/api/admin/marketing'); } catch (err) { mkData = null; }
+  paintMarketing();
+}
+function paintMarketing(){
+  const hero_ = $('mkHero'); if (!hero_) return;
+  const m = mkData;
+  if (!m) {
+    hero_.innerHTML = hero({eyebrow: 'Marketing · last 30 days', big: 'Not connected yet', small: 'connect Resmara’s own ad account to fill this page',
+      steps: [{n: '—', l: 'Ad spend'}, {n: '—', l: 'Leads'}, {n: '—', l: 'Cost per lead'}, {n: '—', l: 'New paying agents'}]});
+    ['mkVerdict', 'mkFunnel', 'mkWeeks'].forEach(id => { $(id).className = 'hint'; $(id).textContent = 'Appears once the back end sends Resmara’s ad numbers and sign-ups.'; });
+    const s = $('sum-marketing'); if (s) s.textContent = 'not connected yet';
+    return;
+  }
+  const cpl = m.leads ? m.spend_usd / m.leads : null, cpa = m.paying ? m.spend_usd / m.paying : null;
+  const allowed = finData && finData.acquisition ? finData.acquisition.max_cac_usd[3] : null;
+  hero_.innerHTML = hero({eyebrow: 'Marketing · last ' + (m.days || 30) + ' days', big: cpa === null ? 'No paying agents yet' : esc(usd(cpa)) + ' <small>per new paying agent</small>',
+    small: allowed !== null && cpa !== null ? (cpa <= allowed ? 'under the ' + esc(usd(allowed)) + ' we can afford' : 'over the ' + esc(usd(allowed)) + ' we can afford') : '',
+    steps: [
+      {n: usd(m.spend_usd), l: 'Ad spend', s: m.campaigns_running + ' ad(s) running'},
+      {n: m.leads, l: 'Leads', s: 'people who started signing up'},
+      {n: cpl === null ? '—' : usd(cpl), l: 'Cost per lead'},
+      {n: m.paying, l: 'New paying agents', s: 'paid for a first campaign', cls: m.paying ? 'good' : ''}]});
+  $('mkVerdict').className = '';
+  $('mkVerdict').innerHTML = cpa === null || allowed === null ? '<div class="hint">Needs at least one paying agent from ads to judge.</div>' :
+    '<div class="verdict ' + (cpa <= allowed ? 'ok' : 'bad') + '"><b>' + (cpa <= allowed ? 'Yes, it’s paying for itself.' : 'Not yet. Each agent costs more than they’re worth.') + '</b>' +
+    '<span>A new paying agent costs us <b>' + esc(usd(cpa)) + '</b>. Finance says we can spend up to <b>' + esc(usd(allowed)) + '</b> to win one and still make 3x back.</span></div>';
+  const steps = [['Saw an ad', m.impressions], ['Clicked', m.clicks], ['Started signing up', m.leads], ['Made an account', m.signups], ['Paid for a campaign', m.paying]];
+  $('mkFunnel').className = '';
+  $('mkFunnel').innerHTML = '<div class="funnel">' + steps.map((s, i) => '<div class="fn"><b>' + esc(Number(s[1] || 0).toLocaleString('en-US')) + '</b><span>' + esc(s[0]) + '</span>' +
+    (i ? '<small>' + (steps[i - 1][1] ? Math.round(s[1] / steps[i - 1][1] * 1000) / 10 : 0) + '% of the step before</small>' : '<small>&nbsp;</small>') + '</div>').join('<i>›</i>') + '</div>';
+  const wk = m.weeks || [], mx = Math.max(1, ...wk.map(w => w.leads || 0));
+  $('mkWeeks').className = '';
+  $('mkWeeks').innerHTML = wk.length ? '<div class="weeks" style="grid-template-columns:repeat(' + wk.length + ',1fr)">' + wk.map(w => '<div class="wk"><b>' + esc(w.leads) + '</b><i style="height:' + Math.max(4, Math.round((w.leads || 0) / mx * 100)) + '%"></i><span>' +
+    esc(dateOnly(w.start).replace(/, \d{4}$/, '')) + '<br>' + esc(usd(w.spend_usd || 0)) + '</span></div>').join('') + '</div><p class="hint" style="margin:10px 0 0">Bars are leads. The money under each is what we spent that week.</p>' : '<div class="hint">No weeks yet.</div>';
+  const s = $('sum-marketing'); if (s) s.textContent = (cpl === null ? '' : usd(cpl) + ' per lead · ') + m.paying + ' new paying agent(s)';
+}
+
+// ── website: is resmara.com up, tracking, fast, and turning visitors into sign-ups? ──
+// Needs GET /api/admin/website from the back end (Google Analytics, Clarity, PageSpeed, tag checks).
+let webData = null;
+async function loadWebsite(){
+  try { webData = await api('/api/admin/website'); } catch (err) { webData = null; }
+  paintWebsite();
+}
+function paintWebsite(){
+  const h = $('webHero'); if (!h) return;
+  const w = webData;
+  if (!w) {
+    h.innerHTML = hero({eyebrow: 'resmara.com · last 30 days', big: 'Not connected yet', small: 'connect Google Analytics, Clarity and the tags to fill this page',
+      steps: [{n: '—', l: 'Visitors'}, {n: '—', l: 'Sign-ups started'}, {n: '—', l: 'Conversion rate'}, {n: '—', l: 'Page speed'}]});
+    ['webChecks', 'webSources', 'webPages'].forEach(id => { $(id).className = 'hint'; $(id).textContent = 'Appears once the back end is connected to Google Analytics, Clarity and PageSpeed.'; });
+    $('webHeatBtn').innerHTML = ''; attnBox('attn-website', [], ''); navBadge('website', 0);
+    const s = $('sum-website'); if (s) s.textContent = 'not connected yet';
+    return;
+  }
+  const conv = w.visitors ? Math.round(w.signups_started / w.visitors * 1000) / 10 : 0;
+  const speedCls = w.speed_mobile >= 90 ? 'good' : w.speed_mobile < 50 ? 'alert' : '';
+  h.innerHTML = hero({eyebrow: 'resmara.com · last ' + (w.days || 30) + ' days', big: esc(Number(w.visitors).toLocaleString('en-US')) + ' <small>visitors</small>',
+    small: w.visitors_prev ? (w.visitors >= w.visitors_prev ? 'up ' : 'down ') + Math.abs(Math.round((w.visitors - w.visitors_prev) / w.visitors_prev * 100)) + '% on the 30 days before' : '',
+    steps: [
+      {n: Number(w.visitors).toLocaleString('en-US'), l: 'Visitors', s: Number(w.new_visitors || 0).toLocaleString('en-US') + ' new'},
+      {n: w.signups_started, l: 'Sign-ups started', s: 'clicked Let’s get started'},
+      {n: conv + '%', l: 'Conversion rate', s: 'visitors who started signing up'},
+      {n: w.speed_mobile, l: 'Page speed', s: 'on phones, out of 100 · ' + w.speed_desktop + ' on desktop', cls: speedCls}]});
+  $('webChecks').className = '';
+  $('webChecks').innerHTML = checkGrid(w.checks || []);
+  const fails = (w.checks || []).filter(c => c.status === 'fail');
+  attnBox('attn-website', [], fails.length ? attnList(fails.map(c => ({main: c.name + ' is not working', sub: c.detail || ''}))) : '', fails.length);
+  navBadge('website', fails.length);
+  const bars = (rows, key) => { const mx = Math.max(1, ...rows.map(r => r[key])); return '<div class="hbars">' + rows.map(r =>
+    '<div class="hb"><span>' + esc(r.name) + '</span><i><em style="width:' + Math.round(r[key] / mx * 100) + '%"></em></i><b>' + esc(Number(r[key]).toLocaleString('en-US')) + '</b></div>').join('') + '</div>'; };
+  $('webSources').className = ''; $('webSources').innerHTML = (w.sources || []).length ? bars(w.sources, 'visitors') : '<div class="hint">No visits yet.</div>';
+  $('webPages').className = ''; $('webPages').innerHTML = (w.pages || []).length ? bars(w.pages, 'views') : '<div class="hint">No visits yet.</div>';
+  $('webHeatTxt').textContent = w.clarity_sessions ? Number(w.clarity_sessions).toLocaleString('en-US') + ' recorded visits in the last 30 days. See where people click, scroll and give up.' : 'See where people click, scroll and give up, in Microsoft Clarity.';
+  $('webHeatBtn').innerHTML = w.clarity_url ? '<a class="tk-send heat-btn" href="' + esc(w.clarity_url) + '" target="_blank" rel="noopener">Open heat maps</a>' : '';
+  const s = $('sum-website'); if (s) s.textContent = Number(w.visitors).toLocaleString('en-US') + ' visitors · ' + conv + '% start signing up' + (fails.length ? ' · ' + fails.length + ' check(s) failing' : '');
+}
+
+// ── settings: who is on the team, and which parts of the Team room each person sees ──
+// Needs /api/admin/team (list, invite, change access, remove) from the back end, and the server
+// must refuse a section's data to anyone without access to it; hiding it here is only the look.
+const ACCESS_NOTE = 'Settings is open to everyone for their own appearance; only super admins see the team.';
+const ACCESS = [
+  ['build', 'Build', 'Build room, Releases', ['buildroom', 'releases']],
+  ['agents', 'Agents', 'Accounts, Support, Connections', ['users', 'support', 'advertising']],
+  ['campaigns', 'Campaigns', 'Campaigns and their posts', ['campaigns']],
+  ['money', 'Money', 'Finance, Start-up costs', ['finance', 'costs']],
+  ['business', 'Business', 'Growth, Marketing, Website', ['growth', 'marketing', 'website']],
+  ['system', 'System', 'System check, Activity', ['health', 'activity']],
+];
+let teamRows = null, teamOpen = new Set();
+function paintAccessPick(){
+  const el = $('tmAccess'); if (!el || el.dataset.done) return; el.dataset.done = '1';
+  el.innerHTML = ACCESS.map(([k, l, s]) => '<label class="ap"><input type="checkbox" value="' + k + '"' + (['build','agents','campaigns'].includes(k) ? ' checked' : '') + '><span><b>' + esc(l) + '</b><small>' + esc(s) + '</small></span></label>').join('');
+}
+async function loadTeam(){
+  paintAccessPick();
+  try { teamRows = await api('/api/admin/team'); } catch (err) { teamRows = null; }
+  paintTeam();
+}
+function isSuper(t){ return !!(t && (t.super_admin || t.owner)); }
+function accessChips(t){
+  if (isSuper(t)) return '<span class="cost-chip on">Super admin · everything</span>';
+  return (t.access || []).map(k => { const g = ACCESS.find(x => x[0] === k); return g ? '<span class="cost-chip">' + esc(g[1]) + '</span>' : ''; }).join(' ') || '<span class="cost-chip bad">No access</span>';
+}
+function paintTeam(){
+  const el = $('teamList'); if (!el) return;
+  const me = window.resmaraMe || {};
+  const rows = teamRows || (me.email ? [{id: 'me', name: me.name || 'You', email: me.email, owner: true, status: 'active', last_login: me.last_login}] : []);
+  el.className = '';
+  el.innerHTML = '<div class="cost-list">' + rows.map(t => {
+    const open = teamOpen.has(String(t.id)), you = me.email && t.email === me.email;
+    return '<div class="cost' + (open ? ' open' : '') + '"><div class="cost-line team-line">' +
+      '<div class="cost-main"><b>' + esc(t.name || t.email) + (you ? ' <span class="cost-chip">You</span>' : '') + '</b><span>' + esc(t.email) + '</span></div>' +
+      '<div class="chips">' + accessChips(t) + '</div>' +
+      '<div>' + (t.status === 'invited' ? '<span class="cost-chip bad">Invite sent · not signed in yet</span>' : '<span class="cost-chip ok">Active</span>') + '</div>' +
+      '<div class="cost-meta"><span>Last sign-in</span><span>' + esc(when(t.last_login)) + '</span></div>' +
+      (you ? '<span></span>' : '<button class="tk-toggle" data-tmopen="' + esc(t.id) + '">' + (open ? 'Close' : 'Manage') + '</button>') +
+    '</div>' + (you ? '' :
+    '<div class="cost-actions' + (open ? '' : ' hidden') + '"><div style="flex:1">' +
+      '<div class="access-pick small">' + ACCESS.map(([k, l]) => '<label class="ap"><input type="checkbox" data-tmacc="' + esc(t.id) + '" value="' + k + '"' + (isSuper(t) || (t.access || []).includes(k) ? ' checked' : '') + (isSuper(t) ? ' disabled' : '') + '><span><b>' + esc(l) + '</b></span></label>').join('') + '</div>' +
+      '<label class="owner-pick"><input type="checkbox" data-tmowner="' + esc(t.id) + '"' + (isSuper(t) ? ' checked' : '') + '> <span><b>Super admin</b></span></label>' +
+      '<div class="cost-btns" style="margin-top:12px"><button class="cb light" data-tmsave="' + esc(t.id) + '">Save access</button>' +
+        (t.status === 'invited' ? '<button class="cb light" data-tmresend="' + esc(t.id) + '">Resend invite</button>' : '') + '</div></div>' +
+      '<button class="cb danger" data-tmremove="' + esc(t.id) + '">Remove from team</button></div>') + '</div>';
+  }).join('') + '</div>' + (teamRows ? '' : '<p class="hint" style="margin:12px 0 0">Adding people needs the back end to save team members. Until then only you are listed.</p>');
+  const s = $('sum-settings'); if (s && window.resmaraSuper !== false) s.textContent = rows.length + ' team member' + (rows.length === 1 ? '' : 's');
+  const h = $('teamHero');
+  if (h) { const inv = rows.filter(t => t.status === 'invited').length, own = rows.filter(t => isSuper(t)).length;
+    h.innerHTML = hero({eyebrow: 'Team', big: esc(rows.length) + ' <small>team member' + (rows.length === 1 ? '' : 's') + '</small>', small: 'who can sign in to the Team room',
+      steps: [{n: own, l: 'Super admins', s: 'can manage the team'}, {n: rows.length - own, l: 'Team', s: 'see only what you allow'},
+              {n: inv, l: 'Invites waiting', s: 'not signed in yet', cls: inv ? 'alert' : ''}, {n: rows.filter(t => t.status !== 'invited').length, l: 'Active', s: 'signed in at least once', cls: 'good'}]}); }
+}
+function teamAccessFrom(id){ return [...document.querySelectorAll('[data-tmacc="' + id + '"]:checked')].map(x => x.value); }
+document.addEventListener('click', async e => {
+  const o = e.target.closest('[data-tmopen]'); if (o) { const id = o.dataset.tmopen; teamOpen.has(id) ? teamOpen.delete(id) : teamOpen.add(id); paintTeam(); return; }
+  const say = (t, c) => { const m = $('tmMsg'); if (m) { m.className = 'msg ' + (c || ''); m.textContent = t; } };
+  if (e.target.closest('#tmAdd')) {
+    const name = $('tmName').value.trim(), email = $('tmEmail').value.trim(), owner = $('tmOwner').checked;
+    const access = [...document.querySelectorAll('#tmAccess input:checked')].map(x => x.value);
+    if (!name || !email) return say('A name and an email, please.', 'bad');
+    if (!owner && !access.length) return say('Tick at least one part of the Team room they can see.', 'bad');
+    say('Sending the invite…');
+    try { const r = await api('/api/admin/team', {method: 'POST', body: {name, email, super_admin: owner, access}});
+      say((r && r.emailed === false && r.invite_link) ? 'Added. Email isn’t set up, so send them this link yourself: ' + r.invite_link : 'Invite sent to ' + email + '. They choose their own password from the email.', 'ok');
+      $('tmName').value = ''; $('tmEmail').value = ''; loadTeam();
+    } catch (err) { say('Could not add them: ' + err.message, 'bad'); }
+    return;
+  }
+  const sv = e.target.closest('[data-tmsave]'); if (sv) { const id = sv.dataset.tmsave;
+    try { await api('/api/admin/team/' + id, {method: 'PATCH', body: {access: teamAccessFrom(id), super_admin: !!document.querySelector('[data-tmowner="' + id + '"]:checked')}}); loadTeam(); } catch (err) { alertMsg(err); } return; }
+  const rs = e.target.closest('[data-tmresend]'); if (rs) { try { await api('/api/admin/team/' + rs.dataset.tmresend + '/invite', {method: 'POST'}); rs.textContent = 'Invite sent'; } catch (err) { alertMsg(err); } return; }
+  const rm = e.target.closest('[data-tmremove]'); if (rm) { if (!confirm('Remove them from the team? They will not be able to sign in to the Team room.')) return;
+    try { await api('/api/admin/team/' + rm.dataset.tmremove, {method: 'DELETE'}); loadTeam(); } catch (err) { alertMsg(err); } return; }
+});
+// What the signed-in person may see. Owners (and anyone the server does not describe yet) see it all.
+function applyAccess(me){
+  const acc = me && Array.isArray(me.team_access) ? me.team_access : null;
+  const owner = !acc || me.team_super_admin || me.team_owner;
+  const allowed = new Set(['overview']);
+  ACCESS.forEach(([k, , , secs]) => { if (owner || acc.includes(k)) secs.forEach(s => allowed.add(s)); });
+  allowed.add('settings');
+  const ta = $('teamAdmin'); if (ta) ta.style.display = owner ? '' : 'none';
+  const th = $('teamHero'); if (th) th.style.display = owner ? '' : 'none';
+  window.resmaraSuper = owner; const ss = $('sum-settings'); if (ss && !owner) ss.textContent = 'your appearance';
+  document.querySelectorAll('#index a[data-go]').forEach(a => { a.style.display = allowed.has(a.dataset.go) ? '' : 'none'; });
+  document.querySelectorAll('#index .nav-group').forEach(g => { let n = g.nextElementSibling, any = false;
+    while (n && !n.classList.contains('nav-group')) { if (n.style.display !== 'none') any = true; n = n.nextElementSibling; }
+    g.style.display = any ? '' : 'none'; });
+  window.resmaraAllowed = allowed;
+}
+
+// ── light / dark, per person, remembered on this device ──
+function setTheme(t){ document.documentElement.classList.toggle('dark', t === 'dark'); try { localStorage.setItem('resmara_theme', t); } catch (e) {}
+  document.querySelectorAll('.theme-switch').forEach(b => b.setAttribute('aria-checked', String(t === 'dark'))); }
+document.addEventListener('click', e => { if (e.target.closest('.theme-switch')) setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark'); });
+setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+
+// ── releases: what's waiting to go live, and what went live ──
+// Needs GET /api/admin/releases from the back end (reads the GitHub pull requests and the Render deploys).
+let relData = null; const relOpenSet = new Set();
+async function loadReleases(){
+  try { relData = await api('/api/admin/releases'); } catch (err) { relData = null; }
+  paintReleases();
+}
+function relStatus(r){
+  if (r.state === 'open') return '<span class="cost-chip bad">Waiting on ' + esc(r.waiting_on || 'Dan') + ' to merge</span>';
+  if (r.deploy === 'live') return '<span class="cost-chip ok">Live</span>';
+  if (r.deploy === 'failed') return '<span class="cost-chip bad">Deploy failed</span>';
+  return '<span class="cost-chip on">Merged · deploying</span>';
+}
+function relRow(r){
+  const open = relOpenSet.has(String(r.number));
+  return '<div class="cost' + (open ? ' open' : '') + '"><div class="cost-line rel-line">' +
+    '<div class="cost-main"><b>#' + esc(r.number) + ' · ' + esc(r.title) + '</b><span>by ' + esc(r.author || '') + ' · ' + esc(r.side || '') + '</span></div>' +
+    '<div>' + relStatus(r) + '</div>' +
+    '<div class="cost-meta"><span>' + (r.state === 'open' ? 'Opened' : 'Live') + '</span><span>' + esc(when(r.state === 'open' ? r.opened_at : (r.live_at || r.merged_at))) + '</span></div>' +
+    '<button class="tk-toggle" data-relopen="' + esc(r.number) + '">' + (open ? 'Close' : 'What’s in it') + '</button></div>' +
+    '<div class="cost-actions' + (open ? '' : ' hidden') + '"><div class="rel-body">' +
+      ((r.summary || []).length ? '<ul>' + r.summary.map(s => '<li>' + esc(s) + '</li>').join('') + '</ul>' : '<p class="hint">No summary.</p>') +
+      ((r.backend_tasks || []).length ? '<b>Back end still needed</b><ul>' + r.backend_tasks.map(s => '<li>' + esc(s) + '</li>').join('') + '</ul>' : '') +
+    '</div><a class="cb light" href="' + esc(r.url) + '" target="_blank" rel="noopener">Open on GitHub</a></div></div>';
+}
+function paintReleases(){
+  const h = $('relHero'); if (!h) return;
+  if (!relData) {
+    h.innerHTML = '';
+    ['relOpen', 'relDone'].forEach(id => { $(id).className = 'hint'; $(id).textContent = 'Appears once the back end reads the pull requests from GitHub.'; });
+    navBadge('releases', 0); return;
+  }
+  if relData && relData.connected === false {
+    h.innerHTML = hero({eyebrow: 'Releases', big: 'Not connected', small: (relData.problems || [])[0] || 'the service has no GitHub or Render credential'});
+    ['relOpen', 'relDone'].forEach(id => { const el = $(id); if (!el) return; el.className = 'hint';
+      el.textContent = (relData.problems || [])[0] || 'Connect GitHub to see what is waiting to go live.'; });
+    navBadge('releases', 0); return;
+  }
+  const openR = (relData.open || []), doneR = (relData.recent || []);
+  const lastLive = doneR.find(r => r.deploy === 'live');
+  h.innerHTML = hero({eyebrow: 'Releases', big: openR.length ? esc(openR.length) + ' waiting to go live' : 'Everything is live',
+    small: lastLive ? 'last update went live ' + esc(when(lastLive.live_at || lastLive.merged_at)) : '',
+    steps: [
+      {n: openR.length, l: 'Waiting to merge', s: 'pull requests open', cls: openR.length ? 'alert' : ''},
+      {n: doneR.filter(r => r.deploy !== 'live' && r.deploy !== 'failed').length, l: 'Deploying', s: 'merged, going live'},
+      {n: doneR.filter(r => r.deploy === 'failed').length, l: 'Failed deploys', s: 'need a look', cls: doneR.some(r => r.deploy === 'failed') ? 'alert' : ''},
+      {n: doneR.filter(r => r.deploy === 'live').length, l: 'Went live', s: 'in the last 30 days', cls: 'good'}]});
+  $('relOpen').className = ''; $('relOpen').innerHTML = openR.length ? '<div class="cost-list">' + openR.map(relRow).join('') + '</div>' : '<div class="attn-ok">✓ Nothing waiting.</div>';
+  $('relDone').className = ''; $('relDone').innerHTML = doneR.length ? '<div class="cost-list">' + doneR.map(relRow).join('') + '</div>' : '<div class="hint">Nothing yet.</div>';
+  navBadge('releases', openR.length);
+  const s = $('sum-releases'); if (s) s.textContent = openR.length ? openR.length + ' waiting to go live' : 'everything is live';
+}
+document.addEventListener('click', e => { const t = e.target.closest('[data-relopen]'); if (!t) return; const n = t.dataset.relopen; relOpenSet.has(n) ? relOpenSet.delete(n) : relOpenSet.add(n); paintReleases(); });
+function paintFinanceHero(){
+  const el = $('finOrders'); if (!el || !lastMetrics) return;
+  const rev = lastMetrics.revenue || {}; if (rev.error) { el.innerHTML = ''; return; }
+  const act = finData && finData.actuals ? finData.actuals : {}, unit = finData && finData.unit ? finData.unit : {};
+  el.innerHTML = hero({eyebrow: 'Money in', big: esc(usd(rev.paid_usd || 0)), small: 'collected so far',
+    steps: [
+      {n: rev.paid_orders || 0, l: 'Campaigns paid for', s: 'all time'},
+      {n: usd(act.gross_last_30d_usd || 0), l: 'Last 30 days', s: 'collected'},
+      {n: rev.pending_orders || 0, l: 'Checkouts not finished', s: rev.stripe_configured ? 'started paying, didn’t finish' : 'Stripe is not connected yet', cls: rev.pending_orders ? 'alert' : ''},
+      {n: usd(unit.contribution_usd || 0), l: 'We keep per campaign', s: (unit.margin_pct || 0) + '% margin', cls: 'good'}]});
+}
+function paintFinanceDaily(){
+  const el = $('finDaily'); if (!el) return;
+  if (!finDays || !finDays.days) { el.className = 'hint'; el.textContent = 'A bar for each day’s sales appears here once the back end sends them.'; $('finDay').innerHTML = ''; return; }
+  const days = finDays.days, max = Math.max(1, ...days.map(d => d.revenue_usd || 0));
+  if (!finDaySel) finDaySel = days[days.length - 1].date;
+  el.className = '';
+  el.innerHTML = '<div class="spark fin">' + days.map(d => '<i data-fin-day="' + esc(d.date) + '" class="' + (d.date === finDaySel ? 'on' : '') + '" style="height:' +
+    Math.max(3, Math.round((d.revenue_usd || 0) / max * 100)) + '%" title="' + esc(dateOnly(d.date)) + ': ' + esc(d.orders) + ' order(s), ' + esc(usd(d.revenue_usd || 0)) + '"></i>').join('') +
+    '</div><div class="spark-axis"><span>' + esc(dateOnly(days[0].date)) + '</span><span>' + esc(dateOnly(days[days.length - 1].date)) + '</span></div>';
+  const d = days.find(x => x.date === finDaySel) || days[days.length - 1];
+  $('finDay').innerHTML = '<div class="day-sum"><b>' + esc(dateOnly(d.date)) + '</b><span>' + esc(d.orders) + ' order(s)</span><span>' + esc(usd(d.revenue_usd || 0)) + ' collected</span>' +
+    (d.unfinished ? '<span class="bad-t">' + esc(d.unfinished) + ' checkout(s) not finished</span>' : '') + '</div>' +
+    ((d.items || []).length ? '<div class="log">' + d.items.map(o => '<div class="log-row"><span class="log-when">' + esc(when(o.at)) + '</span><span class="log-text">' +
+      esc(o.agent || '') + ' · ' + esc(o.address || '') + '</span><b>' + esc(usd(o.amount_usd || 0)) + '</b></div>').join('') + '</div>' : '<div class="hint">No orders that day.</div>');
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-fin-day]'); if (b) { finDaySel = b.dataset.finDay; paintFinanceDaily(); return; }
+  if (e.target.closest('#calcToggle')) { const now = $('calcBody').classList.toggle('hidden'); $('calcBtn').textContent = now ? 'Open' : 'Close'; $('calcCard').classList.toggle('open', !now); }
+});
+
+// ── growth: a monthly goal, and how many agents it takes to reach it ──
+const GOAL_KEY = 'resmara_growth_goal';
+function growthGoal(){ try { return Number(localStorage.getItem(GOAL_KEY)) || 5000; } catch (e) { return 5000; } }
+function monthStart(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+function paintGrowth(){
+  const card = $('goalCard'); if (!card) return;
+  const now = new Date(), m0 = monthStart(now), m1 = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const parse = s => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(s || '') ? s : (s || '') + 'Z');
+  const agents = (userRows || []).filter(u => !u.is_test && !u.is_admin);
+  const newThis = agents.filter(u => u.created_at && parse(u.created_at) >= m0).length;
+  const newLast = agents.filter(u => u.created_at && parse(u.created_at) >= m1 && parse(u.created_at) < m0).length;
+  const price = finData && finData.price ? finData.price.cents / 100 : 49;
+  const camps = campRows || [];
+  const campsThis = camps.filter(c => c.created_at && parse(c.created_at) >= m0);
+  const activeThis = new Set(campsThis.map(c => c.user_id)).size;
+  const byAgent = {}; camps.forEach(c => { byAgent[c.user_id] = (byAgent[c.user_id] || 0) + 1; });
+  const repeat = Object.values(byAgent).filter(n => n >= 2).length;
+  const left = agents.filter(u => !u.is_active).length;
+  const goal = growthGoal();
+  const soFar = campsThis.length * price;
+  const needCamps = Math.ceil(goal / price);
+  const perAgent = activeThis ? campsThis.length / activeThis :
+    (finData && finData.assumptions ? (finData.assumptions.campaigns_per_agent_per_year || 8) / 12 : 0.67);
+  const needAgents = Math.ceil(needCamps / Math.max(perAgent, 0.1));
+  const more = Math.max(0, needAgents - activeThis);
+  const pct = Math.min(100, Math.round(soFar / goal * 100));
+  const monthName = now.toLocaleDateString('en-US', {month: 'long'});
+  card.innerHTML =
+    '<div class="goal-top"><div><span class="eyebrow-s">' + esc(monthName) + ' goal</span>' +
+      '<div class="goal-num">' + esc(usd(soFar)) + ' <small>of</small> <label class="goal-input">$<input id="goalInput" type="number" step="500" min="0" value="' + esc(goal) + '"></label></div>' +
+      '<div class="goal-bar"><i style="width:' + pct + '%"></i></div><div class="goal-pct">' + pct + '% of the way · ' + esc(campsThis.length) + ' campaign(s) so far this month</div></div></div>' +
+    '<div class="goal-steps">' +
+      goalStep(needCamps, 'campaigns a month', 'at ' + usd(price) + ' each') +
+      goalStep(needAgents, 'active agents', 'at about ' + perAgent.toFixed(1) + ' campaign(s) each a month') +
+      goalStep(activeThis, 'active now', 'started a campaign this month') +
+      goalStep(more, 'more agents needed', more ? 'to reach the goal' : 'You are on track', more ? 'alert' : 'good') +
+    '</div>' + (campRows ? '' : '<p class="hint" style="margin:12px 0 0">These use the campaign list, which appears once the back end sends it.</p>');
+  const gs = $('growthSquares');
+  if (gs) gs.innerHTML = '<div class="grid g4">' +
+    stat(newThis, 'new this month', newThis ? 'good' : '', newLast ? newLast + ' last month' : '') +
+    stat(activeThis, 'active this month', '', 'of ' + agents.length + ' agents') +
+    stat(repeat, 'repeat agents', repeat ? 'good' : '', agents.length ? Math.round(repeat / agents.length * 100) + '% of agents' : '') +
+    stat(left, 'left', left ? 'alert' : '', left ? 'closed their account' : 'nobody has left') +
+    '</div>';
+  const wk = $('growthWeeks');
+  if (wk) {
+    if (!campRows) { wk.className = 'hint'; wk.textContent = 'Appears once the back end sends the campaign list.'; }
+    else {
+      const weeks = []; const start = new Date(now); start.setDate(start.getDate() - start.getDay()); start.setHours(0, 0, 0, 0);
+      for (let i = 7; i >= 0; i--) { const s = new Date(start); s.setDate(s.getDate() - i * 7); const e = new Date(s); e.setDate(e.getDate() + 7);
+        weeks.push({s, n: camps.filter(c => { const t = parse(c.created_at); return t >= s && t < e; }).length}); }
+      const mx = Math.max(1, ...weeks.map(w => w.n));
+      wk.className = '';
+      wk.innerHTML = '<div class="weeks">' + weeks.map(w => '<div class="wk"><b>' + w.n + '</b><i style="height:' + Math.max(4, Math.round(w.n / mx * 100)) + '%"></i><span>' +
+        esc(w.s.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})) + '</span></div>').join('') + '</div>';
+    }
+  }
+  const sg = $('sum-growth'); if (sg) sg.textContent = pct + '% of ' + monthName + ' goal · ' + newThis + ' new agent(s)';
+}
+function goalStep(n, l, s, cls){ return '<div class="goal-step ' + (cls || '') + '"><b>' + esc(n) + '</b><span>' + esc(l) + '</span><small>' + esc(s) + '</small></div>'; }
+document.addEventListener('change', e => { if (e.target.id === 'goalInput') { try { localStorage.setItem(GOAL_KEY, String(Number(e.target.value) || 0)); } catch (x) {} paintGrowth(); } });
+
+let lastMetrics = null, lastHealth = null;
 async function loadMetrics(){
   try {
     const m = await api('/api/admin/metrics');
@@ -713,68 +2032,62 @@ async function loadMetrics(){
     $('testTicketCount').textContent = s.test_tickets || 0;
     openFromWork(m);
 
+    // Campaigns is only about campaigns: how many, and where each one is. Accounts live in
+    // Accounts, ad budget in Connections, money in Finance.
+    const st = c.by_stage || {};
+    const failedNow = (ct.failed || 0) - (ct.failed_test || 0);
+    const builtNot = Math.max(0, (st.PENDING || 0) - (c.awaiting_build || 0));
+    const nb2 = (c.awaiting_build || 0) - (c.awaiting_build_test || 0);
     $('campaignsBody').innerHTML = c.error ? groupError('campaigns', c.error) :
-      '<div class="grid">' +
-        stat(u.total, 'accounts', '', u.test_accounts ? u.real + ' real · ' + u.test_accounts + ' test' : '') +
-        stat(c.total, 'campaigns', '', c.test_campaigns ? c.real + ' real · ' + c.test_campaigns + ' test' : '') +
-        stat(c.live, 'live') + stat(c.launched, 'launched') +
-        stat(c.awaiting_build, 'awaiting build', '', c.awaiting_build_test ? c.awaiting_build_test + ' of them test' : '') +
-        stat('$' + Number(c.budget_configured_usd || 0).toFixed(2), 'budget configured', 'wide') +
-      '</div>' +
-      '<div class="stageband"><span class="sl">Campaigns by stage</span>' + pills(c.by_stage) + '</div>' +
-      // Money belongs next to campaigns: one campaign is one $49 purchase.
-      (rev.error ? groupError('revenue', rev.error) :
-      '<h3 style="margin:14px 0 6px">Money</h3><div class="grid">' +
-        stat('$' + Number(rev.paid_usd || 0).toFixed(2), 'collected', 'wide',
-          rev.paid_orders + ' paid order(s) of ' + rev.orders) +
-        stat('$' + Number(rev.price_usd || 0).toFixed(2), 'price per campaign', '',
-          rev.stripe_configured ? 'charged through Stripe Checkout' : 'Stripe is not connected — nothing can be bought') +
-        stat(rev.paid_orders, 'campaigns paid for', '', rev.pending_orders ? rev.pending_orders + ' checkout(s) started, not paid' : 'no abandoned checkouts') +
-        stat(fmt(rev.newest_at), 'last order', 'wide') +
-      '</div>');
+      hero({eyebrow: 'Campaigns', big: (failedNow + nb2) ? esc(failedNow + nb2) + ' need attention' : 'All running smoothly',
+        small: esc(c.live || 0) + ' live of ' + esc(c.real || c.total || 0) + ' campaigns',
+        steps: [
+          {n: c.real || c.total || 0, l: 'Campaigns', s: 'every home so far'},
+          {n: c.live || 0, l: 'Live now', s: 'posting and advertising', cls: c.live ? 'good' : ''},
+          {n: builtNot, l: 'Built, not launched', s: 'usually waiting on the agent'},
+          {n: failedNow, l: 'Failed posts', s: failedNow ? 'listed below' : 'none', cls: failedNow ? 'alert' : ''}]});
+    // Orders belong with the money.
+    if ($('finOrders')) paintFinanceHero();
+    loadFinanceDaily();
 
+    // Content reads in the order a post moves: failed first, because that is the one to act on.
     $('contentBody').innerHTML = ct.error ? groupError('content', ct.error) :
-      '<div class="grid">' +
-        stat(ct.posts_total, 'posts', '', ct.test_posts ? ct.real_posts + ' real · ' + ct.test_posts + ' test' : '') +
-        stat(ct.due_now, 'due for the publisher', '', ct.due_now_test ? ct.due_now_test + ' of them test' : '') +
-        // 'awaiting approval' and 'scheduled' can hold the same rows: the engine stamps a
-        // publish time on every draft. The labels now say which question each square answers.
-        stat(ct.awaiting_approval, 'waiting on a human') + stat(ct.approved, 'approved by a human') +
-        stat(ct.scheduled, 'queued with a date') + stat(ct.published, 'actually posted') +
-        stat(ct.failed, 'publish failed', '', ct.failed_test ? ct.failed_test + ' of them test' : '') +
-        stat(fmt(ct.next_publish_at), 'next publish', 'wide') +
+      '<h3 class="card-title">Posts</h3><div class="grid">' +
+        stat(ct.failed, 'failed to post', ct.failed ? 'alert' : '', ct.failed_test ? ct.failed_test + ' of them test' : '') +
+        stat(ct.awaiting_approval, 'waiting on review') +
+        stat(ct.scheduled, 'scheduled') +
+        stat(ct.due_now, 'posting now', '', ct.due_now_test ? ct.due_now_test + ' of them test' : '') +
+        stat(ct.published, 'posted', ct.published ? 'good' : '') +
+        stat(when(ct.next_publish_at), 'next post goes out') +
+        stat(ct.posts_total, 'posts written', '', ct.test_posts ? ct.real_posts + ' real · ' + ct.test_posts + ' test' : '') +
+      '</div>' +
+      '<h3 class="card-title" style="margin-top:22px">Photos</h3><div class="grid">' +
         stat(ct.photos, 'photos', '', ct.photos_test ? ct.photos_test + ' test' : '') +
-        // Was "37 tagged / of those": a number with no noun. Name what is tagged (a photo
-        // attached to a campaign) and what is not, so the square answers a question.
         stat(ct.photos_tagged, 'photos on a campaign', '',
           ct.photos_untagged ? ct.photos_untagged + ' imported but not used yet' : 'every photo is on a campaign') +
         stat(ct.designs, 'designs', '', 'creative the engine drew') +
       '</div>';
 
-    $('advertisingBody').innerHTML = a.error ? groupError('advertising', a.error) :
-      '<div class="grid">' +
-        stat(a.accounts, 'ad accounts') + stat(a.live_accounts, 'live tokens') +
-        stat(a.simulated, 'simulated') +
-        stat(a.needs_reconnect, 'need reconnect', '', a.expiring ? a.expiring + ' expiring soon' : '') +
-        stat('$' + Number(a.budget_configured_usd || 0).toFixed(2), 'budget configured', 'wide') +
-        statRaw(pills(a.by_token_status), 'token state (last sweep)', 'wide') +
-        statRaw(pills(a.platforms), 'platforms', 'wide') +
-      '</div><p class="hint">Token state is written by the health sweep, so this is the last thing we actually asked Meta — not a guess about whether a token still works.</p>';
+    // Connections is only about the agents' Meta logins: what is broken first, then every
+    // connection, then the counts. Ad budget is campaign money, so it is not shown here.
+    $('advertisingBody').innerHTML = a.error ? groupError('connections', a.error) :
+      '<div class="br-card" style="margin-top:0"><h3 class="card-title">Every connection</h3><div id="connList" class="hint">Loading…</div></div>';
+    loadConnections();
+    loadCampaigns(); loadActivity(); loadSystemCheck(); loadMarketing(); loadWebsite(); loadTeam(); loadReleases();
 
     $('activityBody').innerHTML = act.error ? groupError('activity', act.error) :
-      '<h3>Last ' + esc(act.days || 14) + ' days (UTC)</h3>' + sparkline(act.per_day) +
-      '<div style="margin-top:6px">' + pills(act.by_type_14d) + '</div>' +
-      '<div class="hint" style="margin-top:6px">' + esc(act.total_14d || 0) + ' recorded event(s) in the window.</div>';
+      sparkline(act.per_day) + '<div class="hint" style="margin-top:8px">Click a day to see what happened.</div>';
 
     $('unavailable').innerHTML = h.length
       ? '<h3>Not measured</h3>' + h.map(x => '<div class="hint">' + esc(x.metric) + ': ' + esc(x.reason) + '</div>').join('')
       : '<div class="hint">Everything measured is above.</div>';
 
     renderTriage(m);
+    paintAttention(m);
     renderSums(m);
     renderTickets();
     renderUsers();
-    $('stamp').textContent = 'refreshed ' + new Date().toISOString().slice(11,19) + ' UTC';
+    $('stamp').textContent = 'Updated ' + new Date().toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'});
   } catch (err) {
     // Every square used to go blank and only one of the four sections said why. Say it once,
     // in each section, and keep the console's own health row as the place to look next.
@@ -801,13 +2114,16 @@ function renderUsers(){
   const total = rows.length;
   if (!showAll) rows = rows.slice(0, 25);
   body.innerHTML = rows.length ? rows.map(u =>
-    '<tr' + (u.is_test ? ' class="testrow"' : '') + '><td>' + u.id + '</td><td>' + esc(u.email) + (u.is_test ? ' <span class="pill test">test</span>' : '') +
-      (u.is_admin ? ' <span class="pill ok">admin</span>' : '') + '</td><td>' + esc(u.name || '—') + '</td>' +
-    '<td>' + (u.is_active ? '<span class="pill ok">yes</span>' : '<span class="pill bad">no</span>') + '</td>' +
-    '<td><span class="pill ' + (u.subscription_status === 'active' ? 'ok' : 'warn') + '">' + esc(u.subscription_status) + '</span></td>' +
-    '<td>' + (u.campaign_count ?? 0) + '</td><td>' + fmt(u.last_login) + '</td>' +
-    '<td><button class="ghost tiny" data-resetlink="' + u.id + '" title="Create a one-time password reset link to send by hand">Reset link</button></td></tr>').join('')
+    '<tr class="rowlink' + (u.is_test ? ' testrow' : '') + '" data-agent="' + u.id + '"><td>' + u.id + '</td>' +
+    '<td><b>' + esc(u.name || u.email) + '</b>' + (u.is_test ? ' <span class="pill test">test</span>' : '') + (u.is_admin ? ' <span class="pill ok">admin</span>' : '') +
+      (u.name ? '<div class="tiny">' + esc(u.email) + '</div>' : '') + '</td>' +
+    '<td>' + (u.is_active ? '<span class="pill ok">Active</span>' : '<span class="pill bad">Inactive</span>') + '</td>' +
+    '<td>' + flagCell(agentFlags(u)) + '</td>' +
+    '<td>' + (u.campaign_count ?? 0) + '</td><td>' + esc(when(u.last_login)) + '</td>' +
+    '<td><span class="tk-toggle light">Open</span></td></tr>').join('')
     : '<tr><td colspan="8" class="hint">No account matches. Test accounts are hidden unless you ask for them.</td></tr>';
+  if (typeof paintGrowth === 'function') paintGrowth();
+  if (typeof paintAccountsHero === 'function') paintAccountsHero();
   $('userCount').textContent = total + ' match(es)' + (rows.length < total ? ' · showing ' + rows.length : '') +
     (showTest ? '' : ' · test accounts hidden');
 }
@@ -838,38 +2154,55 @@ function thread(t){
   return '<div class="thread">' + msgs.map(m =>
     '<div class="m"><b>' + esc(m.from || 'unknown') + '</b> <span class="hint">' + fmt(m.at) + '</span><p>' + esc(m.text || '') + '</p></div>').join('') + '</div>';
 }
+const TK_STATUS = {open: 'Open', in_progress: 'Working on it', resolved: 'Resolved', closed: 'Closed'};
+const openTickets = new Set();
 function ticketRow(t){
-  return '<tr' + (t.is_test ? ' class="testrow"' : '') + '><td>' + t.id + '</td><td>' + esc(t.client_email || ('user ' + t.user_id)) + (t.is_test ? ' <span class="pill test">test</span>' : '') + '</td><td>' + esc(t.subject) + '</td>' +
-    '<td><span class="pill ' + (isOpen(t) ? 'warn' : 'ok') + '">' + esc(t.status) + '</span></td>' +
-    '<td>' + fmt(t.created_at) + '</td><td>' + fmt(t.updated_at) + '</td><td>' + lastFrom(t) + '</td>' +
-    '<td><button class="ghost tiny" data-ticket="' + t.id + '">Open</button></td></tr>' +
-    '<tr class="ticket-detail hidden" id="ticket-' + t.id + '"><td colspan="8">' + thread(t) +
-      '<div class="row" style="align-items:flex-end">' +
-        '<div style="flex:0 0 190px"><label for="status-' + t.id + '">Status</label>' +
-          '<select id="status-' + t.id + '">' + ['open','in_progress','resolved','closed'].map(v =>
-            '<option value="' + v + '"' + (t.status === v ? ' selected' : '') + '>' + v + '</option>').join('') + '</select></div>' +
-        '<div><label for="reply-' + t.id + '">Reply to the client</label>' +
-          '<textarea id="reply-' + t.id + '" placeholder="Type the answer the client will read on their Support page…"></textarea></div>' +
+  const isOpenNow = openTickets.has(String(t.id));
+  const ours = waitingOnUs(t);
+  const turn = !isOpen(t) ? '' : ours ? '<span class="tk-turn us">Waiting on us</span>' : '<span class="tk-turn them">Waiting on the agent</span>';
+  const msgs = t.messages || [];
+  return '<article class="tk' + (isOpenNow ? ' open' : '') + (t.is_test ? ' testrow' : '') + '" id="tk-' + t.id + '">' +
+    '<div class="tk-head">' +
+      '<div class="tk-main"><b>' + esc(t.subject) + '</b>' +
+        '<span>' + esc(t.client_email || ('Agent ' + t.user_id)) + ' · Request #' + esc(t.id) + ' · ' + esc(when(t.created_at)) +
+        (t.is_test ? ' · <span class="pill test">test</span>' : '') + '</span></div>' +
+      '<div class="tk-side">' + turn + '<span class="tk-status s-' + esc(t.status) + '">' + esc(TK_STATUS[t.status] || t.status) + '</span>' +
+        '<button class="tk-toggle" data-ticket="' + t.id + '">' + (isOpenNow ? 'Close' : 'Open') + '</button></div>' +
+    '</div>' +
+    '<div class="tk-body' + (isOpenNow ? '' : ' hidden') + '" id="ticket-' + t.id + '">' +
+      '<div class="tk-thread">' + (msgs.length ? msgs.map(m => {
+        const team = String(m.from || '').toLowerCase() === 'admin';
+        return '<div class="tk-msg ' + (team ? 'team' : 'agent') + '"><span>' + (team ? 'Resmara team' : esc(t.client_email || 'Agent')) + (m.at ? ' · ' + esc(when(m.at)) : '') + '</span><p>' + esc(m.text || '') + '</p></div>';
+      }).join('') : '<div class="hint">No messages yet.</div>') + '</div>' +
+      '<div class="tk-reply">' +
+        '<label for="reply-' + t.id + '">Your reply</label>' +
+        '<textarea id="reply-' + t.id + '" rows="4" placeholder="Write the answer the agent will read on their Support page…"></textarea>' +
+        '<div class="tk-foot">' +
+          '<label class="tk-statuspick" for="status-' + t.id + '">Status after you send' +
+            '<select id="status-' + t.id + '">' + Object.keys(TK_STATUS).map(v =>
+              '<option value="' + v + '"' + (t.status === v ? ' selected' : '') + '>' + TK_STATUS[v] + '</option>').join('') + '</select></label>' +
+          '<div class="tk-btns">' +
+            '<button class="tk-kb" data-kb="' + t.id + '" title="Turn this reply into an answer the Ask Resmara chat gives next time">Save as a chat answer</button>' +
+            '<button class="tk-send" data-save="' + t.id + '">Send reply</button>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
-      '<div style="margin-top:10px"><button class="tiny" data-save="' + t.id + '">Save</button> ' +
-      '<button class="ghost tiny" data-close="' + t.id + '">Cancel</button>' +
-      '<button class="ghost tiny" data-kb="' + t.id + '" title="Turn this reply into an answer the Ask Resmara chat gives next time">Add reply to Resmara&#39;s answers</button></div>' +
-    '</td></tr>';
+    '</div>' +
+  '</article>';
 }
 function renderTickets(){
-  const body = $('ticketsTable').querySelector('tbody');
+  const body = $('ticketsTable');
   const showTest = $('showTestTickets').checked;
   let rows = ticketRows.filter(t => showTest || !t.is_test);
   if (ticketFilter === 'waiting') rows = rows.filter(waitingOnUs);
   else if (ticketFilter === 'open') rows = rows.filter(isOpen);
   else if (ticketFilter === 'resolved') rows = rows.filter(t => !isOpen(t));
   body.innerHTML = rows.length ? rows.map(ticketRow).join('')
-    : '<tr><td colspan="8" class="hint">Nothing here. ' +
-      (ticketFilter === 'waiting' ? 'No client is waiting on us. ' : '') +
-      (showTest ? '' : 'Test tickets are hidden unless you ask for them.') + '</td></tr>';
+    : '<div class="attn-ok">' + (ticketFilter === 'waiting' ? '✓ No agent is waiting on us.' : 'No tickets here.') + '</div>';
   const shown = rows.filter(t => !t.is_test).length;
-  $('ticketCount').textContent = rows.length + ' row(s) · ' + shown + ' real' +
-    (showTest ? '' : ' · ' + ticketRows.filter(t => t.is_test).length + ' test hidden');
+  const hid = showTest ? 0 : ticketRows.filter(t => t.is_test).length;
+  $('ticketCount').textContent = hid ? hid + ' test ticket(s) hidden' : '';
+  if (lastMetrics && !renderTickets._busy) { renderTickets._busy = true; try { paintAttention(lastMetrics); } finally { renderTickets._busy = false; } }
 }
 async function loadTickets(){
   try {
@@ -932,7 +2265,7 @@ async function saveTicket(id){
   if (reply) params.set('reply', reply);
   try {
     await api('/api/admin/support/' + encodeURIComponent(id) + '?' + params.toString(), { method: 'PATCH' });
-    msg.className = 'msg ok'; msg.textContent = 'Ticket ' + id + ' saved' + (reply ? ' and the reply is visible to the client.' : '.');
+    msg.className = 'msg ok'; msg.textContent = reply ? 'Reply sent. The agent sees it on their Support page.' : 'Status saved.';
     await loadTickets(); loadMetrics();
   } catch (err) { msg.className = 'msg bad'; msg.textContent = 'Could not save ticket ' + id + ': ' + err.message; }
 }
@@ -996,6 +2329,12 @@ document.querySelectorAll('.filters .chip').forEach(chip => chip.addEventListene
 
 async function boot(){
   let me;
+  // Signed out on purpose: say so, and do not call it an ended session.
+  if (!localStorage.getItem(TOKEN_KEY)) {
+    let out = false; try { out = sessionStorage.getItem('resmara_signed_out') === '1'; sessionStorage.removeItem('resmara_signed_out'); } catch (e) {}
+    const m = $('loginMsg'); if (m && out) { m.className = 'msg ok'; m.textContent = 'You\u2019re signed out. Sign in again any time.'; }
+    return;
+  }
   try { me = await api('/api/auth/me'); }
   catch (err) {
     localStorage.removeItem(TOKEN_KEY);
@@ -1009,15 +2348,19 @@ async function boot(){
   $('index').classList.remove('hidden');
   $('logout').classList.remove('hidden');
   $('tools').classList.remove('hidden');
-  $('who').textContent = me.email + (me.is_admin ? ' · admin' : ' · NOT admin');
+  // A team member is not an operator, but the console is theirs: say which of the two it is so
+  // nobody reads "NOT admin" as "this is broken" when it is a granted account.
+  const inConsole = !!(me.is_admin || me.team_super_admin || (Array.isArray(me.team_access) && me.team_access.length));
+  $('who').textContent = me.email + (me.is_admin || me.team_super_admin ? ' · admin' : inConsole ? ' · team' : ' · NOT admin');
   // The build room records who claimed a task; "who" is this signed-in operator.
   window.resmaraMe = me;
-  if (!me.is_admin) {
-    // A logged-in non-admin used to see four empty sections and a 403 buried in one of them.
-    // Say it at the top: this is refused, not empty.
+  applyAccess(me);
+  if (!inConsole) {
+    // A logged-in account with no team access used to see four empty sections and a 403 buried
+    // in one of them. Say it at the top: this is refused, not empty.
     $('triage').innerHTML = '<div class="msg bad" style="grid-column:1/-1">' +
-      'Signed in as ' + esc(me.email) + ', which is not an admin account, so every figure here is refused by the server. ' +
-      'This is not an empty product — sign out and use an account marked admin in the Accounts table.</div>';
+      'Signed in as ' + esc(me.email) + ', which has no access to the Team room, so every figure here is refused by the server. ' +
+      'This is not an empty product — ask an owner to add this address on the Team page.</div>';
   }
   refreshAll();
 }
@@ -1055,60 +2398,56 @@ async function loadCosts(){
   }
 }
 
+const costOpen = new Set();
 function renderCosts(){
   const s = costSummary || {};
   const sq = $('costSquares'); if (!sq) return;
   const payers = Object.keys(s.by_payer_usd || {});
-  sq.innerHTML = '<div class="grid">' +
-    stat(usd(s.spent_to_date_usd), 'spent so far', 'wide',
-         (s.cost_rows || 0) + ' row(s) in the ledger' + (payers.length ? ' · ' + payers.join(' & ') : '')) +
-    stat(usd(s.monthly_recurring_usd), 'monthly repeated', '', usd(s.yearly_run_rate_usd) + ' a year') +
-    stat(usd(s.one_off_usd), 'one-off purchases', '') +
-    stat(String(s.active_subscriptions || 0), 'subscriptions running', '',
-         s.next_renewal_on ? 'next charge ' + s.next_renewal_on : 'none outstanding') +
-    stat(String(s.with_receipt || 0) + '/' + (s.cost_rows || 0), 'receipts on file', '') +
-    '</div>' +
+  const missing = (s.cost_rows || 0) - (s.with_receipt || 0);
+  sq.innerHTML = hero({eyebrow: 'Building Resmara', big: esc(usd(s.spent_to_date_usd || 0)), small: 'spent so far' + (payers.length ? ' by ' + esc(payers.join(' & ')) : ''),
+    steps: [
+      {n: usd(s.monthly_recurring_usd || 0), l: 'Every month', s: usd(s.yearly_run_rate_usd || 0) + ' a year'},
+      {n: usd(s.one_off_usd || 0), l: 'One-off purchases', s: 'domains, design, setup'},
+      {n: s.active_subscriptions || 0, l: 'Subscriptions', s: s.next_renewal_on ? 'next charge ' + dateOnly(s.next_renewal_on) : 'none running'},
+      {n: missing, l: 'Missing receipts', s: (s.with_receipt || 0) + ' of ' + (s.cost_rows || 0) + ' on file', cls: missing ? 'alert' : ''}]}) +
     (payers.length
       ? '<div class="chipbox" style="margin-top:12px">' + payers.map(p =>
           '<span class="chip">' + esc(p) + ' ' + usd(s.by_payer_usd[p]) + '</span>').join('') + '</div>'
       : '');
 
-  const tb = $('costsTable').querySelector('tbody');
+  const tb = $('costsTable');
   if (!costRows.length) {
-    tb.innerHTML = '<tr><td colspan="10"><span class="hint">Nothing recorded yet. The first row is usually the domain or the first month of hosting.</span></td></tr>';
+    tb.innerHTML = '<div class="hint">Nothing recorded yet. The first one is usually the domain or the first month of hosting.</div>';
   } else {
     tb.innerHTML = costRows.map(c => {
-      const receipts = (c.receipts || []).map(r =>
-        '<button class="ghost tiny" data-receipt="' + r.id + '" title="' + esc(r.name) + '">view</button>').join(' ');
-      const repeats = c.kind === 'recurring'
-        ? (c.cadence === 'yearly' ? 'yearly' : 'monthly') +
-          (c.ended_on ? '<div class="tiny">ended ' + esc(c.ended_on) + '</div>' : '')
-        : 'no';
-      const money = usd(c.amount_usd) + (c.kind === 'recurring' ? '<div class="tiny">per ' + (c.cadence === 'yearly' ? 'year' : 'month') + '</div>' : '');
-      const charged = c.kind === 'recurring'
-        ? usd(c.charged_to_date_usd) + '<div class="tiny">' + c.charges + ' charge(s)</div>'
-        : usd(c.charged_to_date_usd);
-      return '<tr>' +
-        '<td class="nw">' + esc(c.paid_on) + '</td>' +
-        '<td>' + esc(c.paid_by) + '</td>' +
-        '<td>' + esc(c.vendor) + '</td>' +
-        '<td>' + esc(c.description || '—') + '</td>' +
-        '<td class="nw">' + money + '</td>' +
-        '<td>' + repeats + '</td>' +
-        '<td>' + charged + '</td>' +
-        '<td class="nw">' + esc(c.next_charge_on || '—') + '</td>' +
-        '<td>' + (receipts || '<span class="tiny">none</span>') + '</td>' +
-        '<td class="tiny"><button class="ghost tiny" data-attach="' + c.id + '">attach</button> ' +
-          (c.kind === 'recurring'
-            ? (c.ended_on
-                ? '<button class="ghost tiny" data-resume="' + c.id + '">resume</button>'
-                : '<button class="ghost tiny" data-end="' + c.id + '">end</button> ')
-            : '') +
-          '<button class="ghost tiny" data-delcost="' + c.id + '">delete</button></td>' +
-        '</tr>';
+      const rec = c.kind === 'recurring', per = c.cadence === 'yearly' ? 'yr' : 'mo';
+      const type = !rec ? '<span class="cost-chip">One-off</span>'
+        : c.ended_on ? '<span class="cost-chip">Ended ' + esc(dateOnly(c.ended_on)) + '</span>'
+        : '<span class="cost-chip on">' + (c.cadence === 'yearly' ? 'Yearly' : 'Monthly') + (c.next_charge_on ? ' · next ' + esc(dateOnly(c.next_charge_on)) : '') + '</span>';
+      const has = (c.receipts || []).length;
+      const open = costOpen.has(String(c.id));
+      return '<div class="cost' + (open ? ' open' : '') + '">' +
+        '<div class="cost-line">' +
+          '<div class="cost-main"><b>' + esc(c.vendor) + '</b><span>' + esc(c.description || '—') + '</span></div>' +
+          '<div class="cost-meta"><span>Paid by ' + esc(c.paid_by || '—') + '</span><span>' + esc(dateOnly(c.paid_on)) + '</span></div>' +
+          '<div>' + type + '</div>' +
+          '<div class="cost-amt"><b>' + usd(c.amount_usd) + (rec ? '<small>/' + per + '</small>' : '') + '</b>' +
+            (rec ? '<span>' + usd(c.charged_to_date_usd) + ' so far</span>' : '') + '</div>' +
+          '<div>' + (has ? '<span class="cost-chip ok">Receipt on file</span>' : '<span class="cost-chip bad">No receipt</span>') + '</div>' +
+          '<button class="tk-toggle" data-costopen="' + c.id + '">' + (open ? 'Close' : 'Manage') + '</button>' +
+        '</div>' +
+        '<div class="cost-actions' + (open ? '' : ' hidden') + '">' +
+          '<div class="cost-btns">' +
+            (c.receipts || []).map((r, i) => '<button class="cb light" data-receipt="' + r.id + '" title="' + esc(r.name || '') + '">View receipt' + (has > 1 ? ' ' + (i + 1) : '') + '</button>').join('') +
+            '<button class="cb light" data-attach="' + c.id + '">' + (has ? 'Add another receipt' : 'Attach receipt') + '</button>' +
+            (rec ? (c.ended_on ? '<button class="cb light" data-resume="' + c.id + '">Restart subscription</button>'
+                               : '<button class="cb light" data-end="' + c.id + '">End subscription</button>') : '') +
+          '</div>' +
+          '<button class="cb danger" data-delcost="' + c.id + '">Delete cost</button>' +
+        '</div>' +
+      '</div>';
     }).join('');
   }
-
   const sum = $('sum-costs');
   if (sum) sum.textContent = (s.cost_rows || 0) + ' cost(s) · ' + usd(s.spent_to_date_usd) + ' spent · ' +
     usd(s.monthly_recurring_usd) + '/mo repeating';
@@ -1206,6 +2545,8 @@ if ($('cAdd')) {
   });
   const d = $('cDate'); if (d) d.value = new Date().toISOString().slice(0, 10);
   $('costsTable').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-costopen]');
+    if (t) { const id = t.dataset.costopen; if (costOpen.has(id)) costOpen.delete(id); else costOpen.add(id); renderCosts(); return; }
     const r = e.target.closest('[data-receipt],[data-attach],[data-delcost],[data-end],[data-resume]');
     if (!r) return;
     if (r.dataset.receipt) return openReceipt(Number(r.dataset.receipt));
@@ -1284,16 +2625,14 @@ function renderBuildroom(){
   const s = brSummary || {};
   const sq = $('brSquares'); if (!sq) return;
   const owners = Object.keys(s.by_owner || {});
-  sq.innerHTML = '<div class="grid">' +
-    stat(String(s.open || 0), 'still open', 'wide',
-         (s.tasks || 0) + ' task' + (s.tasks === 1 ? '' : 's') + ' on the board · ' +
-         (s.assigned || 0) + ' assigned, ' + (s.unassigned || 0) + ' with nobody to do it') +
-    stat(String(s.claimed || 0), 'claimed by somebody', '', owners.length ? owners.join(' & ') : 'nobody yet') +
-    stat(String(s.unclaimed || 0), 'nobody has it', '') +
-    stat(String(s.blocked || 0), 'blocked', '') +
-    stat(String(s.overdue || 0), 'overdue', '') +
-    stat(String(s.tested || 0), 'tested', '', (s.untested_and_done || 0) + ' done but untested') +
-    '</div>' +
+  const tasks = s.tasks || 0, done = Math.max(0, tasks - (s.open || 0));
+  sq.innerHTML = hero({eyebrow: 'Build progress', big: esc(done) + ' <small>of</small> ' + esc(tasks), small: 'tasks done',
+    bar: {pct: tasks ? done / tasks * 100 : 0, label: (tasks ? Math.round(done / tasks * 100) : 0) + '% done · ' + (s.open || 0) + ' still open · ' + (s.tested || 0) + ' tested'},
+    steps: [
+      {n: s.claimed || 0, l: 'Being worked on', s: owners.length ? owners.join(' & ') : 'nobody has claimed one'},
+      {n: s.unclaimed || 0, l: 'Nobody has it', s: 'open and unclaimed', cls: s.unclaimed ? 'alert' : ''},
+      {n: s.blocked || 0, l: 'Blocked', s: 'something is stopping it', cls: s.blocked ? 'alert' : ''},
+      {n: s.overdue || 0, l: 'Overdue', s: 'past the due date', cls: s.overdue ? 'alert' : ''}]}) +
     (s.stale_claims ? '<div class="hint" style="margin-top:8px">' + s.stale_claims +
       ' stale claim(s) — held for more than ' + (s.stale_after_hours || 24) + 'h, so anybody can take them over.</div>' : '');
 
@@ -1513,38 +2852,39 @@ async function loadFinance(){
   }
 }
 
+function calcRow(k, v, big){ return '<div class="calc-row' + (big ? ' big' : '') + '"><span>' + esc(k) + '</span><b>' + v + '</b></div>'; }
 function renderFinance(){
   const d = finData; if (!d) return;
   const sq = $('finSquares'); if (!sq) return;
   const u = d.unit, a = d.actuals, f = d.fixed, b = d.breakeven, v = d.volume;
-  sq.innerHTML = '<div class="grid">' +
-    stat(d.price.label, 'price per campaign', '',
-         'one campaign, paid when it is built · no subscription, no packs') +
+  sq.innerHTML = '<div class="grid g4">' +
+    stat(d.price.label, 'price per campaign') +
+    stat(usd(u.costs_usd), 'our cost per sale') +
+    stat(usd(u.contribution_usd), 'we keep per campaign', u.contribution_usd > 0 ? 'good' : 'bad', u.margin_pct + '% margin') +
     stat(usd(f.total_monthly_usd), 'hosting per month', '', usd(f.annual_usd) + ' a year') +
-    stat(usd(u.costs_usd), 'our cost per sale', '',
-         'delivery ' + usd(u.delivery_usd) + ' + hosting ' + usd(u.hosting_usd) + ' + refund buffer') +
-    stat(usd(u.contribution_usd), 'we keep per campaign', u.contribution_usd > 0 ? 'good' : 'bad',
-         u.margin_pct + '% margin') +
-    stat(b.campaigns_per_month === null ? '—' : String(b.campaigns_per_month),
-         'sales to cover hosting', '',
-         v.used + ' a month right now (' + v.basis + ')') +
-    stat(d.price_floor.at_current_volume_usd === null ? '—' : usd(d.price_floor.at_current_volume_usd),
-         'price for target margin', '', d.price_floor.target_margin_pct + '% after delivery') +
-    stat(usd(a.gross_usd), 'revenue collected', '',
-         a.paid_campaigns + ' campaign(s) paid, ' + usd(a.gross_last_30d_usd) + ' in 30 days') +
-    stat(String(a.customers), 'customers who paid', '',
-         a.repeat_customers + ' came back more than once') +
-    stat(String(a.repeat_customers), 'repeat customers', a.repeat_customers ? 'good' : '',
-         a.repeat_rate_pct + '% of buyers') +
-    stat(d.capacity.storage_mode === 'r2' ? 'R2' : 'Database', 'photo storage',
-         d.capacity.storage_mode === 'r2' ? 'good' : '', d.capacity.r2_note) +
-    stat(d.capacity.asset_mb + ' MB', 'photos kept in the database', '',
-         d.capacity.campaigns_built + ' campaign(s) built') +
-    stat(d.capacity.db_mb === null ? '—' : d.capacity.db_mb + ' MB', 'database size', '') +
     '</div>';
+  const cs = $('calcSum'); if (cs) cs.textContent = 'Right now: ' + usd(u.contribution_usd) + ' kept per campaign' +
+    (b.campaigns_per_month === null ? '' : ' · ' + b.campaigns_per_month + ' sale(s) a month covers hosting');
+  paintGrowth(); paintFinanceHero(); if (typeof paintMarketing === 'function') paintMarketing();
+  const ss = $('sysStorage');
+  if (ss) ss.innerHTML = '<div class="grid">' +
+    stat(d.capacity.storage_mode === 'r2' ? 'R2' : 'Database', 'photo storage', d.capacity.storage_mode === 'r2' ? 'good' : '') +
+    stat(d.capacity.asset_mb + ' MB', 'photos kept in the database') +
+    stat(d.capacity.db_mb === null ? '—' : d.capacity.db_mb + ' MB', 'database size') +
+    '</div>';
+  const res = $('finResults');
+  if (res) res.innerHTML = '<span class="calc-eyebrow">Results</span>' +
+    calcRow('Price per campaign', d.price.label) +
+    calcRow('Our cost per sale', usd(u.costs_usd)) +
+    calcRow('We keep per campaign', usd(u.contribution_usd) + ' <small>' + esc(u.margin_pct) + '%</small>', true) +
+    calcRow('Hosting per month', usd(f.total_monthly_usd)) +
+    calcRow('Sales a month to cover hosting', b.campaigns_per_month === null ? '—' : esc(b.campaigns_per_month)) +
+    calcRow('Lowest price for ' + esc(d.price_floor.target_margin_pct) + '% margin', d.price_floor.at_current_volume_usd === null ? '—' : usd(d.price_floor.at_current_volume_usd)) +
+    calcRow('One agent is worth', usd(d.repeat.lifetime_contribution_usd)) +
+    calcRow('Most we may pay to win one', usd(d.acquisition.max_cac_usd[3]), true);
 
   const rep = $('finRepeat');
-  if (rep) rep.innerHTML = '<div class="grid">' +
+  if (rep) rep.innerHTML = '<div class="grid g3">' +
     stat(usd(d.repeat.annual_contribution_usd), 'one agent, one year', '',
          d.repeat.campaigns_per_agent_per_year + ' campaigns') +
     stat(usd(d.repeat.lifetime_contribution_usd), 'one agent, all years', '',
@@ -1556,26 +2896,33 @@ function renderFinance(){
 
   const form = $('finForm');
   if (form) {
-    form.innerHTML = (d.fields || []).map(f => {
-      const val = d.assumptions[f.key];
-      return '<div style="flex:0 0 200px">' +
-        '<label for="fin-' + esc(f.key) + '">' + esc(f.label) + ' <span class="hint">(' + esc(f.unit) + ')</span></label>' +
-        '<input id="fin-' + esc(f.key) + '" data-fin="' + esc(f.key) + '" type="number" step="' + esc(f.step) + '" value="' + esc(val) + '">' +
-        '<div class="hint" style="margin:4px 0 0;font-size:11px">' + esc(f.hint) + '</div></div>';
-    }).join('');
+    const byKey = {}; (d.fields || []).forEach(f => { byKey[f.key] = f; });
+    const groups = [
+      ['Each campaign', ['engine_cost_per_campaign_usd', 'gb_per_campaign', 'refund_buffer_pct']],
+      ['Hosting each month', ['hosting_web_usd', 'hosting_postgres_usd', 'hosting_cron_usd', 'hosting_domain_usd']],
+      ['Agents', ['campaigns_per_agent_per_year', 'retention_years', 'planning_volume_per_month']],
+      ['Goal', ['target_margin_pct']],
+    ];
+    const used = new Set(groups.flatMap(g => g[1]));
+    const extra = (d.fields || []).filter(f => !used.has(f.key)).map(f => f.key);
+    if (extra.length) groups.push(['Other', extra]);
+    form.innerHTML = groups.map(([title, keys]) => '<fieldset class="calc-group"><legend>' + esc(title) + '</legend>' +
+      keys.filter(k => byKey[k]).map(k => { const f = byKey[k], val = d.assumptions[k];
+        return '<label class="calc-field" title="' + esc(f.hint) + '"><span>' + esc(f.label) + '</span>' +
+          '<span class="calc-input"><input id="fin-' + esc(k) + '" data-fin="' + esc(k) + '" type="number" step="' + esc(f.step) + '" value="' + esc(val) + '"><i>' + esc(f.unit) + '</i></span></label>'; }).join('') +
+      '</fieldset>').join('');
   }
 
   const tb = document.querySelector('#finCustomers tbody');
   if (tb) {
     tb.innerHTML = (d.customers && d.customers.length)
-      ? d.customers.map(c => '<tr><td>' + esc(c.email) + '</td><td>' + c.campaigns + '</td><td>' +
+      ? d.customers.map(c => '<tr class="rowlink" data-agent-email="' + esc(c.email) + '"><td>' + esc(c.email) + '</td><td>' + c.campaigns + '</td><td>' +
           usd(c.paid_usd) + '</td><td>' + finDate(c.last_paid) + '</td></tr>').join('')
       : '<tr><td colspan="4" class="hint">Nobody has paid yet — the model above is what the pricing will do when they do.</td></tr>';
   }
 
   const s = $('sum-finance');
-  if (s) s.textContent = usd(u.contribution_usd) + ' kept per campaign · ' +
-    usd(d.repeat.lifetime_contribution_usd) + ' per agent';
+  if (s) s.textContent = usd(u.contribution_usd) + ' kept per campaign · ' + usd(a.gross_usd) + ' collected';
 }
 
 async function saveFinance(){
@@ -1588,7 +2935,7 @@ async function saveFinance(){
   try {
     await api('/api/admin/finance/assumptions', { method: 'PUT', body: { values: values } });
     await loadFinance();
-    if (msg) { msg.className = 'msg ok'; msg.textContent = 'Saved — the model recalculated.'; }
+    if (msg) { msg.className = 'msg ok'; msg.textContent = 'Saved and recalculated.'; }
   } catch (err) {
     if (msg) { msg.className = 'msg bad'; msg.textContent = 'Could not save — ' + err.message; }
   } finally {
@@ -1603,24 +2950,25 @@ $('loginBtn').addEventListener('click', login);
 
 // Password help while email is not connected: mint the one-time link here and send it to the
 // customer by hand. It works once and expires in an hour; nothing is exposed publicly.
-$('usersTable').addEventListener('click', async (e) => {
-  const btn = e.target.closest('[data-resetlink]');
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('#agentPage [data-resetlink]');
   if (!btn) return;
-  const row = btn.closest('tr');
+  const out = $('resetOut');
+  const row = {after: n => { out.innerHTML = ''; out.appendChild(n); }};
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = '…';
   try {
     const r = await api('/api/admin/users/' + Number(btn.dataset.resetlink) + '/reset-link', { method: 'POST' });
-    const line = document.createElement('tr');
-    line.className = 'resetline';
-    line.innerHTML = '<td colspan="8" class="hint">' + (r.emailed
+    const line = document.createElement('div');
+    line.className = 'reset-out';
+    line.innerHTML = '<div>' + (r.emailed
       ? 'Reset link emailed to ' + esc(r.email) + '.'
       : 'Send this link to ' + esc(r.email) + ' — works once, expires in ' + r.expires_minutes + ' min: ' +
-        '<input readonly value="' + esc(r.link) + '" style="width:70%;margin-left:6px" onclick="this.select()">') + '</td>';
+        '<input readonly value="' + esc(r.link) + '" onclick="this.select()">') + '</div>';
     row.after(line);
   } catch (err) {
-    const line = document.createElement('tr');
-    line.innerHTML = '<td colspan="8" class="msg bad">' + esc(err.message) + '</td>';
+    const line = document.createElement('div');
+    line.className = 'reset-out msg bad'; line.textContent = err.message;
     row.after(line);
   } finally {
     btn.disabled = false; btn.textContent = label;
@@ -1628,11 +2976,17 @@ $('usersTable').addEventListener('click', async (e) => {
 });
 
 $('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(e); });
-$('logout').addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); location.reload(); });
+$('logout').addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); try { sessionStorage.setItem('resmara_signed_out', '1'); } catch (e) {} location.hash = ''; location.reload(); });
 $('checkBoost').addEventListener('click', checkBoost);
 document.addEventListener('click', (e) => {
   const open = e.target.closest('[data-ticket]');
-  if (open) { $('ticket-' + open.dataset.ticket).classList.toggle('hidden'); return; }
+  if (open) {
+    const id = open.dataset.ticket, body = $('ticket-' + id), now = body.classList.toggle('hidden');
+    if (now) openTickets.delete(id); else openTickets.add(id);
+    open.textContent = now ? 'Open' : 'Close';
+    $('tk-' + id).classList.toggle('open', !now);
+    return;
+  }
   const save = e.target.closest('[data-save]');
   if (save) { saveTicket(save.dataset.save); return; }
   const close = e.target.closest('[data-close]');
@@ -1651,6 +3005,40 @@ setInterval(() => {
   refreshAll();
 }, 60000);
 boot();
+</script>
+
+<script>
+/* One section at a time. The sidebar picks a view; Overview shows the pulse and a card per section. */
+(function(){
+  document.body.classList.add('views');
+  const GROUP={buildroom:'Build',releases:'Build',users:'Agents',growth:'Business',marketing:'Business',website:'Business',support:'Agents',advertising:'Agents',campaigns:'Campaigns',finance:'Money',costs:'Money',health:'System',activity:'System',settings:'System'};
+  function paintOverview(){
+    const box=document.getElementById('overviewList'); if(!box) return;
+    box.innerHTML=[...document.querySelectorAll('#index a[data-go]')].filter(a=>a.dataset.go!=='overview').map(a=>{
+      const s=document.getElementById('sum-'+a.dataset.go);
+      const bd=a.querySelector('.nav-badge'), name=a.firstChild.textContent;
+      return '<button data-view="'+a.dataset.go+'"><span class="og">'+GROUP[a.dataset.go]+(bd?'<span class="nav-badge">'+bd.textContent+'</span>':'')+'</span><b>'+name+'</b><span class="s">'+(s?s.textContent:'')+'</span></button>';
+    }).join('');
+  }
+  function show(sec){
+    const over=!sec||sec==='overview';
+    document.body.classList.toggle('on-section',!over);
+    document.querySelectorAll('details.sec').forEach(d=>{const on=d.dataset.sec===sec;d.classList.toggle('is-view',on);if(on)d.open=true;});
+    document.querySelectorAll('#index a[data-go]').forEach(a=>a.setAttribute('aria-current',String(a.dataset.go===(over?'overview':sec))));
+    const c=document.getElementById('crumbNow'); if(c) c.textContent=over?'Overview':((document.querySelector('#sec-'+sec+' summary h2')||{}).textContent||'');
+    if(over) paintOverview();
+    try{history.replaceState(null,'',over?'#overview':'#sec-'+sec)}catch(e){}
+    window.scrollTo({top:0});
+  }
+  window.openSection=show;
+  document.addEventListener('click',e=>{
+    const t=e.target.closest('[data-go],[data-view]'); if(!t) return;
+    e.preventDefault(); e.stopImmediatePropagation(); show(t.dataset.go||t.dataset.view);
+  },true);
+  let ovT;new MutationObserver(ms=>{if(ms.every(m=>(m.target.closest?m.target:m.target.parentElement)?.closest('#overviewList')))return;clearTimeout(ovT);ovT=setTimeout(()=>{if(!document.body.classList.contains('on-section'))paintOverview()},150)}).observe(document.getElementById('console'),{subtree:true,characterData:true,childList:true});
+  const h=(location.hash||'').replace('#sec-','').replace('#','');
+  setTimeout(()=>show(h&&h!=='overview'?h:'buildroom'),0);
+})();
 </script>
 </body>
 </html>

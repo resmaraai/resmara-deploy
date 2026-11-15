@@ -70,6 +70,16 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
+    # The Team room's Releases page reads the deploy mirror and the host. Both are read-only
+    # credentials: a GitHub token that can see pull requests, and a Render key scoped to the
+    # service. Unset means the page says it cannot reach them, not that nothing shipped.
+    GITHUB_TOKEN: str = os.getenv("RESMARA_GITHUB_TOKEN", "")
+    GITHUB_REPO: str = os.getenv("RESMARA_GITHUB_REPO", "resmaraai/resmara-deploy")
+    RENDER_API_KEY: str = os.getenv("RESMARA_RENDER_API_KEY", "")
+    RENDER_SERVICE_ID: str = os.getenv("RESMARA_RENDER_SERVICE_ID", "")
+    RENDER_API_BASE: str = os.getenv("RESMARA_RENDER_API_BASE", "https://api.render.com/v1")
+    GITHUB_API_BASE: str = os.getenv("RESMARA_GITHUB_API_BASE", "https://api.github.com")
+
     # Models that must not be used for this workload, whatever the env says. glm-5.3 spent its
     # entire output budget on the trace and returned empty content on the hosted endpoint, and
     # it costs several times a flash model per call. Dan's rule: deepseek for anything that

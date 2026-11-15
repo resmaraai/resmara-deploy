@@ -29,6 +29,11 @@ ADDITIONS = {
         ("email_confirmed_at", "TIMESTAMP"),
         ("confirm_token_hash", "VARCHAR"),
         ("confirm_sent_at", "TIMESTAMP"),
+        # The Team room's access list and the fail log the console reads. Both are read on
+        # every console call, so an established database needs the ALTER before the page works.
+        ("team_access", "JSON"),
+        ("team_super_admin", "BOOLEAN DEFAULT 0"),
+        ("team_invited_at", "TIMESTAMP"),
     ],
     "ad_accounts": [
         ("refresh_token", "TEXT"),
@@ -64,6 +69,7 @@ ADDITIONS = {
         ("failure_note", "TEXT"),
         ("failed_at", "DATETIME"),
         ("failure_notified_at", "DATETIME"),
+        ("fail_log", "JSON"),
     ],
     "ads": [
         ("meta_adset_id", "VARCHAR"),
@@ -207,7 +213,10 @@ def _ddl_for(ddl: str, dialect: str) -> str:
     """Translate the SQLite-flavoured DDL to what this database actually understands."""
     if dialect == "postgresql":
         # Postgres has no DATETIME; SQLite has no TIMESTAMPTZ, so this only ever narrows one way.
-        return ddl.replace("DATETIME", "TIMESTAMP")
+        # It also has no truthy integer where a boolean is expected: "BOOLEAN DEFAULT 0" is a
+        # syntax error there, so the SQLite spelling is translated rather than duplicated in
+        # ADDITIONS (which every other table reads as SQLite).
+        return ddl.replace("DATETIME", "TIMESTAMP").replace("BOOLEAN DEFAULT 0", "BOOLEAN DEFAULT FALSE")
     return ddl
 
 

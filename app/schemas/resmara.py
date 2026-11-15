@@ -18,6 +18,10 @@ class UserOut(BaseModel):
     subscription_status: str = "inactive"
     last_login: Optional[datetime] = None
     created_at: Optional[datetime] = None
+    # The Team room: the groups this account may read, and whether it may manage the team. The
+    # console reads these to draw its sidebar; the server checks them again on every call.
+    team_access: Optional[list[str]] = None
+    team_super_admin: bool = False
     class Config:
         from_attributes = True
 

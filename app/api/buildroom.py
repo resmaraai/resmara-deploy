@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_admin_user
 from app.db.session import BuildroomTask, get_db
+from app.services import team_access
 
 router = APIRouter()
 
@@ -206,7 +207,7 @@ class TestedIn(BaseModel):
 
 # ── routes ───────────────────────────────────────────────────────────────────────────
 @router.get("/admin/buildroom")
-def list_tasks(db: Session = Depends(get_db), _admin=Depends(get_admin_user)):
+def list_tasks(db: Session = Depends(get_db), _admin=Depends(team_access.needs("build"))):
     rows = db.query(BuildroomTask).order_by(
         BuildroomTask.status.desc(), BuildroomTask.due_on.is_(None), BuildroomTask.due_on,
         BuildroomTask.id.desc()).all()
@@ -217,7 +218,7 @@ def list_tasks(db: Session = Depends(get_db), _admin=Depends(get_admin_user)):
 
 
 @router.post("/admin/buildroom", status_code=201)
-def create_task(payload: TaskIn, db: Session = Depends(get_db), _admin=Depends(get_admin_user)):
+def create_task(payload: TaskIn, db: Session = Depends(get_db), _admin=Depends(team_access.needs("build"))):
     title = (payload.title or "").strip()
     if not title:
         raise HTTPException(status_code=400, detail="A task needs a title")
@@ -245,7 +246,7 @@ def create_task(payload: TaskIn, db: Session = Depends(get_db), _admin=Depends(g
 
 @router.patch("/admin/buildroom/{task_id}")
 def update_task(task_id: int, payload: TaskPatch, db: Session = Depends(get_db),
-                _admin=Depends(get_admin_user)):
+                _admin=Depends(team_access.needs("build"))):
     task = db.get(BuildroomTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="No such task")
@@ -309,7 +310,7 @@ def update_task(task_id: int, payload: TaskPatch, db: Session = Depends(get_db),
 
 @router.post("/admin/buildroom/{task_id}/claim")
 def claim_task(task_id: int, payload: WhoIn, db: Session = Depends(get_db),
-               _admin=Depends(get_admin_user)):
+               _admin=Depends(team_access.needs("build"))):
     task = db.get(BuildroomTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="No such task")
@@ -338,7 +339,7 @@ def claim_task(task_id: int, payload: WhoIn, db: Session = Depends(get_db),
 
 @router.post("/admin/buildroom/{task_id}/release")
 def release_task(task_id: int, payload: WhoIn, db: Session = Depends(get_db),
-                 _admin=Depends(get_admin_user)):
+                 _admin=Depends(team_access.needs("build"))):
     task = db.get(BuildroomTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="No such task")
@@ -361,7 +362,7 @@ def release_task(task_id: int, payload: WhoIn, db: Session = Depends(get_db),
 
 @router.post("/admin/buildroom/{task_id}/tested")
 def mark_tested(task_id: int, payload: TestedIn, db: Session = Depends(get_db),
-                _admin=Depends(get_admin_user)):
+                _admin=Depends(team_access.needs("build"))):
     task = db.get(BuildroomTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="No such task")
@@ -378,7 +379,7 @@ def mark_tested(task_id: int, payload: TestedIn, db: Session = Depends(get_db),
 
 
 @router.delete("/admin/buildroom/{task_id}")
-def delete_task(task_id: int, db: Session = Depends(get_db), _admin=Depends(get_admin_user)):
+def delete_task(task_id: int, db: Session = Depends(get_db), _admin=Depends(team_access.needs("build"))):
     task = db.get(BuildroomTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="No such task")

@@ -911,3 +911,39 @@ dialog:has(.ei-split){max-width:900px;width:min(900px,calc(100vw - 24px))}
 /* Photo permission checkbox on New campaign */
 .nc-rights{display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;font-size:14px;color:#12354d;cursor:pointer;line-height:1.45}
 .nc-rights input{width:18px;height:18px;margin:2px 0 0;flex:none;accent-color:#d94c0d}
+
+/* Homepage scroll boxes scroll by touch on phones (the brand kit's content is inert, not the box itself) */
+#home-brand .mb-preview,#home-report-preview{touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+
+/* ── agent dashboard: light / dark switch ── */
+.theme-toggle{display:flex!important;align-items:center;justify-content:space-between;gap:10px;width:100%;margin:6px 0 0;padding:8px 14px!important;border-radius:999px!important;background:#eef6fb!important;color:#12354d!important;font-weight:600;font-size:13px;border:0!important}
+.theme-toggle i{position:relative;width:38px;height:22px;border-radius:99px;background:#c7dbe8;flex-shrink:0;transition:background .2s}
+.theme-toggle i:after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s}
+.theme-toggle[aria-checked="true"] i{background:#d94c0d}.theme-toggle[aria-checked="true"] i:after{left:19px}
+html.dark body:has(.shell),html.dark .shell,html.dark .shell .main,html.dark .workspace-main{background:#0b1a26!important;color:#d6e6f1}
+html.dark .shell .sidebar{background:#081520!important;border-color:#1d3a50!important}
+html.dark .shell .sidebar img[src*="logo-navy"]{content:url(resmara-logo-white.png)}
+html.dark .shell .side-nav button{color:#9db6c8!important}
+html.dark .shell .side-nav button.active{background:#13283a!important;color:#fff!important}
+html.dark .shell button.alt,html.dark .shell .theme-toggle{background:#13283a!important;color:#d6e6f1!important;border-color:#23425a!important}
+html.dark .shell h1,html.dark .shell h2,html.dark .shell h3,html.dark .shell b,html.dark .shell strong,html.dark .shell label{color:#f2f8fc!important}
+html.dark .shell p,html.dark .shell .fine,html.dark .shell .small,html.dark .shell span:not(.nav-badge):not(.pill):not(.eyebrow){color:#9db6c8}
+html.dark .shell .card,html.dark .shell .panel,html.dark .shell .stat,html.dark .shell article,html.dark .shell .day,html.dark .shell .ticket,html.dark .shell .meta-card,html.dark .shell [class*="-card"]:not(.theme-toggle){background:#13283a!important;border-color:#23425a!important;color:#d6e6f1}
+html.dark .shell .card-body,html.dark .shell .tabs,html.dark .shell .welcome+div{background:transparent}
+html.dark .shell input,html.dark .shell select,html.dark .shell textarea{background:#0f2231!important;border-color:#2a4a63!important;color:#eef6fb!important}
+html.dark .shell .ticket-msg{border-color:#2d6a92}
+html.dark .shell .progress{background:#1f3d52}
+html.dark #modal{background:#13283a;color:#d6e6f1;border-color:#23425a}
+html.dark #modal h2,html.dark #modal b,html.dark #modal label{color:#f2f8fc}
+html.dark .shell .camp-tabs{background:#13283a!important}
+html.dark .shell .camp-tabs button{color:#9db6c8!important}
+html.dark .shell .camp-tabs button.on{background:#2d6a92!important;color:#fff!important}
+html.dark .shell .camp-tabs button span{color:inherit}
+
+/* chat: take me there */
+.pip-go{display:inline-block;margin:6px 0 4px;padding:9px 16px;border-radius:999px;background:#d94c0d;color:#fff;border:0;font-weight:700;font-size:12.5px;cursor:pointer;align-self:flex-start}
+.pip-go:hover{background:#bd400b}
+.billing-close.pulse{animation:bc-pulse 1.2s ease 2}
+@keyframes bc-pulse{50%{transform:scale(1.04)}}
+
+.pip-questions{display:none!important}

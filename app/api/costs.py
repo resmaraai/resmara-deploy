@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_admin_user
 from app.db.session import Cost, CostReceipt, get_db
+from app.services import team_access
 
 router = APIRouter()
 
@@ -201,7 +202,7 @@ def _summary(costs: list, today: Optional[date] = None) -> dict:
 
 # ── routes ───────────────────────────────────────────────────────────────────────────
 @router.get("/admin/costs")
-def list_costs(current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def list_costs(current_user=Depends(team_access.needs("money")), db: Session = Depends(get_db)):
     costs = db.query(Cost).order_by(Cost.paid_on.desc(), Cost.id.desc()).all()
     receipt_rows: dict[int, list] = {}
     for r in db.query(CostReceipt).all():
@@ -214,7 +215,7 @@ def list_costs(current_user=Depends(get_admin_user), db: Session = Depends(get_d
 
 
 @router.post("/admin/costs", status_code=201)
-def create_cost(payload: CostIn, current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def create_cost(payload: CostIn, current_user=Depends(team_access.needs("money")), db: Session = Depends(get_db)):
     kind = payload.kind if payload.kind in KINDS else "one_off"
     cadence = payload.cadence if payload.cadence in CADENCES else ("monthly" if kind == "recurring" else None)
     if kind == "recurring" and cadence not in CADENCES:
@@ -240,7 +241,7 @@ def create_cost(payload: CostIn, current_user=Depends(get_admin_user), db: Sessi
 
 
 @router.patch("/admin/costs/{cost_id}")
-def patch_cost(cost_id: int, payload: CostPatch, current_user=Depends(get_admin_user),
+def patch_cost(cost_id: int, payload: CostPatch, current_user=Depends(team_access.needs("money")),
                db: Session = Depends(get_db)):
     cost = db.query(Cost).filter(Cost.id == cost_id).first()
     if not cost:
@@ -269,7 +270,7 @@ def patch_cost(cost_id: int, payload: CostPatch, current_user=Depends(get_admin_
 
 
 @router.delete("/admin/costs/{cost_id}")
-def delete_cost(cost_id: int, current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def delete_cost(cost_id: int, current_user=Depends(team_access.needs("money")), db: Session = Depends(get_db)):
     cost = db.query(Cost).filter(Cost.id == cost_id).first()
     if not cost:
         raise HTTPException(status_code=404, detail="No such cost")
@@ -281,7 +282,7 @@ def delete_cost(cost_id: int, current_user=Depends(get_admin_user), db: Session 
 
 @router.post("/admin/costs/{cost_id}/receipt", status_code=201)
 async def upload_receipt(cost_id: int, file: UploadFile = File(...),
-                         current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+                         current_user=Depends(team_access.needs("money")), db: Session = Depends(get_db)):
     cost = db.query(Cost).filter(Cost.id == cost_id).first()
     if not cost:
         raise HTTPException(status_code=404, detail="No such cost")
@@ -306,7 +307,7 @@ async def upload_receipt(cost_id: int, file: UploadFile = File(...),
 
 
 @router.get("/admin/costs/receipts/{receipt_id}")
-def get_receipt(receipt_id: int, current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def get_receipt(receipt_id: int, current_user=Depends(team_access.needs("money")), db: Session = Depends(get_db)):
     """Admin only, no cache: a receipt shows the card somebody paid with."""
     row = db.query(CostReceipt).filter(CostReceipt.id == receipt_id).first()
     if not row:
@@ -320,7 +321,7 @@ def get_receipt(receipt_id: int, current_user=Depends(get_admin_user), db: Sessi
 
 
 @router.delete("/admin/costs/receipts/{receipt_id}")
-def delete_receipt(receipt_id: int, current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def delete_receipt(receipt_id: int, current_user=Depends(team_access.needs("money")), db: Session = Depends(get_db)):
     row = db.query(CostReceipt).filter(CostReceipt.id == receipt_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="No such receipt")
