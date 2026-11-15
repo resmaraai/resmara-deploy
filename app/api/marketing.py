@@ -28,9 +28,9 @@ log = logging.getLogger("resmara.marketing")
 router = APIRouter()
 
 MISSING = {
-    "ad_spend": "Resmara's own Meta ad account is not connected on the service",
-    "visitors": "Google Analytics is not connected on the service (RESMARA_GA4_TOKEN + RESMARA_GA4_PROPERTY_ID)",
-    "clarity": "Microsoft Clarity is not connected on the service (RESMARA_CLARITY_TOKEN + RESMARA_CLARITY_PROJECT_ID)",
+    "ad_spend": "Resmara's own Meta ad account is not connected (needs META_AD_ACCOUNT_ID + META_SYSTEM_TOKEN)",
+    "visitors": "Google Analytics is not connected (needs GA4_PROPERTY_ID + a service-account key in GA4_SA_JSON)",
+    "clarity": "Microsoft Clarity is not connected (needs CLARITY_PROJECT_ID + CLARITY_TOKEN)",
 }
 
 # Accounts that count as agents, not operators.

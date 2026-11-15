@@ -41,7 +41,12 @@ _GA4_CACHE: Dict[str, Any] = {"token": "", "expires": 0.0}
 
 
 def _env(name: str) -> str:
-    return (os.getenv(name) or "").strip()
+    """Read a setting, accepting the RESMARA_-prefixed spelling the rest of the app uses.
+
+    The service's other secrets are all RESMARA_*, so both spellings are accepted here rather than
+    making somebody guess which one this page wants.
+    """
+    return (os.getenv(name) or os.getenv("RESMARA_" + name) or "").strip()
 
 
 # --------------------------------------------------------------------------- Meta ad spend
