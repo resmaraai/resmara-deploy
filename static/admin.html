@@ -1928,7 +1928,8 @@ function paintReleases(){
     navBadge('releases', 0); return;
   }
   if (relData && relData.connected === false) {
-    h.innerHTML = hero({eyebrow: 'Releases', big: 'Not connected', small: (relData.problems || [])[0] || 'the service has no GitHub or Render credential'});
+    h.innerHTML = hero({eyebrow: 'Releases', big: 'Not connected', small: (relData.problems || [])[0] || 'the service has no GitHub or Render credential',
+      steps: [{n: '—', l: 'Open pull requests'}, {n: '—', l: 'Went live'}, {n: '—', l: 'Live commit'}]});
     ['relOpen', 'relDone'].forEach(id => { const el = $(id); if (!el) return; el.className = 'hint';
       el.textContent = (relData.problems || [])[0] || 'Connect GitHub to see what is waiting to go live.'; });
     navBadge('releases', 0); return;

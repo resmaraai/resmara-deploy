@@ -76,6 +76,23 @@ for page in PAGES:
 
 print("\n[a page whose script parses still has its entry point]")
 console = open(os.path.join(ROOT, "static/admin.html"), encoding="utf-8").read()
+
+# hero() maps over `steps` unconditionally, so a call that forgets it throws the moment that
+# section is drawn - which is exactly how a "Not connected" panel took the Releases list down
+# after the script itself parsed fine. Every call has to carry the array.
+hero_calls = 0
+hero_missing = 0
+for match in re.finditer(r"hero\(\{", console):
+    tail = console[match.start():match.start() + 900]
+    # Stop at the end of this call's object literal: the first `})` that closes it.
+    end = tail.find("})")
+    body = tail[:end if end > 0 else len(tail)]
+    hero_calls += 1
+    if "steps:" not in body:
+        hero_missing += 1
+        print(f"        a hero() call with no steps: {body[:90].replace(chr(10), ' ')}")
+ok(f"all {hero_calls} hero() calls carry their steps", hero_missing == 0, f"{hero_missing} missing")
+
 ok("the sign-in handler is bound", "$('loginBtn').addEventListener('click', login)" in console)
 ok("boot runs on load", "boot()" in console)
 ok("a syntax error would not be caught by a string test alone",
