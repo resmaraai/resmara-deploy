@@ -140,6 +140,22 @@ class Boost(Base):
     # gates read them. Both null = nobody has paid for this campaign yet.
     paid_at = Column(DateTime(timezone=True), nullable=True)
     paid_amount_cents = Column(Integer, nullable=True)
+    # --- Digital Ad Engine v1.3 -------------------------------------------------
+    # The listing link the agent pasted, and the optional click destination from launch
+    # details. Left blank, the ad and the posts send clicks to the listing.
+    listing_url = Column(Text, nullable=True)
+    destination_url = Column(Text, nullable=True)
+    # The listing's video, when the link had one: it becomes the ad and the day-1 post.
+    video_url = Column(Text, nullable=True)
+    budget_confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    # Round n+1 points at the campaign it continues, so a listing keeps its history.
+    parent_boost_id = Column(Integer, nullable=True)
+    paused_at = Column(DateTime(timezone=True), nullable=True)
+    paused_days = Column(Integer, default=0)
+    # active | pending | sold | contingent | unknown — written by the daily watcher.
+    listing_status = Column(String, nullable=True)
+    listing_checked_at = Column(DateTime(timezone=True), nullable=True)
+    reboost_offer_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     launched_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -190,6 +206,14 @@ class Ad(Base):
     reach = Column(Integer, nullable=True)     # last pulled from the Insights API
     last_error = Column(Text, nullable=True)
     status = Column(String, default="draft")  # draft, submitted, live, paused
+    # One ad per campaign: carousel of designed posts, or a single video (Ad Engine §4.2).
+    format = Column(String, nullable=True)          # carousel | video
+    card_post_ids = Column(JSON, default=[])        # which posts are the carousel cards
+    image_hashes = Column(JSON, default=[])         # Meta image_hash per card, in order
+    meta_campaign_id = Column(String, nullable=True)
+    meta_video_id = Column(String, nullable=True)
+    video_url = Column(Text, nullable=True)
+    destination_url = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # --- Photo / design asset (the PHOTO INDEX behind the content engine) ---

@@ -42,6 +42,73 @@ def resolve_ad_account(boost: Boost, current_user: User, db: Session):
             .first())
 
 
+
+def _post_image_bytes(db, post) -> tuple:
+    """Bytes of a post's designed image, from disk, the database row or its public URL.
+
+    The ad can only be built from a real picture, so this returns (bytes, filename) or
+    (None, None) — never a placeholder.
+    """
+    import httpx
+    from app.services.publisher import local_media_path, public_media_url
+
+    name = (post.image_url or "").rsplit("/", 1)[-1].split("?")[0] or f"post-{post.id}.jpg"
+    path = local_media_path(post.image_url) if post.image_url else None
+    if path:
+        try:
+            with open(path, "rb") as fh:
+                return fh.read(), name
+        except OSError:
+            pass
+    if post.design_asset_id and db is not None:
+        from app.db.session import Asset
+        asset = db.query(Asset).filter(Asset.id == post.design_asset_id).first()
+        data = getattr(asset, "data", None) if asset else None
+        if data:
+            return data, name
+    url = public_media_url(post.image_url) if post.image_url else None
+    if url:
+        try:
+            resp = httpx.get(url, timeout=30, follow_redirects=True)
+            if resp.status_code < 400 and resp.content:
+                return resp.content, name
+        except Exception:  # noqa: BLE001 - a fetch failure falls through to "no media"
+            pass
+    return None, None
+
+
+def _carousel_cards(posts, plan_ad: dict, limit: int = 5) -> list:
+    """The strongest approved designed posts, day 1 leading (Ad Engine §4.2).
+
+    The plan names ``creativeDays``; anything it names that has no designed image is
+    skipped, and the list is topped up in day order so a carousel never ships short.
+    """
+    by_day = {}
+    for post in posts:
+        day = post.day or 0
+        if day not in by_day or (post.slot or 1) < (by_day[day].slot or 1):
+            by_day[day] = post
+    chosen, seen = [], set()
+
+    def take(day):
+        post = by_day.get(day)
+        if post is not None and post.id not in seen and post.image_url:
+            seen.add(post.id)
+            chosen.append(post)
+
+    for raw in plan_ad.get("creativeDays") or []:
+        try:
+            take(int(raw))
+        except (TypeError, ValueError):
+            continue
+    if 1 not in seen:
+        take(1)
+    for day in sorted(by_day):
+        if len(chosen) >= limit:
+            break
+        take(day)
+    return chosen[:limit]
+
 def _merge_custom(configs: dict, custom: dict) -> list:
     """Overlay the operator's hand-edited campaign/adset/adcreative fields from the launch
     UI on top of the built configs. Returns the overridden paths so the caller can report
@@ -113,11 +180,74 @@ async def launch_boost(boost: Boost, current_user: User, db: Session, *, budget_
             "precheck": precheck,
         }
 
-    configs = build_boost_configs(boost, plan=boost.plan or {}, page_id=ad_account.page_id)
+    # --- media first: the ad is only real once it has a picture or a video (Ad Engine §4.2)
+    from app.services.publisher import public_media_url
+    plan_ad = {}
+    if isinstance(boost.plan, dict) and isinstance(boost.plan.get("ad"), dict):
+        plan_ad = boost.plan["ad"]
+    client = get_platform_client(ad_account)
+    video = None
+    cards = []
+    media_notes = []
+    video_url = getattr(boost, "video_url", None)
+    if video_url:
+        try:
+            uploaded = await client.upload_ad_video(public_media_url(video_url) or video_url)
+            video_id = uploaded.get("id")
+            if video_id and await client.wait_for_video(video_id):
+                video = {"video_id": video_id}
+                media_notes.append(f"video {video_id} processed by Meta")
+            else:
+                media_notes.append("Meta could not process the listing video — falling back "
+                                   "to the carousel")
+        except Exception as exc:  # noqa: BLE001 - fall back, and say so
+            media_notes.append(f"video upload failed ({exc}) — falling back to the carousel")
+    if not video:
+        for post in _carousel_cards(posts, plan_ad):
+            if client.simulated:
+                # A demo account never calls Meta, so there is nothing to upload and no
+                # bytes to read — the tree still has to be complete for the walkthrough.
+                cards.append({"image_hash": f"sim_{post.id}", "title": post.title,
+                              "post_id": post.id})
+                continue
+            data, filename = _post_image_bytes(db, post)
+            if not data:
+                media_notes.append(f"post {post.id} has no image file to upload")
+                continue
+            try:
+                uploaded = await client.upload_ad_image(data, filename)
+            except Exception as exc:  # noqa: BLE001
+                media_notes.append(f"post {post.id} image upload failed: {exc}")
+                continue
+            cards.append({"image_hash": uploaded["hash"], "title": post.title,
+                          "post_id": post.id})
+
+    from app.services import geocode as geo_service
+    configs = build_boost_configs(
+        boost,
+        plan=boost.plan or {},
+        page_id=ad_account.page_id,
+        budget_usd=budget,
+        cards=cards,
+        video=video,
+        ig_user_id=getattr(ad_account, "ig_user_id", None),
+        destination=getattr(boost, "destination_url", None),
+        go_live=boost.go_live_date,
+        geo=geo_service.for_boost(boost, db),
+        campaign_no=(boost.repeat_round or 0) + 1,
+    )
+    configs.setdefault("notes", []).extend(media_notes)
+    if configs.get("format") == "none":
+        detail = ("the ad has no creative: " + "; ".join(configs.get("notes") or [])
+                  if configs.get("notes") else "no designed post image and no usable video")
+        db.add(Event(user_id=current_user.id, boost_id=boost.id, event_type="error",
+                     payload={"where": "ad_media", "detail": detail[:400]}))
+        db.commit()
+        return {"status": "no_creative", "boost_id": boost.id, "detail": detail,
+                "config_notes": configs.get("notes")}
     overridden = _merge_custom(configs, custom_configs or {})
     if overridden:
         configs.setdefault("notes", []).append("operator overrides: " + ", ".join(overridden))
-    client = get_platform_client(ad_account)
     try:
         result = await client.create_campaign(configs)
     except Exception as e:
@@ -149,12 +279,23 @@ async def launch_boost(boost: Boost, current_user: User, db: Session, *, budget_
 
     ad_row = db.query(Ad).filter(Ad.boost_id == boost.id).first()
     if not ad_row:
-        ad_row = Ad(boost_id=boost.id, kind="photo")
+        ad_row = Ad(boost_id=boost.id, kind="video" if configs.get("format") == "video" else "photo")
         db.add(ad_row)
     ad_row.meta_ad_id = ad_id
     ad_row.meta_adset_id = adset_id
     ad_row.meta_creative_id = creative_id
-    ad_row.status = "submitted"
+    ad_row.meta_campaign_id = campaign_id
+    ad_row.format = configs.get("format")
+    ad_row.card_post_ids = [c.get("post_id") for c in cards if c.get("post_id")]
+    ad_row.image_hashes = [c.get("image_hash") for c in cards if c.get("image_hash")]
+    ad_row.video_url = video_url
+    ad_row.meta_video_id = (video or {}).get("video_id")
+    ad_row.destination_url = (configs.get("adcreative") or {}).get("object_story_spec", {}) \
+        .get("link_data", {}).get("link") or (configs.get("adcreative") or {}) \
+        .get("object_story_spec", {}).get("video_data", {}).get("call_to_action", {}) \
+        .get("value", {}).get("link")
+    # Approved by the agent, active in Meta, and simply not delivering before start_time (§4.4).
+    ad_row.status = "scheduled"
 
     db.add(Event(user_id=current_user.id, boost_id=boost.id, event_type="campaign_launched",
                  payload={"action": action, "campaign_id": campaign_id, "adset_id": adset_id,

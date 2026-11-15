@@ -115,8 +115,23 @@ class BoostOut(BaseModel):
     # The campaign's own first gallery photo, so a card shows the property instead of stock
     # art. Empty means no photo imported yet - the UI has to say that, not fake one.
     image: Optional[str] = None
+    # Which campaign this is for the listing, and the one it continues (§4.6). A repeat is
+    # $39 and its copy is regenerated, so the UI needs both numbers on the campaign itself.
+    repeat_round: int = 0
+    parent_boost_id: Optional[int] = None
+    # The links the campaign runs on (§3), the pause state (§4.5) and what the listing watcher
+    # last saw (§5). All optional: a campaign that has not reached launch has none of them.
+    listing_url: Optional[str] = None
+    destination_url: Optional[str] = None
+    video_url: Optional[str] = None
+    listing_status: Optional[str] = None
+    listing_checked_at: Optional[datetime] = None
+    budget_confirmed_at: Optional[datetime] = None
+    paused_at: Optional[datetime] = None
+    paused_days: int = 0
     class Config:
         from_attributes = True
+
 
 # --- Launch Payload ---
 class LaunchPayload(BaseModel):

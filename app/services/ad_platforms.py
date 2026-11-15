@@ -360,6 +360,97 @@ class MetaAdsClient(_BaseAdsClient):
             {"fields": "id,account_id,name,currency,account_status"},
         )
 
+    # -- media + edits (the ad builder needs these) -------------------------
+
+    async def _post_form(self, path: str, data: dict) -> dict:
+        """POST form-encoded. Media endpoints (adimages, advideos) take base64 and file URLs
+        as ordinary form parameters; a JSON body is not accepted for them."""
+        url = self._url(path)
+        async with httpx.AsyncClient(timeout=max(self.timeout, 60)) as client:
+            resp = await client.post(url, params={"access_token": self.access_token}, data=data)
+        return self._handle(resp, path)
+
+    async def upload_ad_image(self, data: bytes, filename: str = "post.jpg") -> dict:
+        """Upload one designed post to the ad account's image library.
+
+        Returns ``{"hash": <image_hash>, "name": <filename>}``. The carousel creative is
+        built from these hashes (§4.2); without an upload the ad would have no picture,
+        which is exactly the bug this replaces.
+        """
+        import base64
+        if self.simulated:
+            return {"hash": f"sim_{abs(hash(filename)) % 10**10}", "name": filename,
+                    "simulated": True}
+        resp = await self._post_form(f"act_{self._act_id}/adimages", {
+            "bytes": base64.b64encode(data).decode("ascii"),
+            "filename": filename,
+        })
+        images = (resp or {}).get("images") or {}
+        entry = images.get(filename) or next(iter(images.values()), {}) if images else {}
+        image_hash = (entry or {}).get("hash")
+        if not image_hash:
+            raise PlatformError(
+                "Meta accepted the image upload but returned no image_hash",
+                platform="meta", path=f"act_{self._act_id}/adimages", body=resp,
+            )
+        return {"hash": image_hash, "name": filename, "body": resp}
+
+    async def upload_ad_video(self, file_url: str) -> dict:
+        """Hand Meta a public video URL; Meta copies the footage, Resmara stores it (§4.2)."""
+        if self.simulated:
+            return {"id": "sim_video_001", "simulated": True}
+        resp = await self._post_form(f"act_{self._act_id}/advideos", {"file_url": file_url})
+        video_id = (resp or {}).get("id")
+        if not video_id:
+            raise PlatformError(
+                "Meta returned no video id for the listing video",
+                platform="meta", path=f"act_{self._act_id}/advideos", body=resp,
+            )
+        return {"id": video_id, "body": resp}
+
+    async def get_video_status(self, video_id: str) -> dict:
+        if self.simulated:
+            return {"id": video_id, "status": {"video_status": "ready"}, "simulated": True}
+        return await self._get(video_id, {"fields": "id,status,thumbnails"}) or {}
+
+    async def wait_for_video(self, video_id: str, *, timeout: int = 600, interval: int = 10) -> bool:
+        """Poll until Meta has processed the video. False means fall back to the carousel."""
+        import asyncio
+        waited = 0
+        while waited < timeout:
+            try:
+                info = await self.get_video_status(video_id)
+            except Exception as exc:  # noqa: BLE001 - a poll failure is not a verdict
+                log.warning("video %s status failed: %s", video_id, exc)
+                info = {}
+            status = ((info or {}).get("status") or {}).get("video_status")
+            if status == "ready":
+                return True
+            if status == "error":
+                return False
+            await asyncio.sleep(interval)
+            waited += interval
+        return False
+
+    async def update_object(self, object_id: str, data: dict) -> dict:
+        """POST an edit to a campaign/adset/ad (pause, resume, move the end date)."""
+        if self.simulated:
+            return {"id": object_id, "success": True, "simulated": True, **data}
+        return await self._post(object_id, data)
+
+    async def get_ad_insights(self, ad_id: str, date_preset: str = "lifetime") -> dict:
+        """One ad's numbers. Spend is for Resmara's own learning and never in the seller report."""
+        if self.simulated:
+            return {"data": [{
+                "impressions": "0", "reach": "0", "clicks": "0",
+                "inline_link_clicks": "0", "actions": [], "ctr": "0", "frequency": "0",
+                "spend": "0", "publisher_platform": "facebook",
+            }], "simulated": True}
+        fields = ("impressions,reach,clicks,inline_link_clicks,actions,ctr,frequency,spend,"
+                  "publisher_platform")
+        return await self._get(f"{ad_id}/insights", {"fields": fields, "date_preset": date_preset})
+
+
 
 # ---------------------------------------------------------------------------
 # Payload builder
@@ -377,158 +468,39 @@ def build_boost_configs(
     plan: Optional[dict] = None,
     page_id: Optional[str] = None,
     budget_usd: Optional[float] = None,
+    *,
+    cards: Optional[list] = None,
+    video: Optional[dict] = None,
+    ig_user_id: Optional[str] = None,
+    destination: Optional[str] = None,
+    go_live=None,
+    geo: Optional[dict] = None,
+    campaign_no: Optional[int] = None,
+    status: str = "ACTIVE",
 ) -> dict:
-    """Build the real Meta payload tree from a Boost and its plan.
+    """Build the one Meta ad for a campaign (Digital Ad Engine v1.3 §4).
 
-    ``plan['ad']`` is preferred when present, else ``boost.ad_brief``. Returns
-    ``{campaign, adset, adcreative, ad, notes}``. Every object is ``PAUSED`` and
-    ``special_ad_categories = ['HOUSING']`` is always set (real estate is a
-    special ad category). ``notes`` lists every field that had to be defaulted.
+    Thin adapter: the rules live in :mod:`app.services.ad_build`, which is the module that
+    replaced the version that shipped a daily budget, US-wide targeting, no image and
+    everything PAUSED. Callers that used to pass only a boost still get a full tree; pass
+    ``cards`` (uploaded image hashes) or ``video`` to get a real creative.
     """
-    notes: list[str] = []
-    plan = plan if plan is not None else (getattr(boost, "plan", None) or {})
+    from app.services.ad_build import build_ad_configs
 
-    ad: dict = {}
-    if isinstance(plan, dict) and plan.get("ad"):
-        ad = dict(plan["ad"])
-    elif isinstance(getattr(boost, "ad_brief", None), dict) and boost.ad_brief:
-        ad = dict(boost.ad_brief)
-    elif isinstance(plan, dict) and plan:
-        # A plan without an explicit 'ad' block: use it as the ad source.
-        ad = dict(plan)
-    else:
-        notes.append("no plan/ad_brief on the boost — ad copy fields defaulted")
-
-    street = street_key(getattr(boost, "address", ""))
-    name_base = street or "resmara"
-
-    # Budget (dollars -> cents). Nothing spends without a human: still PAUSED.
-    if budget_usd is None:
-        budget_usd = getattr(boost, "ad_budget_usd", None)
-    if budget_usd is None:
-        budget_usd = 50.0
-        notes.append("budget_usd defaulted to 50.0")
-    daily_budget_cents = _cents(budget_usd)
-
-    # --- Campaign ---
-    objective = ad.get("objective")
-    if not objective:
-        objective = _CAMPAIGN_OBJECTIVE_DEFAULT
-        notes.append(f"campaign.objective defaulted to {_CAMPAIGN_OBJECTIVE_DEFAULT}")
-    campaign = {
-        "name": f"{name_base} · Real Estate Boost",
-        "objective": objective,
-        "status": "PAUSED",
-        "special_ad_categories": ["HOUSING"],
-        "daily_budget": daily_budget_cents,
-    }
-    notes.append("all objects forced to status=PAUSED (human must launch)")
-
-    # --- Ad set ---
-    geo = ad.get("geo_locations")
-    if not geo:
-        geo = {"countries": ["US"]}
-        notes.append("adset.targeting.geo_locations defaulted to US")
-    targeting = {
-        "geo_locations": geo,
-        "age_min": 18,
-        "age_max": 65,
-    }
-    # Meta rejects an ad set that names no bid strategy: "Bid Amount Required For The Bid
-    # Strategy Provided" (subcode 1815857). Verified live against a real HOUSING ad set:
-    # even LOWEST_COST_WITHOUT_CAP is refused until bid_amount is supplied, while
-    # LOWEST_COST_WITH_BID_CAP + bid_amount is accepted — so always send a bid cap, which
-    # is also what Meta's special-ad-category guidance expects for housing ads.
-    bid_strategy = ad.get("bid_strategy") or "LOWEST_COST_WITH_BID_CAP"
-    if not ad.get("bid_strategy"):
-        notes.append("adset.bid_strategy defaulted to LOWEST_COST_WITH_BID_CAP")
-    bid_amount = ad.get("bid_amount")
-    if bid_amount is None:
-        bid_amount = _DEFAULT_BID_CAP_CENTS
-        notes.append(f"adset.bid_amount defaulted to {_DEFAULT_BID_CAP_CENTS} cents")
-    bid_amount = int(bid_amount)
-
-    adset = {
-        "name": ad.get("adset_name") or f"{name_base} · Targeting",
-        "campaign_id": None,  # filled by MetaAdsClient.create_campaign()
-        "billing_event": "IMPRESSIONS",
-        "optimization_goal": "LINK_CLICKS",
-        "bid_strategy": bid_strategy,
-        "bid_amount": bid_amount,
-        "targeting": targeting,
-        # Budget lives on the campaign (CBO). Sending it here as well is refused with
-        # "Can't Set Ad Set and Campaign Budget" (subcode 1885621).
-        "status": "PAUSED",
-    }
-    notes.append("daily budget set on the campaign (CBO); the ad set carries no budget")
-    notes.append("adset.campaign_id filled by MetaAdsClient.create_campaign()")
-
-    # --- Ad creative ---
-    resolved_page = (
-        page_id
-        or ad.get("page_id")
-        or (getattr(boost, "brand_profile", None) or {}).get("page_id")
-        or settings.META_PAGE_ID
-        or ""
+    return build_ad_configs(
+        boost,
+        plan if plan is not None else (getattr(boost, "plan", None) or {}),
+        page_id=page_id or "",
+        ig_user_id=ig_user_id or "",
+        budget_usd=budget_usd,
+        cards=cards,
+        video=video,
+        destination=destination,
+        go_live=go_live,
+        geo=geo,
+        campaign_no=campaign_no,
+        status=status,
     )
-    if not resolved_page:
-        notes.append("adcreative.object_story_spec.page_id is empty (set META_PAGE_ID)")
-
-    link = ad.get("link") or ad.get("landing_page_url")
-    if not link:
-        link = settings.PUBLIC_BASE_URL
-        notes.append("adcreative.link defaulted to settings.PUBLIC_BASE_URL")
-
-    primary_text = ad.get("primary_text") or ad.get("message") or ad.get("caption")
-    if primary_text:
-        primary_text = _clip(primary_text, 125)
-    else:
-        primary_text = ""
-        notes.append("adcreative.message empty — no primary_text on the plan")
-
-    headline = ad.get("headline") or ad.get("title")
-    if headline:
-        headline = _clip(headline, 40)
-    else:
-        headline = _clip(getattr(boost, "address", ""), 40)
-        notes.append("adcreative.name defaulted to the street address")
-
-    description = _clip(ad.get("description") or "", 30)
-    if not ad.get("description"):
-        notes.append("adcreative.description empty")
-
-    cta = ad.get("cta_button") or ad.get("cta") or "LEARN_MORE"
-    cta_type = str(cta).strip().replace(" ", "_").upper()
-    if not (ad.get("cta_button") or ad.get("cta")):
-        notes.append("adcreative call_to_action.type defaulted to LEARN_MORE")
-
-    adcreative = {
-        "name": f"{name_base} · Creative",
-        "object_story_spec": {
-            "page_id": resolved_page,
-            "link_data": {
-                "message": primary_text,
-                "name": headline,
-                "description": description,
-                "link": link,
-                "call_to_action": {"type": cta_type},
-            },
-        },
-    }
-
-    # --- Ad ---
-    ad_payload = {
-        "name": f"{name_base} · Ad",
-        "status": "PAUSED",
-    }
-
-    return {
-        "campaign": campaign,
-        "adset": adset,
-        "adcreative": adcreative,
-        "ad": ad_payload,
-        "notes": notes,
-    }
 
 
 # ---------------------------------------------------------------------------

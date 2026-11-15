@@ -22,6 +22,9 @@ STRIPE_API = "https://api.stripe.com/v1"
 # $49 per campaign, in the smallest currency unit. Overridable so a promo does not need a
 # deploy, but the default is the published price and the tests pin it.
 DEFAULT_PRICE_CENTS = 4900
+# A second campaign on a listing that did not sell is cheaper: the photos, the plan's brand
+# work and the connection are already done (Ad Engine v1.3 §4.6).
+DEFAULT_REPEAT_PRICE_CENTS = 3900
 CURRENCY = "usd"
 
 
@@ -35,6 +38,27 @@ def price_cents() -> int:
     except ValueError:
         return DEFAULT_PRICE_CENTS
     return value if value > 0 else DEFAULT_PRICE_CENTS
+
+
+def repeat_price_cents() -> int:
+    """What a second campaign on the same listing costs. Overridable, defaults to $39."""
+    raw = (os.getenv("STRIPE_REPEAT_PRICE_CENTS") or "").strip()
+    if not raw:
+        return DEFAULT_REPEAT_PRICE_CENTS
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_REPEAT_PRICE_CENTS
+    return value if value > 0 else DEFAULT_REPEAT_PRICE_CENTS
+
+
+def price_for(boost) -> int:
+    """The price of *this* campaign: $49 the first time, $39 for a repeat (§4.6)."""
+    try:
+        round_no = int(getattr(boost, "repeat_round", 0) or 0)
+    except (TypeError, ValueError):
+        round_no = 0
+    return repeat_price_cents() if round_no >= 1 else price_cents()
 
 
 def price_label(cents: int | None = None) -> str:

@@ -184,6 +184,13 @@ def campaign_again(boost_id: int, payload: RepeatRequest | None = None,
                   campaign_days=src.campaign_days, ad_budget_usd=src.ad_budget_usd,
                   property_facts=src.property_facts, brand_profile=src.brand_profile or {},
                   main_status="In Progress", stage="PENDING",
+                  # The links the first campaign ran on come along: the listing has not moved,
+                  # and retyping them is how a re-run ends up pointing at the wrong house.
+                  listing_url=src.listing_url, destination_url=src.destination_url,
+                  video_url=src.video_url,
+                  # Round n+1 remembers the campaign it continues (§4.6), which is also what
+                  # makes this one $39 instead of $49 at checkout.
+                  parent_boost_id=src.id,
                   repeat_round=int(prior_round or 0) + 1)
     db.add(fresh)
     db.flush()
@@ -204,9 +211,11 @@ def campaign_again(boost_id: int, payload: RepeatRequest | None = None,
             row.data = a.data
         db.add(row)
         copied += 1
+    from app.services import billing as _billing
     db.add(Event(user_id=current_user.id, boost_id=fresh.id, event_type="campaign_repeated",
                  payload={"from_boost_id": src.id, "photos": copied,
-                          "round": fresh.repeat_round}))
+                          "round": fresh.repeat_round,
+                          "price_cents": _billing.price_for(fresh)}))
     db.commit()
     db.refresh(fresh)
     return fresh

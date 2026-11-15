@@ -32,5 +32,9 @@ api_router.include_router(costs.router, prefix="", tags=["costs"])
 api_router.include_router(finance.router, prefix="", tags=["finance"])
 # Build room — the claim board the console's Build room section reads and writes.
 api_router.include_router(buildroom.router, prefix="", tags=["buildroom"])
+# After the launch: /api/boosts/{id}/launch-details|pause|resume|ad-performance|again and the
+# daily listing watcher. Everything an approved campaign needs once it is running.
+from app.api import boost_control
 # Ask Resmara's answer library — the chat's misses and the answers the team approved.
 api_router.include_router(help.router, prefix="", tags=["help"])
+api_router.include_router(boost_control.router, prefix="", tags=["campaign control"])

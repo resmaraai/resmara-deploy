@@ -165,7 +165,8 @@ async def create_checkout(body: CheckoutRequest, current_user: User = Depends(ge
     try:
         session = await billing.create_checkout_session(
             boost_id=boost.id, user_id=current_user.id, address=boost.address,
-            base_url=settings.PUBLIC_BASE_URL, customer_id=customer_id, save_card=True)
+            base_url=settings.PUBLIC_BASE_URL, customer_id=customer_id, save_card=True,
+            cents=billing.price_for(boost))
     except httpx.HTTPStatusError as e:
         detail = "Stripe refused the checkout"
         try:
@@ -177,7 +178,7 @@ async def create_checkout(body: CheckoutRequest, current_user: User = Depends(ge
         raise HTTPException(status_code=503, detail=str(e))
 
     order = Order(user_id=current_user.id, boost_id=boost.id,
-                  amount_cents=billing.price_cents(), currency=billing.CURRENCY,
+                  amount_cents=billing.price_for(boost), currency=billing.CURRENCY,
                   status="pending", stripe_session_id=session.get("id"),
                   checkout_url=session.get("url"))
     db.add(order)

@@ -49,6 +49,16 @@ ADDITIONS = {
         ("meta_creative_id", "VARCHAR"),
         ("reach", "INTEGER"),
         ("last_error", "TEXT"),
+        # One ad per campaign, carousel or video (Ad Engine §4.2, §8). The format and the
+        # card list are what the campaign page renders and what the performance loop learns
+        # from, so they are columns and not transient JSON.
+        ("format", "VARCHAR"),
+        ("card_post_ids", "JSON"),
+        ("image_hashes", "JSON"),
+        ("meta_campaign_id", "VARCHAR"),
+        ("meta_video_id", "VARCHAR"),
+        ("video_url", "TEXT"),
+        ("destination_url", "TEXT"),
     ],
     # Listing photos live in the row, not only on disk: a free-tier instance has no volume,
     # so every deploy and every idle restart wipes uploads/ and leaves image_url pointing at
@@ -69,6 +79,19 @@ ADDITIONS = {
         # Which campaign this is for the listing (0 = the first). The build rotates the gallery
         # and asks for new copy when a repeat campaign runs on the same house.
         ("repeat_round", "INTEGER DEFAULT 0"),
+        # --- Digital Ad Engine v1.3 (§8): the launch details, the pause state, the listing
+        # watcher and the $39 re-run all live on the boost. Every one of these is NULL/absent
+        # on an established database, so each needs its own ALTER here.
+        ("destination_url", "TEXT"),
+        ("listing_url", "TEXT"),
+        ("video_url", "TEXT"),
+        ("budget_confirmed_at", "TIMESTAMP"),
+        ("parent_boost_id", "INTEGER"),
+        ("paused_at", "TIMESTAMP"),
+        ("paused_days", "INTEGER DEFAULT 0"),
+        ("listing_status", "VARCHAR"),
+        ("listing_checked_at", "TIMESTAMP"),
+        ("reboost_offer_sent_at", "TIMESTAMP"),
     ],
     "orders": [
         ("user_id", "INTEGER"),

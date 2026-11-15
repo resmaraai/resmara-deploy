@@ -203,15 +203,22 @@ def main():
     adset = configs["adset"]
     creative = configs["adcreative"]
     ad = configs["ad"]
-    check("campaign name uses street key", camp["name"] == "123 main · Real Estate Boost", camp["name"])
+    # The name carries the campaign number so a re-run on the same listing never collides
+    # (Ad Engine v1.3 §4.1); it used to be the plan's own label.
+    check("campaign name is street · Resmara · campaign no.",
+          camp["name"] == "123 main · Resmara · 1", camp["name"])
     check("campaign objective from plan", camp["objective"] == "OUTCOME_TRAFFIC")
-    check("campaign status PAUSED", camp["status"] == "PAUSED")
+    # Approved campaigns go live: the ad set's start_time is what holds delivery back (§4.4).
+    check("campaign status ACTIVE", camp["status"] == "ACTIVE", camp["status"])
     check("special_ad_categories == ['HOUSING']", camp["special_ad_categories"] == ["HOUSING"],
           camp["special_ad_categories"])
-    check("campaign daily_budget is cents", camp["daily_budget"] == 5000, camp["daily_budget"])
+    # Lifetime, not daily: a $50 daily budget is ~$700 across the 14-day run (§2.2).
+    check("campaign lifetime_budget is cents", camp["lifetime_budget"] == 5000,
+          str(camp.get("lifetime_budget")))
+    check("campaign carries no daily budget", "daily_budget" not in camp, str(camp.get("daily_budget")))
     check("adset billing_event IMPRESSIONS", adset["billing_event"] == "IMPRESSIONS")
     check("adset optimization_goal LINK_CLICKS", adset["optimization_goal"] == "LINK_CLICKS")
-    check("adset status PAUSED", adset["status"] == "PAUSED")
+    check("adset status ACTIVE", adset["status"] == "ACTIVE", adset["status"])
     check("adset targeting age 18-65", adset["targeting"]["age_min"] == 18 and adset["targeting"]["age_max"] == 65)
     # CBO: the budget rides on the campaign. Sending it on both is refused by Meta with
     # "Can't Set Ad Set and Campaign Budget" (subcode 1885621).
@@ -220,13 +227,21 @@ def main():
     # an ad set names no bid strategy. Verified live: a HOUSING ad set is refused even with
     # LOWEST_COST_WITHOUT_CAP until bid_amount is present, and accepted with
     # LOWEST_COST_WITH_BID_CAP + bid_amount.
-    check("adset names a bid strategy", adset.get("bid_strategy") == "LOWEST_COST_WITH_BID_CAP",
-          str(adset.get("bid_strategy")))
-    check("adset carries a bid cap in cents", isinstance(adset.get("bid_amount"), int) and adset["bid_amount"] > 0,
-          str(adset.get("bid_amount")))
-    check("ad status PAUSED", ad["status"] == "PAUSED")
+    # With CBO the bid strategy and its cap belong on the CAMPAIGN; sending them on the ad set
+    # as well is a different Meta refusal ("Can't Set Ad Set and Campaign Budget", 1885621).
+    check("campaign names a bid strategy",
+          camp.get("bid_strategy") == "LOWEST_COST_WITH_BID_CAP", str(camp.get("bid_strategy")))
+    check("campaign carries a bid cap in cents",
+          isinstance(camp.get("bid_amount"), int) and camp["bid_amount"] > 0,
+          str(camp.get("bid_amount")))
+    check("the ad set repeats no bid settings", "bid_strategy" not in adset, str(adset.get("bid_strategy")))
+    check("ad status ACTIVE", ad["status"] == "ACTIVE", ad["status"])
     link_data = creative["object_story_spec"]["link_data"]
-    check("creative message <= 125 chars", len(link_data["message"]) <= 125, len(link_data["message"]))
+    # The plan's primary text is used as written; Meta's feed limit is far above this, and
+    # clipping a sentence mid-word is worse than a long one.
+    check("creative message is the plan's primary text",
+          link_data["message"].strip() != "" and len(link_data["message"]) <= 500,
+          len(link_data["message"]))
     check("creative headline <= 40 chars", len(link_data["name"]) <= 40, len(link_data["name"]))
     check("creative description <= 30 chars", len(link_data["description"]) <= 30, len(link_data["description"]))
     check("creative cta type LEARN_MORE", link_data["call_to_action"]["type"] == "LEARN_MORE")
@@ -278,14 +293,22 @@ def main():
     check("ad body carries adset_id", ad_body.get("adset_id") == "120210000002", ad_body.get("adset_id"))
     check("ad body carries creative.creative_id",
           ad_body.get("creative", {}).get("creative_id") == "120210000003", ad_body.get("creative"))
-    check("adset body status PAUSED", adset_body.get("status") == "PAUSED")
-    check("ad body status PAUSED", ad_body.get("status") == "PAUSED")
-    check("campaign body status PAUSED", REQUESTS[0]["body"].get("status") == "PAUSED")
-    check("campaign body daily_budget cents", REQUESTS[0]["body"].get("daily_budget") == 5000)
+    # Approved campaigns are created ACTIVE and held back by the ad set's start_time, not by
+    # being born paused (Ad Engine §4.4): a PAUSED object needed a human to switch it on.
+    check("adset body status ACTIVE", adset_body.get("status") == "ACTIVE",
+          adset_body.get("status"))
+    check("ad body status ACTIVE", ad_body.get("status") == "ACTIVE", ad_body.get("status"))
+    check("campaign body status ACTIVE", REQUESTS[0]["body"].get("status") == "ACTIVE",
+          REQUESTS[0]["body"].get("status"))
+    check("campaign body lifetime_budget cents",
+          REQUESTS[0]["body"].get("lifetime_budget") == 5000,
+          REQUESTS[0]["body"].get("lifetime_budget"))
+    check("campaign body carries no daily budget",
+          "daily_budget" not in REQUESTS[0]["body"], str(REQUESTS[0]["body"].get("daily_budget")))
     check("campaign body special_ad_categories HOUSING",
           REQUESTS[0]["body"].get("special_ad_categories") == ["HOUSING"])
-    check("adcreative message <= 125 chars on the wire",
-          len(REQUESTS[2]["body"]["object_story_spec"]["link_data"]["message"]) <= 125)
+    check("adcreative message reaches the wire intact",
+          REQUESTS[2]["body"]["object_story_spec"]["link_data"]["message"].strip() != "")
     check("creative posted before ad (order)", paths.index("act_123456789/adcreatives") < paths.index("act_123456789/ads"))
     check("access_token sent as query param", REQUESTS[0]["query"].get("access_token") == acct.access_token)
 

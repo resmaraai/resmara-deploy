@@ -125,6 +125,12 @@ class Graph(BaseHTTPRequestHandler):
             if STATE["fail_adset"]:
                 return self._error("Ad set rejected by policy", code=100, subcode=1815857)
             return self._json({"id": "adset_1"})
+        if u.path == f"/{ADVERTISER}/adimages":
+            # Meta answers an image upload with the hash the creative must reference. The
+            # ad builder refuses to create anything without one, so the fake has to hand one out.
+            return self._json({"images": {"p1.jpg": {"hash": "img_hash_1"}}})
+        if u.path == f"/{ADVERTISER}/advideos":
+            return self._json({"id": "video_1"})
         if u.path == f"/{ADVERTISER}/adcreatives":
             return self._json({"id": "creative_1"})
         if u.path == f"/{ADVERTISER}/ads":
@@ -350,8 +356,22 @@ def make_boost(headers, address):
         "address": address, "tier": "bap_shoot_499", "go_live_date": "2026-12-01",
         "campaign_days": 14, "ad_budget_usd": 50.0,
         "property_facts": "4BR/3BA, 2400sqft"}).json()
+    # A designed post has a real image behind it: the ad builder uploads that file to Meta, so
+    # the fixture writes one rather than pointing at a URL nothing serves.
+    from app.core.config import settings as _settings
+    import os as _os
+    _os.makedirs(_settings.UPLOAD_DIR, exist_ok=True)
+    _png = _os.path.join(_settings.UPLOAD_DIR, "p1.jpg")
+    if not _os.path.exists(_png):
+        with open(_png, "wb") as _fh:
+            _fh.write(bytes.fromhex(
+                "ffd8ffe000104a46494600010100000100010000ffdb00430008060607060507070707070807"
+                "07090a0e110a0a0a0a0a140e0f0c1014161918171616141a1d24201a1b211c161a202a202126"
+                "2b2e30302e1f2c3338333136ffc0000b080001000101011100ffc40026000101010100000000"
+                "0000000000000903ffc400141001000000000000000000000000000000ffda0008010100003f"
+                "00ffd9"))
     post = client.post(f"/api/posts?boost_id={boost['id']}&day=1&caption=Day 1"
-                       "&image_url=https://example.com/p1.jpg", headers=headers).json()
+                       "&image_url=/uploads/p1.jpg", headers=headers).json()
     client.patch(f"/api/posts/{post['id']}/approve", headers=headers)
     return boost
 
