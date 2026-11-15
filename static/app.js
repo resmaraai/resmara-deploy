@@ -192,19 +192,23 @@ function ncCheck(form){
  const fail=why=>{form.dataset.state='none';out.innerHTML=`<div class="nc-msg no"><b>We can’t get what we need from this link.</b>${why} Please use another link, or enter the details yourself and upload your photos.<button type="button" class="nc-manual" onclick="ncManual(this)">Enter it manually</button></div>`;ncReady(form)};
  if(!host||!host.includes('.')){fail(' It doesn’t look like a complete web link.');return}
  form.dataset.state='checking';ncReady(form);
- out.innerHTML=`<div class="nc-msg wait nc-walk"><b>Resmara is checking your link…</b><div class="nc-steps"><span class="robot-avatar nc-bot" aria-hidden="true"></span><ul class="link-checks"><li data-k="open" class="now">Opening the link…</li><li data-k="details">Looking for the home’s details…</li><li data-k="photos">Looking for the photos…</li></ul></div></div>`;
+ out.innerHTML=`<div class="nc-msg wait nc-walk"><b>Resmara is checking your link…</b><div class="nc-steps"><span class="robot-avatar nc-bot" aria-hidden="true"></span><ul class="link-checks"><li data-k="open" class="now">Opening the link…</li><li data-k="details">Looking for the home’s details…</li><li data-k="photos">Looking for the photos…</li><li data-k="video">Looking for a video…</li></ul></div></div>`;
  const unreadable=/login|signin|sign-in|my\.flexmls/i.test(url),noPhotos=/zillow|realtor\.com|redfin|trulia|homes\.com/i.test(host);
- const order=['open','details','photos'],bot=out.querySelector('.nc-bot');const mark=(k,ok,t)=>{const li=out.querySelector(`[data-k=${k}]`);if(li){li.className=ok?'ok':'no';li.textContent=t}const nx=out.querySelector(`[data-k=${order[order.indexOf(k)+1]}]`);if(nx&&bot){nx.classList.add('now');bot.style.transform=`translateY(${nx.offsetTop}px)`}};
+ const hasVideo=/video|tour/i.test(url),order=['open','details','photos','video'],bot=out.querySelector('.nc-bot');const mark=(k,ok,t)=>{const li=out.querySelector(`[data-k=${k}]`);if(li){li.className=ok?'ok':'no';li.textContent=t}const nx=out.querySelector(`[data-k=${order[order.indexOf(k)+1]}]`);if(nx&&bot){nx.classList.add('now');bot.style.transform=`translateY(${nx.offsetTop}px)`}};
  setTimeout(()=>mark('open',!unreadable,unreadable?'This link needs an MLS sign-in':'Link opened'),800);
  setTimeout(()=>mark('details',!unreadable,unreadable?'Couldn’t read the home’s details':'Found the home’s details'),1600);
  setTimeout(()=>{
   mark('photos',!(unreadable||noPhotos),unreadable||noPhotos?'Couldn’t get the photos':'Found 24 photos');
   setTimeout(()=>{
-   draft={url,address:listingAddressFromLink(url),addressSource:'link',photoSource:'listing',media:url,photos:[]};
+  const vid=hasVideo&&!unreadable&&!noPhotos;
+  mark('video',true,vid?'Found a listing video':'No video, so your ad will be a photo carousel');
+  setTimeout(()=>{
+   draft={url,address:listingAddressFromLink(url),addressSource:'link',photoSource:'listing',media:url,photos:[],hasVideo:vid};
    if(unreadable){fail(' It needs an MLS sign-in to open.')}
    else if(noPhotos){form.dataset.state='details';out.innerHTML=`<div class="nc-msg part"><b>We have the home’s details, but we can’t get the photos from this link.</b>Upload your photos below and you’re ready to go.</div>`;ncReady(form)}
-   else{form.dataset.state='ok';out.innerHTML=`<div class="nc-msg ok"><span class="robot-avatar" aria-hidden="true"></span><div><b>Green light.</b> We have the home’s details and 24 photos. You’re ready to build.</div></div>`;ncReady(form)}
+   else{form.dataset.state='ok';out.innerHTML=`<div class="nc-msg ok"><span class="robot-avatar" aria-hidden="true"></span><div><b>Green light.</b> We have the home’s details and 24 photos${vid?', plus a listing video. Your video will be your ad and your first post.':'.'} You’re ready to build.</div></div>`;ncReady(form)}
   },500);
+  },800);
  },2400);
 }
 function ncReady(form){const st=form.dataset.state,n=form.files.files.length,addr=['street','city','state','zip'].every(k=>form[k].value.trim()),btn=form.querySelector('.nc-build');
@@ -311,7 +315,7 @@ function buildNeedsCard(){
 // The full build: charge, read the listing, write the posts, design the ad, lay out the calendar.
 function demoBuildCampaign(){
  const account=state,paidDraft={...draft,creditUsed:1,paid:true,image:'sample/card-1.jpg',phase:'active'};
- const steps=['$49 charged to your card','Read your listing','Picked the best photos','Wrote your 14 posts','Designed your carousel ad','Laid out your campaign calendar'],per=1500;
+ const steps=['$49 charged to your card','Read your listing','Picked the best photos','Wrote your 14 posts',(draft.hasVideo?'Set up your video ad':'Designed your carousel ad'),'Laid out your campaign calendar'],per=1500;
  show(`<span class="eyebrow">BUILDING YOUR CAMPAIGN</span><h2>Resmara is building your campaign.</h2><p>This takes a minute or two. You can stay here and watch.</p><div class="build-bar"><div class="build-fill"></div><span class="robot-avatar build-bot" aria-hidden="true"></span></div><p class="build-status" role="status"></p><p class="fine">Demo · no real payment or listing research runs here.</p>`);
  const fill=modal.querySelector('.build-fill'),bot=modal.querySelector('.build-bot'),status=modal.querySelector('.build-status');
  const go=pct=>{fill.style.width=pct+'%';bot.style.left=pct+'%'};
@@ -529,10 +533,11 @@ async function submitTicket(){
 function pipOfferTicket(q){
  const panel=document.querySelector('#pip-messages');if(!panel)return;
  const wrap=document.createElement('div');wrap.className='pip-reply';
- const lead=document.createElement('p');lead.textContent='That question is outside my guided answers. Send it to the team and a person will reply on your Support page.';
+ const lead=document.createElement('p');lead.textContent='I don’t have an answer for that yet. Send it to the team and a person will reply on your Support page, and I’ll learn the answer for next time.';
  wrap.append(lead);
  const btn=document.createElement('button');btn.type='button';btn.className='alt';btn.textContent='Send to support';
  btn.addEventListener('click',async()=>{
+  if(!supportSignedIn()&&typeof supportDemoMode==='function'&&supportDemoMode()){const t={id:1043+demoTickets().length,subject:String(q||'').slice(0,120)||'Question from the Resmara assistant',status:'Open',created_at:new Date().toISOString(),messages:[{from:'You',text:String(q||'')}]};demoTickets().unshift(t);persist();pipMessage('Sent to the team as request #'+t.id+'. We’ll email you, and the reply will show on your Support page.');btn.remove();return}
   if(!supportSignedIn()){pipMessage('Sign in first - a request is attached to your workspace, and the reply lands on your Support page.');return}
   btn.disabled=true;btn.textContent='Sending…';
   try{

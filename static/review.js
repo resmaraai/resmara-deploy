@@ -119,9 +119,9 @@ function details(index){document.querySelector('#content')?.classList.remove('re
 function sampleReviewItems(c){
  // One ad for the whole campaign. If the listing link had a video, the ad is a video ad and
  // the video is also the first post (day 1). Otherwise the ad is a photo ad and every post is a photo.
- const vid=false,titles=['Just listed','Property highlights','Step inside','Room spotlight','The details','A closer look','Weekend viewing','Neighbourhood','Design details','Living spaces','Key features','Viewing reminder','Outdoor living','Final spotlight'];
+ const vid=!!c.hasVideo,titles=['Just listed','Property highlights','Step inside','Room spotlight','The details','A closer look','Weekend viewing','Neighbourhood','Design details','Living spaces','Key features','Viewing reminder','Outdoor living','Final spotlight'];
  const P=typeof SAMPLE_POSTS!=='undefined'?SAMPLE_POSTS:[];const cards=[6,0,2,8,13].map(k=>P[k]&&P[k].img).filter(Boolean);
- const ad={id:0,day:1,title:vid?'Video ad':'Photo carousel ad',kind:'Meta ad',adType:vid?'video':'carousel',caption:campaignSampleCaption(c,0),image:cards[0]||demoItemImage(0),images:cards,reviewed:false};
+ const ad={id:0,day:1,title:vid?'Video ad':'Photo carousel ad',kind:'Meta ad',adType:vid?'video':'carousel',caption:campaignSampleCaption(c,0),image:vid?'sample/card-1.jpg':(cards[0]||demoItemImage(0)),images:vid?[]:cards,reviewed:false};
  const posts=titles.map((t,k)=>({id:k+2,day:k+1,title:k===0&&vid?'Video tour':t,kind:k===0&&vid?'Video post':'Photo post',caption:campaignSampleCaption(c,k+2),image:k===0&&vid?'sample/card-1.jpg':demoItemImage(k+2),reviewed:false}));
  return [ad,...posts];
 }
@@ -261,7 +261,8 @@ function reviewDateLabel(date,time,zone){
 function approveReview(){
  const r=activeReview();if(r.approved)return;
  if(!r.scopeConfirmed||!r.calendarApproved||!r.items.length){toast('Confirm your launch details and approve the calendar first.');document.querySelector('.campaign-scope')?.scrollIntoView({block:'start'});return}
- show(`<h2>Approve the entire campaign?</h2><p>This approves all ${r.items.length} scheduled assets, including any you haven’t opened. Nothing goes live or gets charged at this step.</p><div class="modal-actions"><button class="alt" onclick="modal.close()">Keep reviewing</button><button onclick="confirmCampaignApproval()">Approve all →</button></div>`);
+ const unopened=r.items.filter(i=>!i.reviewed).length;
+ show(unopened?`<span class="eyebrow">NOT EVERYTHING REVIEWED</span><h2>You haven’t reviewed everything.</h2><p>${unopened} of ${r.items.length} posts and ads haven’t been opened. Are you sure you want to approve the whole campaign?</p><p class="fine">Once approved, your posts and ad are locked and go live on your go-live date.</p><div class="modal-actions"><button class="nc-cancel" onclick="modal.close()">Keep reviewing</button><button class="campaign-primary" onclick="confirmCampaignApproval()">Yes, approve →</button></div>`:`<h2>Approve the entire campaign?</h2><p>Your posts and ad are locked and go live on your go-live date.</p><div class="modal-actions"><button class="nc-cancel" onclick="modal.close()">Keep reviewing</button><button class="campaign-primary" onclick="confirmCampaignApproval()">Approve →</button></div>`);
 }
 async function confirmCampaignApproval(){
  const r=activeReview();if(r.approved||!r.scopeConfirmed||!r.calendarApproved||!r.items.length)return;
@@ -509,7 +510,7 @@ function applyCampaignVideo(r,url){
  posts.forEach(p=>{if(p.kind==='Video post'&&p!==first)p.kind='Photo post'});
  if(first){first.kind=url?'Video post':'Photo post';if(url&&first.title==='Just listed')first.title='Video tour';if(!url&&first.title==='Video tour')first.title='Just listed'}
 }
-function videoNote(r){return '';return r.videoUrl?'<p class="video-note has">▶ <b>Video found.</b> It runs as your ad and goes out once as your first post.</p>':'<p class="video-note">No video in your listing link, so your ad and posts use photos. <a href="#" onclick="editCampaignItem(activeReview().items.findIndex(x=>x.kind===\'Meta ad\'));return false">Add a video link</a></p>'}
+function videoNote(r){if(!r.items.some(i=>i.kind==='Video post'))return '<p class="video-note">No video in your listing link, so your ad is a photo carousel and every post is a photo.</p>';return true?'<p class="video-note has">▶ <b>Video found.</b> It runs as your ad and goes out once as your first post.</p>':'<p class="video-note">No video in your listing link, so your ad and posts use photos. <a href="#" onclick="editCampaignItem(activeReview().items.findIndex(x=>x.kind===\'Meta ad\'));return false">Add a video link</a></p>'}
 
 // Photo carousel ad: flip through every card the ad will show.
 function carouselViewer(imgs){
