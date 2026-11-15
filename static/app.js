@@ -506,9 +506,20 @@ async function loadMyTickets(){
   box.innerHTML=rows.map(t=>`<article class="panel" style="margin:0 0 12px">
    <div class="flex"><b>${esc(t.subject)}</b><span class="pill">${esc(t.status)}</span></div>
    <p class="fine">Request #${esc(t.id)} · raised ${esc(String(t.created_at||'').replace('T',' ').slice(0,16))} UTC</p>
-   ${(t.messages||[]).map(m=>`<div style="border-left:2px solid #c7e2f2;padding-left:10px;margin:8px 0">
-     <span class="eyebrow">${esc(m.from||'')}</span><p style="white-space:pre-wrap;margin:2px 0 0">${esc(m.text||'')}</p></div>`).join('')}
+   ${(t.messages||[]).map(m=>`<div class="${m.unread?'ticket-msg-new':''}" style="border-left:2px solid ${m.unread?'#e8892b':'#c7e2f2'};padding-left:10px;margin:8px 0">
+     <span class="eyebrow">${esc(m.from||'')}${m.unread?' · NEW':''}</span><p style="white-space:pre-wrap;margin:2px 0 0">${esc(m.text||'')}</p></div>`).join('')}
   </article>`).join('');
+  // Opening this page is reading the replies: clear the badge server-side so it stays
+  // cleared in the next browser too, not just this tab. The list above was drawn before the
+  // clear, so the NEW marker on it is turned off by hand afterwards — the reply is still
+  // worth seeing marked once, it just must not stay marked after being read.
+  if(RM.markSupportRead)RM.markSupportRead().then(()=>{
+    state.supportUnread=0;persist();if(typeof paintSupportBadge==='function')paintSupportBadge();
+    document.querySelectorAll('#ticketList .ticket-msg-new').forEach(el=>{
+      el.classList.remove('ticket-msg-new');el.style.borderLeftColor='#c7e2f2';
+      const tag=el.querySelector('.eyebrow');if(tag)tag.textContent=tag.textContent.replace(/\s*·\s*NEW$/,'');
+    });
+  }).catch(()=>{});
  }catch(error){
   const detail=(error&&error.status===401)?'Sign in to see your requests.':((error&&error.message)||'Could not load your requests.');
   box.innerHTML='<p class="fine">'+esc(detail)+'</p>';

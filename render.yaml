@@ -53,13 +53,19 @@ services:
         generateValue: true
       # No RESMARA_PUBLIC_BASE_URL / META_REDIRECT_URI: the app reads RENDER_EXTERNAL_URL and
       # derives the callback from it, so the origin follows whatever host Render assigns.
+      # App "Resmara" under Be Authentic Productions (verified), switched 2026-11-15. The old
+      # 1881970083170197 app belongs to the previous setup and must not be used: Facebook Login for
+      # Business there is not configured to issue a user token.
       - key: META_CLIENT_ID
-        value: "1881970083170197"
+        value: "1135911812356864"
       - key: META_CLIENT_SECRET
         sync: false     # Meta → App settings → Basic. The one value Render has to be told.
+      # Reading the ad account (ads_read/read_insights), managing Page ads (pages_manage_ads) and
+      # Instagram insights are new with the switch: the readiness audit and the day 7/14 report read
+      # all four. Keep this list in step with the app's use cases or Meta answers Invalid Scopes.
       - key: META_SCOPES
         value: >-
-          ads_management,business_management,pages_read_engagement,pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish
+          ads_management,ads_read,pages_manage_ads,read_insights,business_management,pages_read_engagement,pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish,instagram_manage_insights
       # Content engine: any OpenAI-compatible endpoint. The build box points at Ollama on
       # localhost, which a hosted instance cannot reach. Unset, the engine honestly reports
       # source="unavailable" and generates nothing; everything else keeps working.

@@ -13,6 +13,9 @@ from app.api import finance
 # Build room: /api/admin/buildroom — who is doing what, and who has it claimed. Replaces the
 # outbound ChatGPT Sites tracker: the board lives inside this console now.
 from app.api import buildroom
+# Ask Resmara: /api/help/misses|answers — the questions the chat could not answer, and the
+# answers the team approved from real support replies.
+from app.api import help
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(resmara.router, prefix="", tags=["resmara"])
@@ -29,3 +32,5 @@ api_router.include_router(costs.router, prefix="", tags=["costs"])
 api_router.include_router(finance.router, prefix="", tags=["finance"])
 # Build room — the claim board the console's Build room section reads and writes.
 api_router.include_router(buildroom.router, prefix="", tags=["buildroom"])
+# Ask Resmara's answer library — the chat's misses and the answers the team approved.
+api_router.include_router(help.router, prefix="", tags=["help"])

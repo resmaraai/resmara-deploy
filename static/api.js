@@ -484,6 +484,12 @@
     return request('/api/support');
   }
 
+  // Opening Support is reading the replies: this clears the orange number for good, on
+  // every browser, instead of only in the one that happens to be open.
+  async function markSupportRead() {
+    return request('/api/support/read', { method: 'POST' });
+  }
+
   // ---- health / version ---------------------------------------------------
 
   async function checkHealth() {
@@ -553,6 +559,7 @@
     tagAssets: tagAssets,
     createTicket: createTicket,
     tickets: tickets,
+    markSupportRead: markSupportRead,
     metaConnect: metaConnect,
     brandProfile: brandProfile,
     saveBrandProfile: saveBrandProfile,

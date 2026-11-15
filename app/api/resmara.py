@@ -487,7 +487,50 @@ def admin_reset_link(user_id: int, request: Request, current_user=Depends(get_ad
 
 @router.get("/support", response_model=list[SupportTicketOut])
 def list_tickets(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(SupportTicket).filter(SupportTicket.user_id == current_user.id).all()
+    """The agent's own requests, each with how many team replies they have not read.
+
+    Read state lives on the message itself (`unread: true`), not on a separate table: a
+    reply is written once by the operator and read once by the agent, and a boolean on the
+    message is the whole state machine. POST /api/support/read clears them.
+    """
+    tickets = db.query(SupportTicket).filter(SupportTicket.user_id == current_user.id).all()
+    out = []
+    for t in tickets:
+        row = SupportTicketOut.model_validate(t)
+        row.unread_replies = sum(1 for m in (t.messages or []) if isinstance(m, dict) and m.get("unread"))
+        out.append(row)
+    return out
+
+
+@router.post("/support/read")
+def mark_support_read(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Opening Support counts as reading the replies; the orange number clears.
+
+    Server-side rather than in localStorage, because the same agent signs in from a phone
+    and a desk: a number that survives one browser and vanishes in another is worse than
+    no number at all.
+    """
+    marked = 0
+    for t in db.query(SupportTicket).filter(SupportTicket.user_id == current_user.id).all():
+        messages = list(t.messages or [])
+        changed = False
+        fresh = []
+        for m in messages:
+            if isinstance(m, dict) and m.get("unread"):
+                # Copy the dict rather than clearing the flag in place: SQLAlchemy's plain
+                # JSON column does not notice a mutation *inside* the value, so an in-place
+                # edit commits as nothing and the badge comes back on the next load.
+                cleaned = dict(m)
+                cleaned["unread"] = False
+                fresh.append(cleaned)
+                marked += 1
+                changed = True
+            else:
+                fresh.append(m)
+        if changed:
+            t.messages = fresh
+    db.commit()
+    return {"marked": marked}
 
 # --- Admin ---
 @router.get("/admin/users", response_model=list[AdminUserOut])
@@ -521,10 +564,32 @@ def admin_update_ticket(ticket_id: int, status: str = None, reply: str = None, c
         ticket.status = status
     if reply:
         msgs = list(ticket.messages or [])
-        msgs.append({"from": "admin", "text": reply, "at": datetime.utcnow().isoformat()})
+        # `unread` is what becomes the orange number on the agent's sidebar; the flag is
+        # cleared by POST /api/support/read when they open Support.
+        msgs.append({"from": "admin", "text": reply, "at": datetime.utcnow().isoformat(),
+                     "unread": True})
         ticket.messages = msgs
         db.add(Event(user_id=ticket.user_id, event_type="ticket_replied",
                      payload={"ticket_id": ticket.id, "by": current_user.email}))
+        # A reply that only exists in the console is a reply nobody reads: mail it, and
+        # record what actually happened rather than assuming it went.
+        owner = db.query(User).filter(User.id == ticket.user_id).first()
+        delivered = False
+        if owner and mail.mail_configured():
+            try:
+                delivered = bool(mail.send_email(
+                    owner.email, f"Resmara support #{ticket.id}: we replied",
+                    f"We answered your support request.\n\n"
+                    f"Subject: {ticket.subject}\n\n{reply}\n\n"
+                    f"Read it in your workspace: https://www.resmara.com/#dashboard\n"))
+            except Exception:
+                delivered = False
+        db.add(Event(user_id=ticket.user_id, event_type="ticket_reply_notified",
+                     payload={"ticket_id": ticket.id, "email": bool(owner and owner.email),
+                              "delivered": delivered,
+                              "reason": "" if delivered else ("no mail provider configured"
+                                                              if not mail.mail_configured()
+                                                              else "every send failed")}))
     db.add(Event(user_id=ticket.user_id, event_type="ticket_updated",
                  payload={"ticket_id": ticket.id, "status": ticket.status,
                           "by": current_user.email}))

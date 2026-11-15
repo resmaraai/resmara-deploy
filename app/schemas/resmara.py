@@ -143,6 +143,10 @@ class SupportTicketOut(BaseModel):
     messages: list = Field(default_factory=list)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    # How many team replies this agent has not opened yet. The sidebar's orange number is
+    # the sum of these, so it has to come from the server: a browser that was closed when
+    # the reply arrived has no other way of knowing.
+    unread_replies: int = 0
     # Only the operator list fills this in, so an operator can see who is writing
     # without a second lookup per row.
     client_email: Optional[str] = None

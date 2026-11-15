@@ -370,6 +370,45 @@ class BuildroomTask(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class HelpMiss(Base):
+    """A question the Ask Resmara chat could not answer.
+
+    The chat matches a question to `static/help-kb.js` locally, so a miss is the only
+    evidence of what customers actually ask that we have no answer for. It is logged
+    instead of guessed at: an operator turns a real miss into an approved answer, and
+    the next agent who asks gets it (see HelpAnswer).
+    """
+    __tablename__ = "help_misses"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    question = Column(String(400), nullable=False)
+    # The same question typed twice is one gap, not two: the count is what makes the
+    # miss list a priority order instead of a log.
+    asked_count = Column(Integer, default=1)
+    ticket_id = Column(Integer, nullable=True)      # set when the agent sent it to support
+    answer_id = Column(Integer, nullable=True)      # set when an operator answered it
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_asked_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class HelpAnswer(Base):
+    """An answer the team approved, served to the chat on load.
+
+    Customer-facing text only: the chat fetches these without a token, so nothing
+    account-specific may be written into one.
+    """
+    __tablename__ = "help_answers"
+    id = Column(Integer, primary_key=True, index=True)
+    question = Column(String(400), nullable=False)
+    answer = Column(Text, nullable=False)
+    topic = Column(String(120), nullable=True)
+    keys = Column(String(400), nullable=True)       # comma separated match words
+    source_ticket_id = Column(Integer, nullable=True)
+    created_by = Column(String(160), nullable=True)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 Base.metadata.create_all(bind=engine)
 
 def get_db():

@@ -332,6 +332,9 @@ tr.testrow td{background:#fbfdff;color:#849bae}
         <div class="scrollx"><table id="ticketsTable"><thead><tr><th>id</th><th>client</th><th>subject</th><th>status</th><th>raised</th><th>updated</th><th>whose turn</th><th></th></tr></thead><tbody></tbody></table></div>
         <div class="hint" id="ticketCount" style="margin-top:6px"></div>
         <div class="msg" id="ticketMsg"></div>
+        <p class="hint" style="margin:18px 0 6px">Questions the Ask Resmara chat couldn&#39;t answer <span id="helpMissCount"></span>
+          — add one and the next agent who asks gets it, without a ticket.</p>
+        <div id="helpMisses" class="hint">Loading…</div>
       </div>
     </details>
 
@@ -849,7 +852,8 @@ function ticketRow(t){
           '<textarea id="reply-' + t.id + '" placeholder="Type the answer the client will read on their Support page…"></textarea></div>' +
       '</div>' +
       '<div style="margin-top:10px"><button class="tiny" data-save="' + t.id + '">Save</button> ' +
-      '<button class="ghost tiny" data-close="' + t.id + '">Cancel</button></div>' +
+      '<button class="ghost tiny" data-close="' + t.id + '">Cancel</button>' +
+      '<button class="ghost tiny" data-kb="' + t.id + '" title="Turn this reply into an answer the Ask Resmara chat gives next time">Add reply to Resmara&#39;s answers</button></div>' +
     '</td></tr>';
 }
 function renderTickets(){
@@ -871,7 +875,54 @@ async function loadTickets(){
   try {
     ticketRows = await api('/api/admin/support');
     renderTickets();
+    loadHelpMisses();
   } catch (err) { $('ticketsTable').querySelector('tbody').innerHTML = '<tr><td colspan="8" class="msg bad">' + esc(err.message) + '</td></tr>'; }
+}
+
+// ── Ask Resmara's answers: the chat's unanswered questions become answers here ────────
+// static/help-kb.js matches locally and cannot invent an answer, so a question it has
+// never seen is logged (POST /api/help/misses). This list is that gap, most-asked first,
+// and the same box turns a good support reply into a permanent answer.
+async function loadHelpMisses(){
+  const box = $('helpMisses'); if (!box) return;
+  try {
+    const d = await api('/api/admin/help/misses');
+    const n = $('helpMissCount'); if (n) n.textContent = '· ' + (d.open || 0) + ' waiting';
+    if (!d.items.length) { box.innerHTML = 'Nothing waiting — every question asked so far has an answer.'; return; }
+    box.innerHTML = d.items.map(m =>
+      '<div class="ticket-msg" style="margin:0 0 10px">' +
+        '<span class="eyebrow">asked ' + m.asked_count + '×' + (m.asked_by ? ' · ' + esc(m.asked_by) : '') +
+          (m.ticket_id ? ' · ticket #' + m.ticket_id : '') + '</span>' +
+        '<p style="margin:2px 0 6px"><b>' + esc(m.question) + '</b></p>' +
+        '<textarea id="kba-' + m.id + '" rows="2" placeholder="The answer Resmara should give next time…"></textarea>' +
+        '<div style="margin-top:6px"><button class="tiny" data-kbm="' + m.id + '" data-q="' +
+          esc(encodeURIComponent(m.question)) + '">Add to Resmara&#39;s answers</button></div>' +
+      '</div>').join('');
+  } catch (err) { box.innerHTML = '<span style="color:#b42318">' + esc(err.message) + '</span>'; }
+}
+async function saveHelpMiss(btn){
+  const id = btn.dataset.kbm, question = decodeURIComponent(btn.dataset.q || '');
+  const ta = $('kba-' + id), answer = (ta && ta.value || '').trim();
+  const box = $('ticketMsg');
+  if (!answer) { if (box) { box.className = 'msg bad'; box.textContent = 'Write the answer first.'; } return; }
+  try {
+    const r = await api('/api/admin/help/answers', { method: 'POST', body: { question: question, answer: answer, miss_ids: [Number(id)] } });
+    if (box) { box.className = 'msg ok'; box.textContent = 'Answer #' + r.id + ' is live in the chat for every agent.'; }
+    loadHelpMisses();
+  } catch (err) { if (box) { box.className = 'msg bad'; box.textContent = 'Not saved: ' + err.message; } }
+}
+async function kbFromTicket(id){
+  const box = $('ticketMsg');
+  const t = (ticketRows || []).find(x => String(x.id) === String(id));
+  const typed = ($('reply-' + id) && $('reply-' + id).value || '').trim();
+  const lastAdmin = ((t && t.messages) || []).filter(m => m.from === 'admin').slice(-1)[0];
+  const answer = typed || (lastAdmin && lastAdmin.text) || '';
+  if (!answer) { if (box) { box.className = 'msg bad'; box.textContent = 'Write the reply first — that text becomes the answer.'; } return; }
+  const question = (t && t.subject) || 'Support reply';
+  try {
+    const r = await api('/api/admin/help/answers', { method: 'POST', body: { question: question, answer: answer, source_ticket_id: Number(id) } });
+    if (box) { box.className = 'msg ok'; box.textContent = 'Added as answer #' + r.id + ' — the chat picks it up on the next page load.'; }
+  } catch (err) { if (box) { box.className = 'msg bad'; box.textContent = 'Not added: ' + err.message; } }
 }
 async function saveTicket(id){
   const status = $('status-' + id).value;
@@ -1585,7 +1636,11 @@ document.addEventListener('click', (e) => {
   const save = e.target.closest('[data-save]');
   if (save) { saveTicket(save.dataset.save); return; }
   const close = e.target.closest('[data-close]');
-  if (close) { $('ticket-' + close.dataset.close).classList.add('hidden'); }
+  if (close) { $('ticket-' + close.dataset.close).classList.add('hidden'); return; }
+  const kb = e.target.closest('[data-kb]');
+  if (kb) { kbFromTicket(kb.dataset.kb); return; }
+  const kbm = e.target.closest('[data-kbm]');
+  if (kbm) { saveHelpMiss(kbm); }
 });
 // The numbers are counts of live rows, so they move while the console is open; refresh
 // them every minute while this tab is actually being looked at - but never on top of a
