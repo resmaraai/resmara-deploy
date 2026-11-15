@@ -83,12 +83,18 @@ def list_team(user=Depends(team_access.needs("team")), db: Session = Depends(get
         raise HTTPException(status_code=403, detail="Only a super admin can see the team")
     rows = (
         db.query(User)
-        .filter((User.is_admin.is_(True)) | (User.team_access.isnot(None)) | (User.team_super_admin.is_(True)))
+        .filter((User.is_admin.is_(True)) | (User.team_super_admin.is_(True))
+                | (User.team_access.isnot(None)))
         .order_by(User.is_admin.desc(), User.id)
         .all()
     )
     out = []
     for person in rows:
+        # Removing someone clears their access but leaves the row (their account and campaigns are
+        # theirs). The list is "who is in the room", so a member with no group and no operator flag
+        # is not in it - otherwise a removed person keeps sitting on the page with a blank access.
+        if not person.is_admin and not person.team_super_admin and not (person.team_access or []):
+            continue
         row = _row(person)
         row["campaigns"] = db.query(Boost).filter(Boost.user_id == person.id).count()
         out.append(row)
