@@ -66,6 +66,9 @@ ADDITIONS = {
         # changes. A duplicate "boosts" key here would have silently dropped this entry, so
         # every boost column belongs in this one block.
         ("hidden", "BOOLEAN DEFAULT FALSE"),
+        # Which campaign this is for the listing (0 = the first). The build rotates the gallery
+        # and asks for new copy when a repeat campaign runs on the same house.
+        ("repeat_round", "INTEGER DEFAULT 0"),
     ],
     "orders": [
         ("user_id", "INTEGER"),
@@ -78,6 +81,12 @@ ADDITIONS = {
         ("checkout_url", "TEXT"),
         ("created_at", "TIMESTAMP"),
         ("paid_at", "TIMESTAMP"),
+    ],
+    # The build room shipped its assigned_to column after the board was already live, and
+    # create_all never adds a column to an existing table — without this ALTER the board on an
+    # established database fails on a missing column the first time a task is read.
+    "buildroom_tasks": [
+        ("assigned_to", "VARCHAR(160)"),
     ],
 }
 

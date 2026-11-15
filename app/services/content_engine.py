@@ -177,13 +177,35 @@ def _photo_strength(asset) -> tuple:
     return (1 if post == "no" else 0, -score, rank, _as_int(getattr(asset, "id", None)) or 0)
 
 
-def galleries_ranked(assets) -> list:
-    """Photo Assets ordered strongest-first (the order the plan and the fallback both use)."""
+def gallery_offset(round_: int, count: int) -> int:
+    """Where a repeat campaign starts in the ranked gallery.
+
+    A second campaign on the same listing is sold as *new* creative, and a gallery walked from the
+    same first photo assigns the same picture to day 1 in both campaigns. Rotating by half the
+    gallery gives the repeat its own opening and its own run of rooms while still showing every
+    photo exactly once. A gallery of three or fewer photos has nothing to rotate.
+    """
+    if count < 4 or (round_ or 0) <= 0:
+        return 0
+    step = max(1, count // 2)
+    return (int(round_) * step) % count
+
+
+def galleries_ranked(assets, offset: int = 0) -> list:
+    """Photo Assets ordered strongest-first (the order the plan and the fallback both use).
+
+    ``offset`` rotates that order: it is how campaign two on the same listing opens on a
+    different photo instead of repeating campaign one's calendar.
+    """
     photos = [a for a in (assets or []) if getattr(a, "kind", "photo") == "photo"]
-    return sorted(photos, key=_photo_strength)
+    ranked = sorted(photos, key=_photo_strength)
+    if ranked and offset:
+        cut = int(offset) % len(ranked)
+        ranked = ranked[cut:] + ranked[:cut]
+    return ranked
 
 
-def build_photo_index(assets) -> str:
+def build_photo_index(assets, offset: int = 0) -> str:
     """One line per photo Asset, fields in the doc's order, joined by ' ;; '.
 
     Line:  file name | id | room | social score | shape | what is visible (SEE) | STORY detail
@@ -195,7 +217,7 @@ def build_photo_index(assets) -> str:
     reads in upload order.
     """
     lines = []
-    for a in galleries_ranked(assets):
+    for a in galleries_ranked(assets, offset):
         parts = [
             str(getattr(a, "filename", "") or ""),
             str(getattr(a, "id", "") or ""),
@@ -319,7 +341,7 @@ def room_family(asset) -> str:
     return raw
 
 
-def assign_gallery(plan_posts, assets) -> list[dict]:
+def assign_gallery(plan_posts, assets, offset: int = 0) -> list[dict]:
     """One photo per post, never two posts on the same space while an unused room exists.
 
     The plan names a photo for each post, but a model reading a 60-photo index happily puts two
@@ -327,9 +349,10 @@ def assign_gallery(plan_posts, assets) -> list[dict]:
     stands when its room has not run yet, otherwise the post takes the strongest unused room. Only
     when the listing runs out of photos does anything repeat, and then the photo that ran longest
     ago comes back. Each entry is ``{"url","file","room","score","replaced"}``; ``replaced`` means
-    the caption was written for a different photo and has to be rewritten.
+    the caption was written for a different photo and has to be rewritten. ``offset`` rotates the
+    gallery, so a second campaign on the same listing walks the rooms from a different photo.
     """
-    every = [a for a in galleries_ranked(assets) if getattr(a, "url", "")]
+    every = [a for a in galleries_ranked(assets, offset) if getattr(a, "url", "")]
     liked = [a for a in every if _photo_strength(a)[0] == 0]
     if not liked:  # every photo was marked unusable: a campaign with no images is worse
         liked = every
@@ -1089,6 +1112,44 @@ def _repair_video_mix(plan: dict, days: int, per_day: int):
     return plan, repairs
 
 
+def repeat_note(boost, db) -> str:
+    """The plan prompt's line about which campaign this is for this listing.
+
+    A second campaign on the same house has to sound like a new campaign, not a re-run: the model
+    is told the round number and given the titles and on-photo lines the earlier campaign already
+    published so it writes new angles instead of the same hooks.
+    """
+    try:
+        round_ = int(getattr(boost, "repeat_round", 0) or 0)
+    except (TypeError, ValueError):
+        round_ = 0
+    if round_ <= 0:
+        return "the first campaign for this listing"
+    used: list[str] = []
+    if db is not None:
+        try:
+            from app.db.session import Boost  # noqa: PLC0415 - avoid a circular import at module load
+            rows = (db.query(Post).join(Boost, Post.boost_id == Boost.id)
+                    .filter(Boost.user_id == getattr(boost, "user_id", None),
+                            Boost.address == getattr(boost, "address", None),
+                            Boost.id != getattr(boost, "id", None))
+                    .order_by(Post.boost_id.desc(), Post.day).limit(40).all())
+            for p in rows:
+                for value in (getattr(p, "title", None), getattr(p, "overlay_text", None)):
+                    text = str(value or "").strip()
+                    if text and text not in used:
+                        used.append(text)
+        except Exception:  # noqa: BLE001 - the note is guidance, never a build blocker
+            used = []
+    note = ("campaign %d on this listing. An earlier campaign already ran here, so this one must "
+            "not read as a repeat: different angles, different openings, different hooks."
+            % (round_ + 1))
+    if used:
+        note += (" Do not reuse any of these titles or on-photo lines from the earlier campaign: "
+                 + "; ".join(used[:24]) + ".")
+    return note
+
+
 async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
                          openings=None, progress=None) -> dict:
     """Run R1 -> R2 -> R3 -> R4, validate, and persist the campaign.
@@ -1159,7 +1220,11 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
     # photo is already in memory for tagging - reading every blob here just to look at its last
     # two bytes pulled 220 MB into a 512 MB instance and stopped the build dead.
     intact, broken = list(photos), []
-    photo_index = build_photo_index(intact)
+    # A second campaign on the same listing walks the gallery from a different photo, so its
+    # calendar is not campaign one's calendar again.
+    round_ = _as_int(getattr(boost, "repeat_round", None)) or 0
+    rotation = gallery_offset(round_, len(intact))
+    photo_index = build_photo_index(intact, offset=rotation)
     no_photos = len(intact) == 0
 
     # --- photos must be seen before the plan can name them -------------------
@@ -1198,7 +1263,7 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
                         + (f" First failure: {first_error[:160]}" if first_error else ""))
             except Exception as exc:  # tagging is an improvement, never a build blocker
                 engine_notes.append(f"Photo tagging failed ({type(exc).__name__}); planning continued.")
-            photo_index = build_photo_index(intact)
+            photo_index = build_photo_index(intact, offset=gallery_offset(round_, len(intact)))
 
     # --- R1: property research (Responses API, web search) ------------------
     r1_input = prompts.R1_PROPERTY_RESEARCH.format(address=address)
@@ -1274,6 +1339,10 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
         property_page_url=property_website,
         property_page_text=_trunc(property_page_text, 4000),
     )
+    # The spec prompt is pinned byte-for-byte by tests/test_content_engine.py, so the repeat
+    # instruction is appended after it rather than edited into it.
+    if round_ > 0:
+        r4_user += "\nCAMPAIGN ROUND: " + repeat_note(boost, db)
     try:
         plan = await llm.chat_json(
             prompts.R4_PLAN_SYSTEM,
@@ -1330,7 +1399,7 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
     # rewritten against the photo it now carries, so the caption never describes the wrong space.
     plan_posts = plan.get("posts") if isinstance(plan, dict) else []
     plan_posts = plan_posts if isinstance(plan_posts, list) else []
-    assignments = assign_gallery(plan_posts, intact)
+    assignments = assign_gallery(plan_posts, intact, offset=rotation)
     replaced_n = sum(1 for a in assignments if a.get("replaced"))
     if replaced_n:
         say("writing photo copy", posts=replaced_n)

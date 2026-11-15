@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.db.session import get_db, User, AdAccount, Creative, Boost, Post, Ad, SupportTicket, Event, Asset, PasswordReset
 from app.core.testdata import is_test_email
 from app.core.security import get_current_user, get_admin_user
@@ -26,6 +29,15 @@ from app.api.auth import reset_link, RESET_TTL_MINUTES
 from app.services import mail
 
 router = APIRouter()
+
+
+class RepeatRequest(BaseModel):
+    """Which photos to carry into the next campaign on this listing.
+
+    Omitted (or null) means the whole gallery comes along; the campaign's own photo strip is
+    where the owner then trims or adds to it.
+    """
+    photo_ids: Optional[list[int]] = None
 
 # --- Ad Accounts ---
 @router.post("/ad-accounts", response_model=AdAccountOut, status_code=201)
@@ -149,26 +161,39 @@ def create_boost(boost: BoostCreate, current_user=Depends(get_current_user), db:
     return new_boost
 
 @router.post("/boosts/{boost_id}/again", response_model=BoostOut, status_code=201)
-def campaign_again(boost_id: int, current_user=Depends(get_current_user),
+def campaign_again(boost_id: int, payload: RepeatRequest | None = None,
+                   current_user=Depends(get_current_user),
                    db: Session = Depends(get_db)):
-    """Start the next campaign on the same house — the repeat purchase in one click.
+    """Start another campaign on the same house — with different photos and new copy.
 
-    Same address, property facts, brand profile and photos, but zero posts and no payment: the
-    new campaign is an ordinary unpaid campaign, so building it spends a prepaid credit or asks
-    for a fresh checkout. "Again" can therefore never hand out a free campaign.
+    The listing, the property facts, the brand and the gallery come along so nothing has to be
+    typed twice. What must NOT come along is the previous campaign: the new row is a fresh
+    unpaid campaign (``stage=PENDING``, no posts), tagged with ``repeat_round`` so the build
+    rotates the photo the calendar opens on and is told which hooks the earlier campaign
+    already used. Building it costs a credit or a checkout like any other campaign — "again"
+    can never hand out a free build.
     """
     src = db.query(Boost).filter(Boost.id == boost_id,
                                  Boost.user_id == current_user.id).first()
     if not src:
         raise HTTPException(status_code=404, detail="Campaign not found")
+    prior_round = (db.query(func.max(Boost.repeat_round))
+                   .filter(Boost.user_id == current_user.id,
+                           Boost.address == src.address).scalar())
     fresh = Boost(user_id=current_user.id, address=src.address, tier=src.tier,
                   campaign_days=src.campaign_days, ad_budget_usd=src.ad_budget_usd,
                   property_facts=src.property_facts, brand_profile=src.brand_profile or {},
-                  main_status="In Progress", stage="PENDING")
+                  main_status="In Progress", stage="PENDING",
+                  repeat_round=int(prior_round or 0) + 1)
     db.add(fresh)
     db.flush()
+    # An explicit photo list is how the owner says "these are the photos for this campaign";
+    # with no list the whole gallery comes along and can be trimmed on the campaign itself.
+    wanted_ids = set(payload.photo_ids or []) if payload else set()
     copied = 0
     for a in db.query(Asset).filter(Asset.boost_id == src.id).all():
+        if wanted_ids and a.id not in wanted_ids:
+            continue
         row = Asset(user_id=current_user.id, boost_id=fresh.id, filename=a.filename,
                     url=a.url, original_name=a.original_name, kind=a.kind, room=a.room,
                     social_score=a.social_score, shape=a.shape, see=a.see, story=a.story,
@@ -180,7 +205,8 @@ def campaign_again(boost_id: int, current_user=Depends(get_current_user),
         db.add(row)
         copied += 1
     db.add(Event(user_id=current_user.id, boost_id=fresh.id, event_type="campaign_repeated",
-                 payload={"from_boost_id": src.id, "photos": copied}))
+                 payload={"from_boost_id": src.id, "photos": copied,
+                          "round": fresh.repeat_round}))
     db.commit()
     db.refresh(fresh)
     return fresh

@@ -141,8 +141,6 @@ def finance(db: Session = Depends(get_db), current_user: User = Depends(get_admi
     a = assumptions(db)
     price_cents = billing.price_cents()
     price = price_cents / 100.0
-    pack_size = billing.pack_size()
-    pack_cents = billing.pack_price_cents(pack_size)
 
     fixed_monthly = (a["hosting_web_usd"] + a["hosting_postgres_usd"] + a["hosting_cron_usd"]
                      + a["hosting_domain_usd"])
@@ -249,10 +247,6 @@ def finance(db: Session = Depends(get_db), current_user: User = Depends(get_admi
         "price": {
             "cents": price_cents,
             "label": billing.price_label(price_cents),
-            "pack_size": pack_size,
-            "pack_cents": pack_cents,
-            "pack_label": billing.price_label(pack_cents),
-            "per_campaign_in_pack": round(pack_cents / float(pack_size) / 100.0, 2),
         },
         "fixed": {
             "web_usd": a["hosting_web_usd"],

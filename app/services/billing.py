@@ -42,103 +42,11 @@ def price_label(cents: int | None = None) -> str:
     return "$%d" % (cents // 100) if cents % 100 == 0 else "$%.2f" % (cents / 100.0)
 
 
-# ── campaign packs (the repeat purchase) ───────────────────────────────────────────────────
-# One campaign at a time is a one-off sale, and a one-off sale cannot pay for a customer: an
-# agent who buys once is worth $49 and a paid acquisition costs more than that. Agents list
-# several homes a year and run several campaigns on each, so the product sells a *pack* of
-# campaigns up front. Default is exactly pack x the single price — no discount invented — and
-# the size/price are env-overridable so an offer can change without a deploy.
-DEFAULT_PACK_SIZE = 4
-
-
-def pack_size() -> int:
-    raw = (os.getenv("STRIPE_PACK_SIZE") or "").strip()
-    try:
-        size = int(raw) if raw else DEFAULT_PACK_SIZE
-    except ValueError:
-        size = DEFAULT_PACK_SIZE
-    return size if 2 <= size <= 24 else DEFAULT_PACK_SIZE
-
-
-def pack_price_cents(size: int | None = None) -> int:
-    """What a pack costs. Default: the single price times the pack, i.e. no hidden discount."""
-    size = pack_size() if size is None else size
-    raw = (os.getenv("STRIPE_PACK_PRICE_CENTS") or "").strip()
-    if raw:
-        try:
-            cents = int(raw)
-            if cents > 0:
-                return cents
-        except ValueError:
-            pass
-    return price_cents() * size
-
-
-def pack_label(size: int | None = None) -> str:
-    size = pack_size() if size is None else size
-    return "%d campaigns for %s" % (size, price_label(pack_price_cents(size)))
-
-
-def _pack_success_url(base: str) -> str:
-    return "%s/?checkout=success&pack=1" % base.rstrip("/")
-
-
-def _pack_cancel_url(base: str) -> str:
-    return "%s/?checkout=cancelled&pack=1" % base.rstrip("/")
-
-
-def pack_checkout_payload(user_id: int, base_url: str, size: int | None = None,
-                          cents: int | None = None, customer_id: str | None = None,
-                          save_card: bool = True) -> list:
-    """Form body for a pack Checkout session. Same bracketed-pair rules as a single campaign."""
-    size = pack_size() if size is None else size
-    cents = pack_price_cents(size) if cents is None else cents
-    pairs = [
-        ("mode", "payment"),
-        ("success_url", _pack_success_url(base_url)),
-        ("cancel_url", _pack_cancel_url(base_url)),
-        ("client_reference_id", "pack-%d" % user_id),
-        ("line_items[0][quantity]", "1"),
-        ("line_items[0][price_data][currency]", CURRENCY),
-        ("line_items[0][price_data][unit_amount]", str(cents)),
-        ("line_items[0][price_data][product_data][name]",
-         ("Resmara campaign pack — %d campaigns" % size)[:250]),
-        # kind=pack is what makes the webhook add campaigns instead of looking for a boost.
-        ("metadata[kind]", "pack"),
-        ("metadata[user_id]", str(user_id)),
-        ("metadata[campaigns]", str(size)),
-        ("payment_intent_data[metadata][kind]", "pack"),
-        ("payment_intent_data[metadata][user_id]", str(user_id)),
-    ]
-    if customer_id:
-        pairs.append(("customer", customer_id))
-        pairs.append(("customer_update[address]", "auto"))
-        if save_card:
-            pairs.append(("payment_intent_data[setup_future_usage]", "off_session"))
-    return pairs
-
-
-async def create_pack_checkout_session(user_id: int, base_url: str,
-                                       size: int | None = None, cents: int | None = None,
-                                       client: httpx.AsyncClient | None = None,
-                                       customer_id: str | None = None,
-                                       save_card: bool = True) -> dict:
-    """Create the Checkout session for a campaign pack and return Stripe's JSON."""
-    if not billing_enabled():
-        raise RuntimeError("Stripe is not configured: set STRIPE_SECRET_KEY on the service.")
-    data = pack_checkout_payload(user_id, base_url, size, cents,
-                                 customer_id=customer_id, save_card=save_card)
-    body, headers = form_body(data)
-    owns = client is None
-    client = client or httpx.AsyncClient(timeout=30)
-    try:
-        resp = await client.post("%s/checkout/sessions" % STRIPE_API, content=body, headers=headers)
-        resp.raise_for_status()
-        return resp.json()
-    finally:
-        if owns:
-            await client.aclose()
-
+# ── prepaid campaigns (legacy, no longer sold) ─────────────────────────────
+# A $196 four-campaign pack used to be offered here. It is not part of the product: a campaign is
+# bought on its own for $49, and a second campaign on the same listing is just another campaign.
+# The credit balance and CreditPurchase rows stay readable so any pack already paid for is still
+# honoured, but nothing in the UI sells one and no new pack session is created.
 
 def secret_key() -> str:
     return (os.getenv("STRIPE_SECRET_KEY") or "").strip()
