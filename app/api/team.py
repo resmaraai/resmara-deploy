@@ -70,7 +70,10 @@ def _mint_invite(db: Session, user: User, request: Optional[Request]) -> Dict[st
             "Use this link to choose your own password and sign in to the Resmara Team room:\n"
             f"{link}\n\nIt expires in {RESET_TTL_MINUTES} minutes. "
             "If you were not expecting this, ignore this email."))
-    return {"link": link, "emailed": sent, "expires_minutes": RESET_TTL_MINUTES}
+    # The console reads `invite_link` (that is what it puts in front of the operator), so that is
+    # the name; `link` stays as an alias for anything that already read it that way.
+    return {"invite_link": link, "link": link, "emailed": sent,
+            "expires_minutes": RESET_TTL_MINUTES}
 
 
 @router.get("/admin/team")

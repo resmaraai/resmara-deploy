@@ -1925,6 +1925,7 @@ function paintReleases(){
   if (!relData) {
     h.innerHTML = '';
     ['relOpen', 'relDone'].forEach(id => { $(id).className = 'hint'; $(id).textContent = 'Appears once the back end reads the pull requests from GitHub.'; });
+    const s2 = $('sum-releases'); if (s2) s2.textContent = 'not connected';
     navBadge('releases', 0); return;
   }
   if (relData && relData.connected === false) {
@@ -1932,6 +1933,7 @@ function paintReleases(){
       steps: [{n: '—', l: 'Open pull requests'}, {n: '—', l: 'Went live'}, {n: '—', l: 'Live commit'}]});
     ['relOpen', 'relDone'].forEach(id => { const el = $(id); if (!el) return; el.className = 'hint';
       el.textContent = (relData.problems || [])[0] || 'Connect GitHub to see what is waiting to go live.'; });
+    const s2 = $('sum-releases'); if (s2) s2.textContent = 'not connected';
     navBadge('releases', 0); return;
   }
   const openR = (relData.open || []), doneR = (relData.recent || []);

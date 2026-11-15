@@ -138,7 +138,8 @@ created = own.post("/api/admin/team", json={"name": "New Person", "email": "new@
                                             "access": ["money"], "super_admin": False})
 ok("a new member is created", created.status_code == 200, created.text[:200])
 body = created.json() if created.status_code == 200 else {}
-ok("with a link to choose their own password", bool(body.get("link")), body)
+ok("with a link to choose their own password", bool(body.get("invite_link")), body)
+ok("and says plainly that no email went out", body.get("emailed") is False, body)
 ok("no password is ever set by the operator", "password" not in created.text.lower())
 
 promoted = own.post("/api/admin/team", json={"email": "customer@example.com", "access": ["campaigns"]})
