@@ -82,6 +82,12 @@ ADDITIONS = {
         ("created_at", "TIMESTAMP"),
         ("paid_at", "TIMESTAMP"),
     ],
+    # The build room shipped its assigned_to column after the board was already live, and
+    # create_all never adds a column to an existing table — without this ALTER the board on an
+    # established database fails on a missing column the first time a task is read.
+    "buildroom_tasks": [
+        ("assigned_to", "VARCHAR(160)"),
+    ],
 }
 
 # SQLite has no BYTEA.

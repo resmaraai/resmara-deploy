@@ -103,6 +103,7 @@ def _out(task: BuildroomTask) -> dict:
         "area": task.area,
         "status": task.status,
         "notes": task.notes or "",
+        "assigned_to": task.assigned_to,
         "claimed_by": task.claimed_by,
         "claimed_at": (_aware(task.claimed_at) or None).isoformat() if task.claimed_at else None,
         "claim_age_hours": claim_age_hours(task),
@@ -116,6 +117,16 @@ def _out(task: BuildroomTask) -> dict:
         "created_at": (_aware(task.created_at) or None).isoformat() if task.created_at else None,
         "updated_at": (_aware(task.updated_at) or None).isoformat() if task.updated_at else None,
     }
+
+
+def _group(items: list[dict], key: str) -> dict[str, int]:
+    """Count open tasks per person, for either the assignment or the claim."""
+    out: dict[str, int] = {}
+    for t in items:
+        who = t.get(key)
+        if who:
+            out[who] = out.get(who, 0) + 1
+    return out
 
 
 def _summary(items: list[dict]) -> dict:
@@ -136,6 +147,12 @@ def _summary(items: list[dict]) -> dict:
         "tested": sum(1 for t in items if t["tested_at"]),
         "untested_and_done": sum(1 for t in items if t["status"] == "done" and not t["tested_at"]),
         "by_owner": by_owner,
+        # Assignment is the plan (who should do it); the claim is the lock (who is on it now).
+        # Both are counted because the question "is this anybody's?" is answered by the claim,
+        # while "did we agree who owns this?" is answered by the assignment.
+        "assigned": sum(1 for t in open_items if t["assigned_to"]),
+        "unassigned": sum(1 for t in open_items if not t["assigned_to"]),
+        "by_assignee": _group(open_items, "assigned_to"),
         "stale_claims": sum(1 for t in open_items if t["claimed_by"] and not t["claim_fresh"]),
         "stale_after_hours": CLAIM_STALE_HOURS,
     }
@@ -157,6 +174,7 @@ class TaskIn(BaseModel):
     status: str = "todo"
     notes: Optional[str] = None
     due_on: Optional[str] = None
+    assigned_to: Optional[str] = None
     claimed_by: Optional[str] = None
     created_by: Optional[str] = None
 
@@ -167,6 +185,8 @@ class TaskPatch(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
     due_on: Optional[str] = None
+    assigned_to: Optional[str] = None
+    clear_assigned: bool = False
     tested_by: Optional[str] = None
     test_note: Optional[str] = None
     clear_tested: bool = False
@@ -211,6 +231,7 @@ def create_task(payload: TaskIn, db: Session = Depends(get_db), _admin=Depends(g
         status=payload.status,
         notes=(payload.notes or None),
         due_on=_parse_date(payload.due_on),
+        assigned_to=((payload.assigned_to or "").strip()[:160] or None),
         created_by=(payload.created_by or None),
     )
     if payload.claimed_by:
@@ -228,10 +249,30 @@ def update_task(task_id: int, payload: TaskPatch, db: Session = Depends(get_db),
     task = db.get(BuildroomTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="No such task")
-    _require_free(task, payload.who, payload.force)
+    # Assignment is routing, not a change to the work itself: deciding who *should* have
+    # something is the operator's call, so an assignment-only edit is not blocked by a claim
+    # somebody else is holding. Any other field still is.
+    assignment_only = (
+        (payload.assigned_to is not None or payload.clear_assigned)
+        and payload.title is None and payload.area is None and payload.status is None
+        and payload.notes is None and payload.due_on is None and payload.tested_by is None
+        and payload.test_note is None and not payload.clear_tested
+    )
+    if not assignment_only:
+        _require_free(task, payload.who, payload.force)
     if payload.force and task.claimed_by and payload.who and \
             task.claimed_by.strip().lower() != payload.who.strip().lower():
         _append_note(task, f"{payload.who} edited this while it was claimed by {task.claimed_by}")
+
+    if payload.clear_assigned:
+        if task.assigned_to:
+            _append_note(task, f"{payload.who or 'operator'} unassigned it (was {task.assigned_to})")
+        task.assigned_to = None
+    elif payload.assigned_to is not None:
+        new_who = payload.assigned_to.strip()[:160] or None
+        if new_who != task.assigned_to:
+            _append_note(task, f"{payload.who or 'operator'} assigned it to {new_who or 'nobody'}")
+        task.assigned_to = new_who
 
     if payload.title is not None:
         title = payload.title.strip()
@@ -278,6 +319,11 @@ def claim_task(task_id: int, payload: WhoIn, db: Session = Depends(get_db),
     if task.claimed_by and task.claimed_by.strip().lower() == by.lower() and claim_is_fresh(task):
         return _out(task)          # already theirs: claiming twice is not an error
     _require_free(task, by, payload.force)
+    if task.assigned_to and task.assigned_to.strip().lower() != by.lower() and not payload.force:
+        raise HTTPException(status_code=409, detail={
+            "assigned_to": task.assigned_to,
+            "why": f"This one is assigned to {task.assigned_to}. Reassign it first, or take it anyway.",
+        })
     if task.claimed_by and task.claimed_by.strip().lower() != by.lower():
         _append_note(task, f"{by} took this over from {task.claimed_by} "
                            f"(claim {claim_age_hours(task)}h old)")

@@ -224,6 +224,74 @@ def main() -> int:
     check("deleting something that is not there is a 404",
           client.delete("/api/admin/buildroom/%d" % late["id"], headers=dan).status_code == 404)
 
+    # ── assignment: the plan, not the lock ────────────────────────────────────
+    # "Who should do this" and "who is on it right now" are different questions. Assignment is
+    # set when the task is written and can be changed by the operator even while somebody else
+    # holds the claim; the claim still decides who may edit the work.
+    r = client.post("/api/admin/buildroom", headers=dan, json={
+        "title": "Homepage copy pass", "area": "front_end",
+        "assigned_to": "adam@example.com", "created_by": "dan@example.com"})
+    copy = r.json()
+    check("a task can be assigned when it is written",
+          copy["assigned_to"] == "adam@example.com", str(copy.get("assigned_to")))
+    s = board()["summary"]
+    check("the board counts what is assigned",
+          s["assigned"] == 1 and s["by_assignee"].get("adam@example.com") == 1, str(s))
+    check("and what has nobody on it", s["unassigned"] >= 0, str(s.get("unassigned")))
+
+    r = client.post("/api/admin/buildroom/%d/claim" % copy["id"], headers=dan,
+                    json={"by": "dan@example.com"})
+    check("somebody else cannot just claim another person's assignment",
+          r.status_code == 409, r.text[:160])
+    check("and the refusal says who it belongs to",
+          (r.json().get("detail") or {}).get("assigned_to") == "adam@example.com", r.text[:160])
+    check("taking it anyway is allowed when asked for",
+          client.post("/api/admin/buildroom/%d/claim" % copy["id"], headers=dan,
+                      json={"by": "dan@example.com", "force": True}).status_code == 200)
+
+    row = client.patch("/api/admin/buildroom/%d" % copy["id"], headers=dan,
+                       json={"assigned_to": "resmaraai@example.com", "who": "dan@example.com"}).json()
+    check("an operator can reassign it", row["assigned_to"] == "resmaraai@example.com",
+          str(row["assigned_to"]))
+    check("and the reassignment is written into the notes",
+          "assigned it to resmaraai@example.com" in (row["notes"] or ""), repr(row["notes"]))
+
+    # Adam holds a fresh claim; Dan reassigns it. The assignment is routing, so it is allowed —
+    # but the same call that also changes the work itself is still refused.
+    client.post("/api/admin/buildroom/%d/release" % copy["id"], headers=dan,
+                json={"by": "dan@example.com", "force": True})
+    client.post("/api/admin/buildroom/%d/claim" % copy["id"], headers=adam,
+                json={"by": "adam@example.com", "force": True})
+    r = client.patch("/api/admin/buildroom/%d" % copy["id"], headers=dan,
+                     json={"assigned_to": "resmaraai@example.com", "who": "dan@example.com"})
+    check("reassignment is not blocked by somebody else's claim", r.status_code == 200, r.text[:160])
+    r = client.patch("/api/admin/buildroom/%d" % copy["id"], headers=dan,
+                     json={"assigned_to": "dan@example.com", "title": "sneaky rename",
+                           "who": "dan@example.com"})
+    check("but a call that also edits the work still is", r.status_code == 409, r.text[:160])
+    check("unassigning works",
+          client.patch("/api/admin/buildroom/%d" % copy["id"], headers=dan,
+                       json={"clear_assigned": True, "who": "dan@example.com"}).json()["assigned_to"] is None)
+
+    # ── the whole description comes back, not a preview ───────────────────────
+    long_note = ("What goes wrong: the hero photo is cropped to a square on a phone, so the barn "
+                 "door is cut off.\nWhat right looks like: the whole door, headline above it, "
+                 "sign-up button reachable without scrolling.\nTouches: static/index.html only, no "
+                 "API changes.") + ("\nPadding line %d to make this unmistakably long." * 1) % 1
+    long_note = long_note + "".join("\nDetail line %d: the reason this exists." % i for i in range(1, 25))
+    r = client.post("/api/admin/buildroom", headers=dan, json={
+        "title": "Hero photo crop on phones", "area": "front_end", "notes": long_note,
+        "created_by": "dan@example.com"})
+    desc_id = r.json()["id"]
+    got = [t for t in board()["items"] if t["id"] == desc_id][0]
+    check("a long description comes back whole, byte for byte", got["notes"] == long_note,
+          "got %d chars, wanted %d" % (len(got["notes"]), len(long_note)))
+    check("it is not truncated to a preview", len(got["notes"]) > 1000, str(len(got["notes"])))
+    check("and it can be edited in place",
+          client.patch("/api/admin/buildroom/%d" % desc_id, headers=dan,
+                       json={"notes": "rewritten", "who": "dan@example.com"}).json()["notes"] == "rewritten")
+
+
     print()
     if FAILS:
         print("BUILD ROOM: %d FAILED" % FAILS)

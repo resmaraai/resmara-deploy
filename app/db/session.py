@@ -356,6 +356,9 @@ class BuildroomTask(Base):
     area = Column(String(24), nullable=False, default="front_end")   # front_end | back_end | both
     status = Column(String(16), nullable=False, default="todo")      # todo | doing | review | done | blocked
     notes = Column(Text, nullable=True)
+    # Who *should* do it, decided when the task is written; separate from the claim, which is
+    # who is *on it right now*. Assignment is the plan, the claim is the lock.
+    assigned_to = Column(String(160), nullable=True)
     claimed_by = Column(String(160), nullable=True)                  # the lock: an email or a name
     claimed_at = Column(DateTime(timezone=True), nullable=True)
     due_on = Column(Date, nullable=True)
