@@ -25,6 +25,8 @@ from app.api import console
 from app.api import system
 from app.api import team
 from app.api import marketing
+# The two ids a browser needs before it can be measured: /api/public/tags. Nothing secret.
+from app.api import public
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(resmara.router, prefix="", tags=["resmara"])
@@ -54,3 +56,6 @@ api_router.include_router(console.router, prefix="", tags=["console"])
 api_router.include_router(system.router, prefix="", tags=["console"])
 api_router.include_router(team.router, prefix="", tags=["console"])
 api_router.include_router(marketing.router, prefix="", tags=["console"])
+# Public, unauthenticated, and safe: a GA4 measurement id and a Clarity project id are printed in
+# the source of every site that uses them. The homepage fetches these to install its tags.
+api_router.include_router(public.router, prefix="", tags=["public"])

@@ -40,8 +40,9 @@ def ok(name, cond, extra: object = ""):
 
 def clear_env():
     for name in ("META_AD_ACCOUNT_ID", "META_SYSTEM_TOKEN", "GA4_PROPERTY_ID", "GA4_TOKEN",
-                 "GA4_SA_JSON", "CLARITY_PROJECT_ID", "CLARITY_TOKEN"):
+                 "GA4_SA_JSON", "CLARITY_PROJECT_ID", "CLARITY_TOKEN", "GA4_MEASUREMENT_ID"):
         os.environ.pop(name, None)
+        os.environ.pop("RESMARA_" + name, None)
 
 
 class FakeResponse:
@@ -236,6 +237,24 @@ for path in ("/api/admin/marketing", "/api/admin/website"):
     ok(f"{path} never invents a figure",
        all(body.get(k) is None for k in ("visitors", "spend_usd", "impressions", "clicks")),
        {k: body.get(k) for k in ("visitors", "spend_usd", "impressions", "clicks")})
+
+# --------------------------------------------------------------------- the tag injector
+print("\n[tracking tags: the ids come from the server, and unset means nothing is injected]")
+clear_env()
+response = client.get("/api/public/tags")
+ok("the tag endpoint is public", response.status_code == 200, str(response.status_code))
+ok("with nothing set it returns two empty ids",
+   response.json() == {"ga4": "", "clarity": ""}, response.json())
+home = client.get("/").text
+ok("the homepage loads the injector", "tags.js" in home, home[:120])
+ok("the homepage does not carry a pasted tag", "googletagmanager.com/gtag/js" not in home)
+
+os.environ["GA4_MEASUREMENT_ID"] = "G-TEST123456"
+os.environ["RESMARA_CLARITY_PROJECT_ID"] = "abcdefghij"
+response = client.get("/api/public/tags")
+ok("both ids come back when set",
+   response.json() == {"ga4": "G-TEST123456", "clarity": "abcdefghij"}, response.json())
+clear_env()
 
 clear_env()
 print()

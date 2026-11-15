@@ -171,15 +171,32 @@ def _run_checks(db: Session) -> List[Dict[str, Any]]:
         if code is None:
             rows.append(_row("Tracking tags", "warn", "Homepage unreachable, tags not checked", checked_at))
         else:
-            present = [label for label, needle in (("Google tag", "googletagmanager.com/gtag/js"),
-                                                   ("Clarity", "clarity.ms/tag"))
-                       if needle in body]
-            rows.append(_row("Tracking tags",
-                             "ok" if len(present) == 2 else "warn",
-                             ("Both present" if len(present) == 2
-                              else ("Present: " + ", ".join(present) if present
-                                    else "Neither the Google tag nor Clarity is on the homepage")),
-                             checked_at))
+            # The ids are injected by static/tags.js from /api/public/tags, so "is it installed"
+            # is two questions: does the page load the injector, and does the server hold an id?
+            loads = "tags.js" in body
+            configured = []
+            try:
+                import os as _os
+                if (_os.getenv("GA4_MEASUREMENT_ID") or _os.getenv("RESMARA_GA4_MEASUREMENT_ID") or "").strip():
+                    configured.append("Google tag")
+                if (_os.getenv("CLARITY_PROJECT_ID") or _os.getenv("RESMARA_CLARITY_PROJECT_ID") or "").strip():
+                    configured.append("Clarity")
+            except Exception:                                    # noqa: BLE001
+                configured = []
+            if loads and len(configured) == 2:
+                rows.append(_row("Tracking tags", "ok", "Both loaded on every page", checked_at))
+            elif loads and configured:
+                missing = "Clarity" if "Google tag" in configured else "Google tag"
+                rows.append(_row("Tracking tags", "warn",
+                                 f"{configured[0]} is live; {missing} has no id yet "
+                                 f"(GA4_MEASUREMENT_ID / CLARITY_PROJECT_ID)", checked_at))
+            elif loads:
+                rows.append(_row("Tracking tags", "warn",
+                                 "The loader is on every page but no id is set - nothing is being "
+                                 "measured (GA4_MEASUREMENT_ID / CLARITY_PROJECT_ID)", checked_at))
+            else:
+                rows.append(_row("Tracking tags", "warn",
+                                 "The homepage does not load tags.js, so no tag can run", checked_at))
     except Exception as exc:                                     # noqa: BLE001
         rows.append(_row("Tracking tags", "warn", str(exc)[:200], checked_at))
 
