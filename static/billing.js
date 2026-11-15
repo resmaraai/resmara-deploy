@@ -133,40 +133,14 @@ async function myCredits() {
   // Same route the sidebar has always used ('credits'); the page is now Billing.
   // The shell paints first: an await before innerHTML leaves the previous screen on the page
   // when the network is slow, which on a free instance is most of the time.
-  $('#content').innerHTML = `<div class="welcome"><h1>Billing</h1>
-      <p>One property campaign costs ${billingMoney(BILLING_PRICE_CENTS)}, paid when you build it.
-      Another campaign on the same listing is another ${billingMoney(BILLING_PRICE_CENTS)}.</p></div>
-    <section class="panel"><h2>Campaigns left</h2>
-      <div id="billing-balance"><p class="fine">Checking your balance…</p></div></section>
-    <section class="panel"><h2>Purchases</h2>
+  $('#content').innerHTML = `<div class="welcome billing-head"><h1>Billing</h1></div><div class="notice page-intro">Your Resmara purchases and the card we charge when you build a campaign. Your ad budget is billed by Meta to your own ad account, so it doesn’t show here.</div>
+    <section class="panel billing-panel"><h3>Purchases</h3>
       <div id="billing-orders"><p class="fine">Loading your purchases…</p></div></section>
-    <section class="panel"><h2>Payment method</h2>
+    <section class="panel billing-panel"><div class="billing-pm-head"><h3>Payment method</h3><button type="button" class="nc-cancel billing-add-card" onclick="addPaymentCard()">Add a card</button></div>
       <div id="billing-cards"><p class="fine">Checking your saved card…</p></div></section>
-    <section class="panel"><h2>How it works</h2>
-      <p>You pay ${billingMoney(BILLING_PRICE_CENTS)} when you build a campaign. A second campaign on
-      the same listing is another campaign at the same price, with its own photos and copy. Card
-      details go to Stripe; Resmara never stores them. Meta ad spend is separate and paid to Meta
-      from your own ad account.</p></section>
-    <section class="panel"><h2>Your account</h2>
-      <p class="fine">Closing your account removes your name, email and brand profile and stops it
-      signing in. Purchases stay on record for accounting. This cannot be undone.</p>
-      <button class="alt" onclick="closeAccount()">Close my account…</button></section>`;
+    <div class="billing-close"><button class="campaign-primary" onclick="closeAccount()">Close my account</button></div>`;
 
   // The balance is the repeat-customer number: campaigns paid for, not yet built.
-  var balBox = document.getElementById('billing-balance');
-  if (balBox && RM.balance) {
-    RM.balance().then(function (res) {
-      var left = Number((res && res.campaigns_left) || 0);
-      state.campaignsLeft = left;
-      // Only a balance bought before packs were withdrawn ever shows here.
-      balBox.innerHTML = (left > 0
-        ? `<p><b>${left} campaign${left === 1 ? '' : 's'} already paid for</b> — the next build uses one, no card needed.</p>`
-        : `<p class="fine">Nothing prepaid. You pay ${billingMoney(BILLING_PRICE_CENTS)} when you build a campaign.</p>`);
-    }).catch(function () {
-      balBox.innerHTML = '<p class="fine">Could not read your balance right now.</p>';
-    });
-  }
-
   // Saved card: Stripe keeps it on your customer record, so the next campaign is one click.
   var cardBox = document.getElementById('billing-cards');
   if (cardBox && RM.savedCards) {

@@ -115,14 +115,24 @@ async function hydrateReviewItems(r){
   if(activeReview()===r&&ReviewStudio.active!=null)details(ReviewStudio.active);
  }catch(e){}finally{r._hydrating=false}
 }
-function details(index){if(ReviewStudio.active!==index)ReviewStudio.month=null;ReviewStudio.active=index;const c=[...state.campaigns,...examples][index];if(!c)return;const key='review-'+(c.reviewId||index);state.reviews=state.reviews||{};if(!state.reviews[key])state.reviews[key]={approved:false,items:(c.scopeFirst||campaignBoostId(c)!=null)?[]:sampleReviewItems(c)};const r=state.reviews[key];r.scopeFirst=Boolean(c.scopeFirst)||(campaignBoostId(c)!=null&&!Number(c.posts_total||0)&&!r.approved);r.liveGeneration=Boolean(c.liveGeneration)||campaignBoostId(c)!=null;r.scope ||= initialCampaignScope(c);if(examples.includes(c)&&!r.scope.demoBrief&&!r.scopeConfirmed&&!r.approved){r.scope.highlights ||= demoPropertyHighlights(c);r.scope.demoBrief=true;}$('#content').innerHTML=`<div class="review-heading"><h1>${esc(r.scope.address)}</h1></div>${campaignScopePanel(r)}${photosPanel(r)}${reviewCalendar(r,c)}<div class="review-approval"><div><h2 class="campaign-step-title"><span>3</span> ${r.approved?'Campaign approved':'Approve the campaign'}</h2><p>Approve the full calendar when you’re happy with the scope and creative.</p><p class="fine">${r.approved?'Approval saved. Nothing has been published.':!r.items.length?'Approve the property scope to build the calendar.':r.items.filter(i=>i.reviewed).length+' of '+r.items.length+' items spot-checked · Individual review is optional. Approve the scope and calendar first.'}</p></div>${r.approved?'<button onclick="launchOrder()">Review launch →</button>'+(reviewCampaignBoostId()!=null?' <button class="alt" onclick="publishApprovedPosts()">Publish approved posts →</button>':''):`<button class="campaign-primary scope-approval-button" onclick="approveReview()" ${r.scopeConfirmed&&r.calendarApproved&&r.items.length?'':'disabled'}>Approve entire campaign →</button>`}</div><section class="panel"><h3>Reports for this property</h3><ul class="campaign-report-list">${[7,14].map(day=>`<li><strong>Day ${day} report</strong>${Number(c.day)>=day?`<button class="alt" onclick="campaignReport([...state.campaigns,...examples][${index}],${day})">View report ↗</button>`:`<span class="fine">${c.day?'Available on day '+day:'Available after launch'}</span>`}</li>`).join('')}</ul></section>`;refreshPhotoAssets();hydrateReviewItems(r);persist()}
-function sampleReviewItems(c){return Array.from({length:16},(_,i)=>({id:i,day:i<2?1:i-1,title:i===0?'Photo carousel ad':i===1?'Video ad':['Just listed','Property highlights','Step inside','Room spotlight','The details','Video walkthrough','Weekend viewing','A closer look','Neighbourhood','Design details','Property reel','Key features','Viewing reminder','Final spotlight'][i-2],kind:i<2?'Meta ad':([4,7,12,15].includes(i)?'Video post':'Photo post'),caption:campaignSampleCaption(c,i),image:i%3===0?img2:img,reviewed:false}))}
+function details(index){document.querySelector('#content')?.classList.remove('rerun-locked');if(ReviewStudio.active!==index)ReviewStudio.month=null;ReviewStudio.active=index;const c=[...state.campaigns,...examples][index];if(!c)return;const key='review-'+(c.reviewId||index);state.reviews=state.reviews||{};if(!state.reviews[key]||(examples.includes(c)&&state.reviews[key].v!==5))state.reviews[key]={v:5,approved:false,items:(c.scopeFirst||campaignBoostId(c)!=null)?[]:sampleReviewItems(c)};const r=state.reviews[key];if(r.videoUrl===undefined)r.videoUrl='';if(examples.includes(c)&&typeof SAMPLE_POSTS!=='undefined')(r.items||[]).forEach(it=>{if(it.image===img||it.image===img2||!it.image)it.image=demoItemImage(it.id)});r.scopeFirst=Boolean(c.scopeFirst)||(campaignBoostId(c)!=null&&!Number(c.posts_total||0)&&!r.approved);r.liveGeneration=Boolean(c.liveGeneration)||campaignBoostId(c)!=null;r.scope ||= initialCampaignScope(c);if(examples.includes(c)&&!r.scope.demoBrief&&!r.scopeConfirmed&&!r.approved){r.scope.highlights ||= demoPropertyHighlights(c);r.scope.demoBrief=true;}const live=typeof campaignIsLive==='function'&&campaignIsLive(c);if(live&&examples.includes(c)){r.scopeConfirmed=true;r.calendarApproved=true;r.approved=true}$('#content').innerHTML=`<div class="review-heading"><h1>${esc(r.scope.address)}</h1></div>${live?leadsPanel(c,index)+'<div class="live-cal">'+liveCalendar(reviewCalendar(r,c))+'</div>':campaignScopePanel(r)+photosPanel(r)+reviewCalendar(r,c)}${live?'':`<div class="review-approval"><div><h2 class="campaign-step-title"><span>3</span> ${r.approved?'Campaign approved':'Approve the campaign'}</h2><p>Approve the full calendar when you’re happy with the creative.</p><p class="fine">${r.approved?'Approval saved. Nothing has been published.':!r.items.length?'Confirm your launch details to build the calendar.':r.items.filter(i=>i.reviewed).length+' of '+r.items.length+' items spot-checked · Individual review is optional. Confirm your launch details and approve the calendar first.'}</p></div>${r.approved?'<button onclick="launchOrder()">Review launch →</button>'+(reviewCampaignBoostId()!=null?' <button class="alt" onclick="publishApprovedPosts()">Publish approved posts →</button>':''):`<button class="campaign-primary scope-approval-button" onclick="approveReview()" ${r.scopeConfirmed&&r.calendarApproved&&r.items.length?'':'disabled'}>Approve entire campaign →</button>`}</div>`}<section class="panel${live?' live-reports':''}">${live?'<h2 class="campaign-step-title"><span>3</span> Reports for this property</h2>':'<h3>Reports for this property</h3>'}<div class="pr-picks">${[7,14].map(day=>Number(c.day)>=day?`<button type="button" class="pr-pick" onclick="openPropertyReport(${index},${day},this)"><b>Day ${day} report</b><small>Ready · click to open</small></button>`:`<div class="pr-pick off"><b>Day ${day} report</b><small>${c.day?'Ready on day '+day:'Ready after launch'}</small></div>`).join('')}</div><div id="pr-view"></div></section>`;refreshPhotoAssets();hydrateReviewItems(r);persist();if(typeof campaignPhase==='function'&&campaignPhase(c)==='completed'&&!c.rerunPaid)showRerunOffer(index)}
+function sampleReviewItems(c){
+ // One ad for the whole campaign. If the listing link had a video, the ad is a video ad and
+ // the video is also the first post (day 1). Otherwise the ad is a photo ad and every post is a photo.
+ const vid=!!c.hasVideo,titles=['Just listed','Property highlights','Step inside','Room spotlight','The details','A closer look','Weekend viewing','Neighbourhood','Design details','Living spaces','Key features','Viewing reminder','Outdoor living','Final spotlight'];
+ const P=typeof SAMPLE_POSTS!=='undefined'?SAMPLE_POSTS:[];const cards=[6,0,2,8,13].map(k=>P[k]&&P[k].img).filter(Boolean);
+ const ad={id:0,day:1,title:vid?'Video ad':'Photo carousel ad',kind:'Meta ad',adType:vid?'video':'carousel',caption:campaignSampleCaption(c,0),image:vid?'sample/card-1.jpg':(cards[0]||demoItemImage(0)),images:vid?[]:cards,reviewed:false};
+ const posts=titles.map((t,k)=>({id:k+2,day:k+1,title:k===0&&vid?'Video tour':t,kind:k===0&&vid?'Video post':'Photo post',caption:campaignSampleCaption(c,k+2),image:k===0&&vid?'sample/card-1.jpg':demoItemImage(k+2),reviewed:false}));
+ return [ad,...posts];
+}
+// Demo campaigns use the sample home's designed posts, not the illustration.
+function demoItemImage(i){const P=typeof SAMPLE_POSTS!=='undefined'?SAMPLE_POSTS:null;if(!P)return i%3===0?img2:img;return i<2?P[(SAMPLE_AD.creativeDays||[7])[0]-1].img:P[(i-2)%14].img}
 function activeReview(){return state.reviews['review-'+(([...state.campaigns,...examples][ReviewStudio.active]||{}).reviewId||ReviewStudio.active)]}
 function reviewCheck(k,v){const r=activeReview();if(r.approved)return;r[k]=v;persist()}
 function editCampaignItem(i){
  const r=activeReview(),it=r.items[i],slot=reviewSlot(r,it),brand=r.brandProfile||campaignBrandProfile();
- const locked=r.approved||r.calendarApproved,disabled=locked?'disabled':'',ad=it.kind==='Meta ad';
- show(`<span class="eyebrow">${esc(it.kind)} · ${ad?'Days 1–14':'Day '+it.day}</span><h2>${esc(it.title)}</h2><div class="review-preview" style="--agent-colour:${/^#[0-9a-f]{6}$/i.test(brand.colour)?brand.colour:'#143a50'}">${it.image?`<span class="creative-frame"><img src="${esc(it.image)}" alt="Campaign creative">${it.overlay?`<em class="post-overlay">${esc(it.overlay)}</em>`:''}${it.kicker?`<span class="post-kicker">${esc(it.kicker)}</span>`:''}</span>`:'<p class="fine">No photo selected yet.</p>'}${campaignBrandPreview(brand)}</div>${it.room?`<p class="fine">Photo: ${esc(it.room)} — the copy above is written for this photo.</p>`:''}<p>${esc(reviewDateLabel(slot.date,slot.time,r.scope.zone))}</p><p class="fine">${esc(it.visualBrief||'Sample creative preview.')}</p><form onsubmit="event.preventDefault();saveReviewItem(${i},this)"><label class="field">Title<input name="title" required value="${esc(it.title)}" ${disabled}></label><label class="field">Text on the photo<input name="overlay" maxlength="60" placeholder="Words that sit on the image" value="${esc(it.overlay||'')}" ${disabled}></label><label class="field">Caption<textarea name="caption" required ${disabled}>${esc(it.caption)}</textarea></label>${locked?'':`<label class="field">Upload a replacement photo<input name="photo" type="file" accept="image/png,image/jpeg,image/webp"></label><label class="field">Or use an image URL<input name="image" type="url" placeholder="Leave blank to keep the current photo"></label><p class="fine">PNG, JPEG or WebP, up to 500 KB in this preview.</p>${ad?'':`<label class="field">Publishing date<input name="publishDate" type="date" required min="${esc(r.scope.start)}" max="${esc(reviewSlot(r,{day:14}).date)}" value="${esc(slot.date)}"></label><label class="field">Publishing time (${esc(r.scope.zone)})<input name="publishTime" type="time" required value="${esc(slot.time)}"></label><p class="fine">Choosing a date with another post swaps their slots.</p>`}`}<p class="fine" role="alert"></p><div class="modal-actions"><button type="button" class="alt" onclick="modal.close()">Close</button>${locked?'':'<button>Save and mark reviewed ✓</button>'}</div></form>`);
+ const locked=r.approved||r.calendarApproved,disabled=locked?'disabled':'',ad=it.kind==='Meta ad';const isVid=it.kind==='Video post'||(ad&&it.adType==='video');const firstPost=!ad&&it.day===Math.min(...r.items.filter(x=>x.kind!=='Meta ad').map(x=>x.day));const showVid=false; // Video is parked until after launch.
+ show(`<span class="eyebrow">${esc(it.kind)} · ${ad?'Days 1–14':'Day '+it.day}</span><h2>${esc(it.title)}</h2>${showVid?`<label class="field video-link-field">Link to video<input form="post-form" name="videoUrl" type="url" placeholder="Paste a Dropbox, Google Drive, Fotello or Aryeo video link" value="${esc(r.videoUrl||'')}" ${disabled}></label><p class="fine">${r.videoUrl?'Found in your listing link. Your video runs as the ad and goes out once as your first post.':'No video in your listing link. Paste one to use it for your ad and first post. Without one, they use photos.'}</p>`:''}<div class="ei-split"><div class="ei-media"><div class="review-preview" style="--agent-colour:${/^#[0-9a-f]{6}$/i.test(brand.colour)?brand.colour:'#143a50'}">${ad&&it.images&&it.images.length>1?carouselViewer(it.images):isVid?`<span class="creative-frame video-thumb"><img src="${esc(it.image)}" alt="Video thumbnail"><span class="play-btn" aria-hidden="true">▶</span></span><p class="fine">Video: the thumbnail is taken from your video, with no text added.</p>`:it.image?(/sample\/post-|designed/.test(it.image)||it.designed?`<span class="creative-frame designed"><img src="${esc(it.image)}" alt="Designed post"></span>`:`<span class="creative-frame"><img src="${esc(it.image)}" alt="Campaign creative">${it.overlay?`<em class="post-overlay">${esc(it.overlay)}</em>`:''}${it.kicker?`<span class="post-kicker">${esc(it.kicker)}</span>`:''}</span>`):'<p class="fine">No photo selected yet.</p>'}</div>${it.room?`<p class="fine">Photo: ${esc(it.room)} — the copy above is written for this photo.</p>`:''}</div><div class="ei-side"><p class="sp-when">◷ ${esc(reviewDateLabel(slot.date,slot.time,r.scope.zone))}</p><p class="fine">${esc(it.visualBrief||'Sample creative preview.')}</p><form id="post-form" onsubmit="event.preventDefault();saveReviewItem(${i},this)"><label class="field">Title<input name="title" required value="${esc(it.title)}" ${disabled}></label><label class="field">Caption<textarea name="caption" required ${disabled}>${esc(it.caption)}</textarea></label>${locked?'':`${isVid?'':'<label class="field">Upload a replacement photo<input name="photo" type="file" accept="image/*"></label><p class="fine">Resmara resizes and compresses it to a JPEG so it’s ready for Instagram and Facebook.</p>'}${ad?'':`<label class="field">Publishing date<input name="publishDate" type="date" required min="${esc(r.scope.start)}" max="${esc(reviewSlot(r,{day:14}).date)}" value="${esc(slot.date)}"></label><label class="field">Publishing time (${esc(r.scope.zone)})<input name="publishTime" type="time" required value="${esc(slot.time)}"></label><p class="fine">Choosing a date with another post swaps their slots.</p>`}`}<p class="fine" role="alert"></p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Close</button>${locked?'':'<button>Save and mark reviewed ✓</button>'}</div></form></div></div>`);
 }
 function postDay(r,date){
  const day=1+(Date.parse(date)-Date.parse(r.scope.start))/86400000;
@@ -152,14 +162,14 @@ async function saveReviewItem(i,form){
  button.disabled=true;error.textContent='';
  const before=r.items.map(post=>({...post}));
  try{
-  const url=form.elements.image.value.trim(),file=form.elements.photo.files[0];
-  if(!file&&url&&!['https:','http:'].includes(new URL(url).protocol))throw new Error('Use an HTTPS or HTTP image URL.');
-  const image=file?await readBrandImage(file):url||item.image;
+  const file=form.elements.photo?.files[0];
+  const image=file?await compressToJpeg(file):item.image;
   if(!form.isConnected||!modal.open||activeReview()!==r||r.approved||r.calendarApproved)return;
   const date=form.elements.publishDate?.value,time=form.elements.publishTime?.value;
   const oldTime=reviewSlot(r,item).time;
   if(date)moveReviewPost(r,i,date);
-  Object.assign(item,{title:form.elements.title.value,overlay:form.elements.overlay?form.elements.overlay.value:item.overlay,caption:form.elements.caption.value,image,reviewed:true});
+  if(form.elements.videoUrl)applyCampaignVideo(r,form.elements.videoUrl.value.trim());
+  Object.assign(item,{title:form.elements.title.value,caption:form.elements.caption.value,image,reviewed:true});
   if(time&&(!date||date===reviewSlot(r,before[i]).date||time!==oldTime))item.time=time;
   // Approving this post is a backend call when the campaign is backed by a real boost.
   const boostId=reviewCampaignBoostId(),postId=item.postId??item.post_id;
@@ -169,11 +179,11 @@ async function saveReviewItem(i,form){
   }
   // A replacement photo uploads to the backend boost; the local preview stands either way.
   if(window.RM&&boostId!=null&&file){
-   try{await RM.uploadPhoto(file,boostId,'photo')}catch{}
+   try{const blob=await (await fetch(image)).blob();await RM.uploadPhoto(new File([blob],'photo.jpg',{type:'image/jpeg'}),boostId,'photo')}catch{}
   }
   try{localStorage.setItem('resmara',JSON.stringify(state))}catch{
    r.items=before;
-   throw new Error('This browser couldn’t save the change. Try a smaller photo or an image URL.');
+   throw new Error('This browser couldn’t save the change. Try a smaller photo.');
   }
   modal.close();details(ReviewStudio.active);
  }catch(e){error.textContent=e.message}finally{button.disabled=false}
@@ -190,17 +200,23 @@ function nextCampaignDate(){
  return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
 }
 function initialCampaignScope(c){
- return {address:c.address,listing:c.url||'',media:c.media||'',facts:c.research?.facts||c.area||'',highlights:c.research?.highlights||'',photoPlan:c.research?.photoPlan||'Prioritize front and rear exterior, kitchen, living room and standout features. Include a pool, waterfront or land when present. Skip routine toilet and closet photos.',start:c.scopeFirst?nextCampaignDate():'2026-11-02',time:'10:00',zone:c.research?.zone||(examples.includes(c)?'America/Chicago':Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'),budget:'50'};
+ return {address:c.address,listing:c.url||'',media:c.media||'',facts:c.research?.facts||c.area||'',highlights:c.research?.highlights||'',photoPlan:c.research?.photoPlan||'Prioritize front and rear exterior, kitchen, living room and standout features. Include a pool, waterfront or land when present. Skip routine toilet and closet photos.',start:c.start||(c.scopeFirst?nextCampaignDate():'2026-11-02'),time:'10:00',zone:c.research?.zone||(examples.includes(c)?'America/Chicago':Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'),budget:'50',destination:c.destination||''};
 }
 const scopeFields=[
- ['address','Property address','text'],['listing','Public listing or MLS URL','url'],['media','Photo and video gallery URL','url'],['facts','Property facts (price, beds, baths, size)','textarea'],['start','Go-live date','date'],['highlights','Standout features and location','textarea'],['photoPlan','Photo priorities and exclusions','textarea'],['budget','Meta ad budget','text']
+ ['address','Property address','text'],['listing','Public listing or MLS URL','url'],['media','Photo and video gallery URL','url'],['facts','Property facts (price, beds, baths, size)','textarea'],['start','Go-live date','date'],['highlights','Standout features and location','textarea'],['photoPlan','Photo priorities and exclusions','textarea'],['budget','Meta ad budget','text'],['destination','Send clicks to','url']
 ];
+// Step 1 is only the ad budget. The address, facts, photos and story all come from the
+// listing link and the engine; the agent changes anything else on the posts themselves.
+// The other scope fields still travel with the form as hidden values so nothing downstream breaks.
 function campaignScopePanel(r){
  const s=r.scope,locked=r.scopeConfirmed||r.approved;
  const budget=Number(s.budget)>0?Number(s.budget):50;
- const renderField=([key,label,type])=>key==='budget'?`<label class="scope-field">Select your Meta ad budget<select name="budget">${[...new Set([50,75,100,150,200,budget])].sort((a,b)=>a-b).map(amount=>`<option value="${amount}" ${amount===budget?'selected':''}>$${amount}${amount===50?' · Default':''}</option>`).join('')}</select></label>`:`<label class="scope-field">${label}${type==='textarea'? `<textarea name="${key}" rows="2">${esc(s[key])}</textarea>`:`<input name="${key}" type="${type==='url'?'text':type}" ${type==='url'?'inputmode="url"':''} value="${esc(s[key])}" ${['address','start'].includes(key)?'required':''}>`}</label>`;
- const columns=[['Listing details',['address','listing','media','facts','start']],['Creative & budget',['highlights','photoPlan','budget']]];
- return `<details class="panel campaign-scope" ${locked?'':'open'}><summary class="campaign-step-title">Property scope ${locked?'<small>✓ Scope Approved</small>':''}</summary><p>Review the brief that guides your campaign. Check the listing facts, photo priorities and go-live date before approving. Resmara recommends local posting times when it builds the calendar. Your saved My Brand profile supplies the agent details and creative style.</p><p class="fine">${r.liveGeneration?'Drafted from your listing submission and the details you supplied. Verify the facts before approving.':s.demoBrief?'Example of a populated research brief. Property highlights are sample data.':'Prefilled from your listing submission. Property research isn’t connected in this preview.'}</p>${r.liveGeneration?scopeResearchSources():''}<form onsubmit="event.preventDefault();saveCampaignScope(this)"><fieldset ${locked?'disabled':''}><legend class="sr-only">Property scope details</legend><div class="scope-form-columns">${columns.map(([title,keys])=>`<div class="scope-form-column"><h3>${title}</h3>${keys.map(key=>renderField(scopeFields.find(field=>field[0]===key))).join('')}</div>`).join('')}</div></fieldset><div class="scope-form-actions"><p class="fine">${r.scopeFirst&&r.items.length&&!locked?'Approving this revised scope replaces the current demo creative. ':'Campaign cost: 1 credit. ' }Meta ad spend is separate.</p>${locked?`<div class="scope-locked"><strong>✓ Scope Approved</strong>${r.approved?'':'<button type="button" class="alt" onclick="unlockCampaignScope()">Unlock scope</button>'}</div>`:'<button class="campaign-primary scope-approval-button">Approve Property Scope →</button>'}<p class="fine" data-photo-count></p>${reviewCampaignBoostId()==null?'':(r.items&&r.items.length?'':'<button type="button" class="alt" onclick="rebuildLiveCampaign()">Build content with Resmara →</button>')}</div></form></details>`;
+ const shown=['budget','start','destination'];
+ const hidden=scopeFields.filter(f=>!shown.includes(f[0])).map(([key])=>`<input type="hidden" name="${key}" value="${esc(s[key]||'')}">`).join('');
+ const amounts=[...new Set([50,75,100,150,200,budget])].sort((a,b)=>a-b);
+ const when=s.start?new Date(s.start+'T12:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}):'';
+ const today=new Date().toISOString().slice(0,10);
+ return `<details class="panel campaign-scope" ${locked?'':'open'}><summary class="campaign-step-title"><span>1</span> Confirm your launch details ${locked?`<small>✓ Goes live ${esc(when)} · $${budget} budget</small>`:''}</summary><form onsubmit="event.preventDefault();saveCampaignScope(this)">${hidden}<fieldset ${locked?'disabled':''} class="budget-step"><legend class="sr-only">Launch details</legend><div class="ls-grid"><div class="ls-col"><label class="scope-field">Go-live date<input name="start" type="date" required value="${esc(s.start||'')}" min="${today}"></label><p class="budget-note">The day your posts and listing ad start going out.</p></div><div class="ls-col"><label class="scope-field">Send clicks to (optional)<input name="destination" type="text" inputmode="url" placeholder="https://..." value="${esc(s.destination||'')}"></label><p class="budget-note">The page people land on when they click your posts or ad. Left blank, it uses your listing link.</p></div><div class="ls-col"><label class="scope-field">Ad budget<select name="budget">${amounts.map(a=>`<option value="${a}" ${a===budget?'selected':''}>$${a}${a===50?' · Default':''}</option>`).join('')}</select></label><p class="budget-note">Meta bills your ad spend separately from your Resmara campaign. Our default budget is $50.</p></div></div></fieldset><div class="scope-form-actions">${locked?`<div class="scope-locked"><strong>✓ Goes live ${esc(when)} · $${budget} budget</strong>${r.approved?'':'<button type="button" class="alt" onclick="unlockCampaignScope()">Change details</button>'}</div>`:'<button class="campaign-primary scope-approval-button">Confirm details →</button>'}<p class="fine" data-photo-count></p>${reviewCampaignBoostId()==null?'':(r.items&&r.items.length?'':'<button type="button" class="alt" onclick="rebuildLiveCampaign()">Build content with Resmara →</button>')}</div></form></details>`;
 }
 function unlockCampaignScope(){
  const r=activeReview();if(r.approved||ReviewStudio.building.has(r))return;
@@ -229,7 +245,7 @@ function saveCampaignScope(form){
    refreshPhotoAssets();
   }).catch(()=>{});
  }
- persist();if(r.scopeFirst){buildApprovedScope();return}details(ReviewStudio.active);document.querySelector('.review-calendar')?.scrollIntoView({block:'start'});toast('Property scope approved.');
+ persist();if(r.scopeFirst){buildApprovedScope();return}details(ReviewStudio.active);document.querySelector('.review-calendar')?.scrollIntoView({block:'start'});toast('Launch details confirmed.');
 }
 
 function reviewSlot(r,item){
@@ -244,8 +260,9 @@ function reviewDateLabel(date,time,zone){
 }
 function approveReview(){
  const r=activeReview();if(r.approved)return;
- if(!r.scopeConfirmed||!r.calendarApproved||!r.items.length){toast('Approve the property scope and calendar first.');document.querySelector('.campaign-scope')?.scrollIntoView({block:'start'});return}
- show(`<h2>Approve the entire campaign?</h2><p>This approves all ${r.items.length} scheduled assets, including any you haven’t opened. Nothing goes live or gets charged at this step.</p><div class="modal-actions"><button class="alt" onclick="modal.close()">Keep reviewing</button><button onclick="confirmCampaignApproval()">Approve all →</button></div>`);
+ if(!r.scopeConfirmed||!r.calendarApproved||!r.items.length){toast('Confirm your launch details and approve the calendar first.');document.querySelector('.campaign-scope')?.scrollIntoView({block:'start'});return}
+ const unopened=r.items.filter(i=>!i.reviewed).length;
+ show(unopened?`<span class="eyebrow">NOT EVERYTHING REVIEWED</span><h2>You haven’t reviewed everything.</h2><p>${unopened} of ${r.items.length} posts and ads haven’t been opened. Are you sure you want to approve the whole campaign?</p><p class="fine">Once approved, your posts and ad are locked and go live on your go-live date.</p><div class="modal-actions"><button class="nc-cancel" onclick="modal.close()">Keep reviewing</button><button class="campaign-primary" onclick="confirmCampaignApproval()">Yes, approve →</button></div>`:`<h2>Approve the entire campaign?</h2><p>Your posts and ad are locked and go live on your go-live date.</p><div class="modal-actions"><button class="nc-cancel" onclick="modal.close()">Keep reviewing</button><button class="campaign-primary" onclick="confirmCampaignApproval()">Approve →</button></div>`);
 }
 async function confirmCampaignApproval(){
  const r=activeReview();if(r.approved||!r.scopeConfirmed||!r.calendarApproved||!r.items.length)return;
@@ -260,7 +277,7 @@ async function confirmCampaignApproval(){
    return;
   }
  }
- r.approved=true;r.approvedAt=new Date().toISOString();persist();modal.close();details(ReviewStudio.active);
+ r.approved=true;r.approvedAt=new Date().toISOString();{const c=[...state.campaigns,...examples][ReviewStudio.active];if(c&&c.rerunPaid){c.phase='republished';c.status='Republished';c.day=1}}persist();modal.close();details(ReviewStudio.active);
 }
 
 function changeReviewMonth(offset){
@@ -271,13 +288,16 @@ function changeReviewMonth(offset){
 }
 function reviewCalendar(r,c){
  if(r.scopeFirst&&(!r.scopeConfirmed||!r.items.length||r.needsBuild||ReviewStudio.building.has(r))){
-  return `<section class="panel review-calendar"><h2 class="campaign-step-title"><span>2</span> Campaign calendar</h2><p>${ReviewStudio.building.has(r)?'Resmara is building your draft posts and ads.':r.scopeConfirmed?'Your scope is approved. Build the draft to fill your calendar.':'Approve the property scope first. Resmara will use it to build the posts and ads for this calendar.'}</p>${r.scopeConfirmed&&!ReviewStudio.building.has(r)?'<button class="campaign-primary" onclick="buildApprovedScope()">Build campaign calendar →</button>':''}${r.scopeConfirmed&&!ReviewStudio.building.has(r)&&reviewCampaignBoostId()!=null?' <button class="alt" onclick="buildCampaignFromBackend()">Build with the Resmara engine →</button>':''}</section>`;
+  return `<section class="panel review-calendar"><h2 class="campaign-step-title"><span>2</span> Campaign calendar</h2><p>${ReviewStudio.building.has(r)?'Resmara is building your draft posts and ads.':r.scopeConfirmed?'Your scope is approved. Build the draft to fill your calendar.':'Confirm your launch details first. Resmara will build the posts and ads for this calendar.'}</p>${r.scopeConfirmed&&!ReviewStudio.building.has(r)?'<button class="campaign-primary" onclick="buildApprovedScope()">Build campaign calendar →</button>':''}${r.scopeConfirmed&&!ReviewStudio.building.has(r)&&reviewCampaignBoostId()!=null?' <button class="alt" onclick="buildCampaignFromBackend()">Build with the Resmara engine →</button>':''}</section>`;
  }
- const month=ReviewStudio.month||r.scope.start.slice(0,7);
- const first=new Date(month+'-01T12:00:00Z'),end=new Date(first);end.setUTCMonth(end.getUTCMonth()+1);
- const gridStart=new Date(first);gridStart.setUTCDate(1-first.getUTCDay());
- const title=new Intl.DateTimeFormat('en-US',{month:'long',year:'numeric',timeZone:'UTC'}).format(first);
+ // Only the weeks the campaign runs: from the week of day 1 to the week of day 14.
  const start=r.scope.start,last=reviewSlot(r,{day:14}).date;
+ const first=new Date(start+'T12:00:00Z'),lastD=new Date(last+'T12:00:00Z');
+ const gridStart=new Date(first);gridStart.setUTCDate(first.getUTCDate()-first.getUTCDay());
+ const end=new Date(lastD);end.setUTCDate(lastD.getUTCDate()+(7-lastD.getUTCDay()));
+ const fmt=d=>new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',timeZone:'UTC'}).format(d);
+ const title=fmt(first)+' – '+fmt(lastD)+', '+lastD.getUTCFullYear();
+ const month='';
  const posts=r.items.map((item,index)=>({item,index,...reviewSlot(r,item)}));
  const editable=!r.approved&&!r.calendarApproved;
  const ads=posts.filter(x=>x.item.kind==='Meta ad');
@@ -287,12 +307,12 @@ function reviewCalendar(r,c){
   const from=dates.findIndex(date=>date>=start&&date<=last);
   const to=dates.findLastIndex(date=>date>=start&&date<=last);
   const bars=from<0?'':ads.map(({item,index},lane)=>`<button class="review-month-ad" style="grid-column:${from+1}/${to+2};grid-row:${lane+2}" onclick="editCampaignItem(${index})" title="${esc(item.title)} · ${esc(start)}–${esc(last)}">${esc(item.title)}${item.reviewed?' ✓':''}</button>`).join('');
-  weeks.push(`<div class="review-month-week" style="--post-row:${from<0?2:ads.length+2}">${dates.map((date,col)=>`<span class="review-month-date ${date.startsWith(month)?'':'outside-month'}" style="grid-column:${col+1}">${Number(date.slice(-2))}</span>`).join('')}${bars}${dates.map((date,col)=>{
+  weeks.push(`<div class="review-month-week" style="--post-row:${from<0?2:ads.length+2}">${dates.map((date,col)=>`<span class="review-month-date ${date>=start&&date<=last?'':'outside-month'}" style="grid-column:${col+1}">${Number(date.slice(-2))}</span>`).join('')}${bars}${dates.map((date,col)=>{
    const reportDay=[7,14].find(day=>reviewSlot(r,{day}).date===date);
-   return `<div class="review-month-cell ${date.startsWith(month)?'':'outside-month'}" style="grid-column:${col+1}" ${editable&&postDay(r,date)?`ondragover="if(event.dataTransfer.types.includes('application/x-resmara-post'))event.preventDefault()" ondrop="dropReviewPost(event,'${date}')"`:''}>${posts.filter(x=>x.item.kind!=='Meta ad'&&x.date===date).map(({item,index,time})=>`<button class="review-calendar-post" ${editable?`draggable="true" ondragstart="event.dataTransfer.setData('application/x-resmara-post','${index}');event.dataTransfer.effectAllowed='move'"`:''} onclick="editCampaignItem(${index})">${item.image?`<span class="calendar-media"><img src="${esc(item.image)}" alt="${esc(item.room||'')}">${item.kicker?`<span class="post-kicker">${esc(item.kicker)}</span>`:''}${item.overlay?`<em class="post-overlay">${esc(item.overlay)}</em>`:''}</span>`:''}<b>${esc(item.title)}</b><small>${esc(time)}${item.reviewed?' · ✓':''}</small></button>`).join('')}${reportDay?`<span class="review-calendar-report">${Number(c.day)>=reportDay?`<button class="alt" onclick="campaignReport([...state.campaigns,...examples][ReviewStudio.active],${reportDay})">● View report</button>`:'● Report due'}</span>`:''}</div>`;
+   return `<div class="review-month-cell ${date>=start&&date<=last?'':'outside-month'}" style="grid-column:${col+1}" ${editable&&postDay(r,date)?`ondragover="if(event.dataTransfer.types.includes('application/x-resmara-post'))event.preventDefault()" ondrop="dropReviewPost(event,'${date}')"`:''}>${posts.filter(x=>x.item.kind!=='Meta ad'&&x.date===date).map(({item,index,time})=>`<button class="review-calendar-post${item.kind==='Video post'?' is-video':''}" ${editable?`draggable="true" ondragstart="event.dataTransfer.setData('application/x-resmara-post','${index}');event.dataTransfer.effectAllowed='move'"`:''} onclick="editCampaignItem(${index})">${item.image?`<span class="calendar-media"><img src="${esc(item.image)}" alt="${esc(item.room||'')}">${item.kicker?`<span class="post-kicker">${esc(item.kicker)}</span>`:''}${item.overlay?`<em class="post-overlay">${esc(item.overlay)}</em>`:''}</span>`:''}<b>${esc(item.title)}</b><small>${item.kind==='Video post'?'<em class="vid-tag">▶ Video</em> ':''}${esc(time12(time))}${item.reviewed?' · ✓':''}</small></button>`).join('')}${reportDay?`<span class="review-calendar-report">${Number(c.day)>=reportDay?`<button class="alt" onclick="campaignReport([...state.campaigns,...examples][ReviewStudio.active],${reportDay})">● View report</button>`:'● Report due'}</span>`:''}</div>`;
   }).join('')}</div>`);
  }
- return `<details class="panel review-calendar" ${r.calendarApproved||r.approved?'':'open'}><summary class="campaign-step-title"><span>2</span> Campaign calendar ${r.calendarApproved||r.approved?'<small>✓ Calendar Approved</small>':''}</summary><p>This is your campaign calendar for the month. Open any post or ad to check its information and creative before you approve. You only need to open the items you want to spot-check or change.</p>${editable?'<p class="fine">Drag a post to another campaign day, or change its date in the post editor.</p>':''}<div class="flex review-month-nav"><button class="alt" onclick="changeReviewMonth(-1)" aria-label="Previous month">‹</button><strong>${title}</strong><button class="alt" onclick="changeReviewMonth(1)" aria-label="Next month">›</button></div><p class="fine">Times in ${esc(r.scope.zone)} · Ads run ${esc(start)} at ${esc(r.scope.time)} through ${esc(last)}, end of day.</p><div class="review-month-scroll"><div class="review-month-grid"><div class="review-month-weekdays">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<span>${d}</span>`).join('')}</div>${weeks.join('')}</div></div><p class="fine">${r.liveGeneration?'Draft copy, captions and creative directions from your campaign engine'+(r.engine&&r.engine.host?' ('+esc(r.engine.host)+')':'')+'. Nothing has been published.':'Sample schedule and creative. Nothing is published from this preview.'}${r.buildNotes&&r.buildNotes.length?' '+r.buildNotes.map(esc).join(' '):''}</p><div class="scope-form-actions"><span class="fine">${r.scopeConfirmed?'Confirm the dates and creative before approving.':'Approve the property scope first.'}</span>${r.approved?'':r.calendarApproved?'<button class="alt" onclick="unlockCampaignCalendar()">Unlock calendar</button>':`<button class="campaign-primary scope-approval-button" onclick="approveCampaignCalendar()" ${r.scopeConfirmed?'':'disabled'}>Approve Campaign Calendar →</button>`}</div></details>`;
+ return `<details class="panel review-calendar" ${r.calendarApproved||r.approved?'':'open'}><summary class="campaign-step-title"><span>2</span> Campaign calendar ${r.calendarApproved||r.approved?'<small>✓ Calendar Approved</small>':''}</summary><p>This is your campaign calendar. Open any post or ad to check its information and creative before you approve. You only need to open the items you want to spot-check or change.</p>${editable?'<p class="fine">Drag a post to another campaign day, or change its date in the post editor.</p>':''}<div class="flex review-month-nav"><strong>${title}</strong></div>${videoNote(r)}<p class="fine">Times in ${esc(r.scope.zone)} · Ads run ${esc(niceDate(start))} at ${esc(time12(r.scope.time))} through ${esc(niceDate(last))}, end of day.</p><div class="review-month-scroll"><div class="review-month-grid"><div class="review-month-weekdays">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<span>${d}</span>`).join('')}</div>${weeks.join('')}</div></div><p class="fine">${r.liveGeneration?'Draft copy, captions and creative directions from your campaign engine'+(r.engine&&r.engine.host?' ('+esc(r.engine.host)+')':'')+'. Nothing has been published.':'Sample schedule and creative. Nothing is published from this preview.'}${r.buildNotes&&r.buildNotes.length?' '+r.buildNotes.map(esc).join(' '):''}</p><div class="scope-form-actions"><span class="fine">${r.scopeConfirmed?'Confirm the dates and creative before approving.':'Confirm your launch details first.'}</span>${r.approved?'':r.calendarApproved?'<button class="alt" onclick="unlockCampaignCalendar()">Unlock calendar</button>':`<button class="campaign-primary scope-approval-button" onclick="approveCampaignCalendar()" ${r.scopeConfirmed?'':'disabled'}>Approve Campaign Calendar →</button>`}</div></details>`;
 }
 
 function approveCampaignCalendar(){
@@ -437,4 +457,67 @@ async function publishApprovedPosts(){
  const waiting=posts.filter(p=>!p.publish_status||p.publish_status==='scheduled');
  const lines=posts.map(p=>`<li>Day ${p.day} · ${esc(p.kind||'post')} · <b>${esc(p.publish_status||'scheduled')}</b>${p.publish_target?' → '+esc(p.publish_target):''}${p.fb_post_id?' · FB '+esc(p.fb_post_id):''}${p.ig_media_id?' · IG '+esc(p.ig_media_id):''}${p.last_error?' · <span class="fine">'+esc(p.last_error)+'</span>':''}</li>`).join('');
  show(`<h2>${published.length?'Published':'Nothing published yet'}</h2><div class="check">${published.length} published · ${waiting.length} still scheduled · ${failed.length} failed</div>${posts.length?`<ul class="campaign-report-list">${lines}</ul>`:'<p class="fine">No posts to publish: build the campaign first.</p>'}${failed.length?'<p class="fine">A failed post is only retried after its error is fixed - fix the reason above, then publish again.</p>':''}${waiting.length&&!published.length?'<p class="fine">Posts go out on their scheduled day; the publisher also runs on its own schedule.</p>':''}<div class="modal-actions"><button class="alt" onclick="modal.close()">Close</button></div>`);
+}
+
+// --- Run a completed campaign again -------------------------------------------
+// A completed campaign opens blurred with one offer. Paying builds a fresh 14 days
+// (new angles, same home). Once the agent approves it, it moves up to Active as Republished.
+const RERUN_PRICE='$39';
+function showRerunOffer(index){
+ const main=document.querySelector('#content');if(!main)return;
+ main.classList.add('rerun-locked');
+ const c=[...state.campaigns,...examples][index];
+ const box=document.createElement('div');box.className='rerun-offer';
+ box.innerHTML=`<div class="rerun-card"><span class="pill phase-completed">Completed</span><h2>Run this campaign again.</h2><p><b>${esc(c.address)}</b> finished its 14 days. Resmara builds a fresh 14 days of posts and a new listing ad, with new angles on the same home.</p><button class="campaign-primary" onclick="startRerun(${index})">Run it again · ${RERUN_PRICE}</button><button class="alt" onclick="dashboard('campaigns')">Back to my campaigns</button></div>`;
+ main.appendChild(box);
+}
+function startRerun(index){
+ const c=[...state.campaigns,...examples][index];if(!c)return;
+ show(`<span class="eyebrow">RUNNING IT AGAIN</span><h2>Resmara is building a fresh 14 days.</h2><div class="audit-track campaign-build-track"><span class="robot-avatar" aria-hidden="true"></span></div><p role="status">Charging ${RERUN_PRICE} to your saved card…</p><p class="fine">Demo · no real payment runs here.</p>`);
+ const status=modal.querySelector('[role="status"]');
+ ['Looking back at what worked last time…','Planning new angles on the home…','Placing the new posts and ad on the calendar…'].forEach((t,i)=>setTimeout(()=>{if(status?.isConnected)status.textContent=t},1000+i*1400));
+ setTimeout(()=>{
+  c.rerunPaid=true;
+  const key='review-'+(c.reviewId||index);
+  const fresh={approved:false,items:sampleReviewItems(c)};
+  fresh.scope=initialCampaignScope(c);fresh.scope.start=nextCampaignDate();
+  state.reviews[key]=fresh;ReviewStudio.month=null;persist();
+  if(modal.open)modal.close();details(index);
+  toast('Your new campaign is ready. Confirm the launch details and approve it to go live.');
+ },5400);
+}
+
+// Replacement photos: scale to max 1440px on the long side and save as JPEG (Instagram-safe).
+function compressToJpeg(file,max=1440,quality=0.85){
+ return new Promise((ok,bad)=>{
+  if(!/^image\//.test(file.type))return bad(new Error('Choose a photo file.'));
+  const img=new Image(),url=URL.createObjectURL(file);
+  img.onload=()=>{const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);ok(c.toDataURL('image/jpeg',quality))};
+  img.onerror=()=>{URL.revokeObjectURL(url);bad(new Error('That photo couldn’t be read. Try another file.'))};
+  img.src=url;
+ });
+}
+
+function time12(t){if(!t||!/^\d{1,2}:\d{2}/.test(t))return t||'';let [h,m]=t.split(':').map(Number);const ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+String(m).padStart(2,'0')+' '+ap}
+function niceDate(d){try{return new Date(d+'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})}catch(e){return d}}
+
+// The campaign has at most one video. With one: a video ad, and the video goes out once as the first post.
+// Without one: a photo ad and photo posts only.
+function applyCampaignVideo(r,url){
+ r.videoUrl=url;const ad=r.items.find(x=>x.kind==='Meta ad');const posts=r.items.filter(x=>x.kind!=='Meta ad');
+ const first=posts.reduce((a,b)=>a&&a.day<=b.day?a:b,null);
+ if(ad){ad.adType=url?'video':'photo';ad.title=url?'Video ad':'Photo ad'}
+ posts.forEach(p=>{if(p.kind==='Video post'&&p!==first)p.kind='Photo post'});
+ if(first){first.kind=url?'Video post':'Photo post';if(url&&first.title==='Just listed')first.title='Video tour';if(!url&&first.title==='Video tour')first.title='Just listed'}
+}
+function videoNote(r){if(!r.items.some(i=>i.kind==='Video post'))return '<p class="video-note">No video in your listing link, so your ad is a photo carousel and every post is a photo.</p>';return true?'<p class="video-note has">▶ <b>Video found.</b> It runs as your ad and goes out once as your first post.</p>':'<p class="video-note">No video in your listing link, so your ad and posts use photos. <a href="#" onclick="editCampaignItem(activeReview().items.findIndex(x=>x.kind===\'Meta ad\'));return false">Add a video link</a></p>'}
+
+// Photo carousel ad: flip through every card the ad will show.
+function carouselViewer(imgs){
+ return `<div class="ad-carousel" data-i="0"><div class="ad-car-track">${imgs.map((u,k)=>`<img src="${esc(u)}" alt="Ad card ${k+1}" class="${k?'':'on'}">`).join('')}</div><button type="button" class="ad-car-btn prev" aria-label="Previous card" onclick="carouselGo(this,-1)">‹</button><button type="button" class="ad-car-btn next" aria-label="Next card" onclick="carouselGo(this,1)">›</button><div class="ad-car-dots">${imgs.map((_,k)=>`<i class="${k?'':'on'}"></i>`).join('')}</div><p class="fine ad-car-count">Card <b>1</b> of ${imgs.length} · people swipe through these in the ad</p></div>`;
+}
+function carouselGo(btn,d){
+ const box=btn.closest('.ad-carousel'),imgs=box.querySelectorAll('img'),dots=box.querySelectorAll('.ad-car-dots i');
+ let i=(Number(box.dataset.i)+d+imgs.length)%imgs.length;box.dataset.i=i;
+ imgs.forEach((im,k)=>im.classList.toggle('on',k===i));dots.forEach((x,k)=>x.classList.toggle('on',k===i));box.querySelector('.ad-car-count b').textContent=i+1;
 }
