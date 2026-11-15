@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import AdAccount, Boost, Post, User, get_db
-from app.services import team_access
+from app.services import analytics, team_access
 
 log = logging.getLogger("resmara.marketing")
 
@@ -79,41 +79,61 @@ def marketing(days: int = Query(30, ge=1, le=180),
         .scalar() or 0
     )
 
-    weeks: List[Dict[str, Any]] = []
+    # What our own database can say, and what only Meta can.
+    insight = analytics.meta_insights(account, start, end)
+    by_week_signups: Dict[str, int] = {}
     cursor = start
     while cursor < end:
         nxt = min(cursor + timedelta(days=7), end)
-        weeks.append({
-            "start": cursor.date().isoformat(),
-            "leads": None,
-            "spend_usd": None,
-            "signups": sum(1 for u in agents if cursor <= (_created(u) or datetime.min) < nxt),
-        })
+        by_week_signups[cursor.date().isoformat()] = sum(
+            1 for u in agents if cursor <= (_created(u) or datetime.min) < nxt)
         cursor = nxt
 
+    weeks: List[Dict[str, Any]] = [{"start": day, "leads": None, "spend_usd": None,
+                                    "signups": value}
+                                   for day, value in by_week_signups.items()]
+    if insight["connected"]:
+        # Merge Meta's own week starts over ours so a week carries both spend and sign-ups; a
+        # week Meta reports that we did not compute still gets a row (0 sign-ups is the truth).
+        merged: Dict[str, Dict[str, Any]] = {w["start"]: dict(w) for w in weeks}
+        for row in insight["weeks"]:
+            entry = merged.get(row["start"]) or {"start": row["start"], "leads": None,
+                                                 "signups": 0, "spend_usd": None}
+            entry["spend_usd"] = row["spend_usd"]
+            entry["impressions"] = row["impressions"]
+            entry["clicks"] = row["clicks"]
+            merged[row["start"]] = entry
+        weeks = [merged[k] for k in sorted(merged)]
+
     unavailable = []
-    if account is None:
-        unavailable.append({"metric": "ad_spend", "reason": MISSING["ad_spend"]})
-        unavailable.append({"metric": "impressions", "reason": MISSING["ad_spend"]})
-        unavailable.append({"metric": "clicks", "reason": MISSING["ad_spend"]})
+    if not insight["connected"]:
+        reason = insight["why"] or MISSING["ad_spend"]
+        unavailable += [{"metric": "ad_spend", "reason": reason},
+                        {"metric": "impressions", "reason": reason},
+                        {"metric": "clicks", "reason": reason}]
     unavailable.append({"metric": "leads", "reason": MISSING["visitors"]})
 
     return {
-        "connected": False,
+        "connected": bool(insight["connected"]),
         "days": (end - start).days,
-        "spend_usd": None,
-        "impressions": None,
-        "clicks": None,
+        "spend_usd": insight["spend_usd"],
+        "impressions": insight["impressions"],
+        "clicks": insight["clicks"],
         "leads": None,
         "signups": signups,
         "paying": int(paying),
-        "campaigns_running": 0,
+        "campaigns_running": (
+            db.query(func.count(Boost.id)).filter(Boost.status == "live").scalar() or 0
+            if hasattr(Boost, "status") else 0),
         "weeks": weeks,
-        "ad_account": ({"advertiser_id": account.advertiser_id,
-                        "name": account.account_name} if account else None),
+        "ad_account": ({"advertiser_id": insight["account_id"],
+                        "name": (account.account_name if account is not None else None)}
+                       if insight["account_id"] else None),
         "unavailable": unavailable,
-        "note": ("Ad spend needs Resmara's own Meta account connected. Sign-ups and paying agents "
-                 "below are counted from this database."),
+        "note": ("Ad spend is Resmara's own Meta account." if insight["connected"] else
+                 "Ad spend needs Resmara's own Meta account connected - set META_AD_ACCOUNT_ID and "
+                 "META_SYSTEM_TOKEN on the service. Sign-ups and paying agents below are counted "
+                 "from this database and are real."),
     }
 
 
@@ -169,9 +189,11 @@ def _tag_checks(base: str) -> List[Dict[str, Any]]:
 
 @router.get("/admin/website")
 def website(days: int = Query(30, ge=1, le=180),
-            user=Depends(team_access.needs("business"))):
-    """Visitors need Google Analytics; speed and the tags are measured here, for real."""
+            user=Depends(team_access.needs("business")), db: Session = Depends(get_db)):
+    """Visitors come from Google Analytics, sessions from Clarity, speed and tags from here."""
     base = settings.PUBLIC_BASE_URL.rstrip("/")
+    window_days = max(1, min(int(days or 30), 180))
+    start, end = _window(window_days)
     checks = _tag_checks(base)
     mobile, why_mobile = _pagespeed(base + "/", "mobile")
     desktop, why_desktop = _pagespeed(base + "/", "desktop")
@@ -182,21 +204,38 @@ def website(days: int = Query(30, ge=1, le=180),
                    "ok" if (desktop or 0) >= 90 else ("warn" if desktop is not None else "warn"),
                    "detail": f"Lighthouse performance {desktop}/100" if desktop is not None else why_desktop})
 
+    traffic = analytics.ga4_visitors(start, end)
+    clarity = analytics.clarity_sessions()
+    # "Sign-ups started" is ours to count: an account created in the window started signing up.
+    signups_started = (db.query(func.count(User.id))
+                       .filter(User.created_at.isnot(None))
+                       .filter(User.created_at >= start.strftime("%Y-%m-%d %H:%M:%S"))
+                       .scalar() or 0)
+
+    unavailable = []
+    if traffic.get("connected"):
+        checks.insert(0, {"name": "Analytics", "status": "ok",
+                          "detail": f"Google Analytics answered for the last {window_days} days"})
+    else:
+        unavailable.append({"metric": "visitors", "reason": traffic.get("why") or MISSING["visitors"]})
+    if not clarity.get("connected"):
+        unavailable.append({"metric": "clarity", "reason": clarity.get("why") or MISSING["clarity"]})
+
     return {
-        "connected": False,
-        "days": max(1, min(int(days or 30), 180)),
-        "visitors": None,
-        "visitors_prev": None,
-        "new_visitors": None,
-        "signups_started": None,
-        "signups": None,
+        "connected": bool(traffic.get("connected")),
+        "days": window_days,
+        "visitors": traffic.get("visitors"),
+        "visitors_prev": traffic.get("visitors_prev"),
+        "new_visitors": traffic.get("new_visitors"),
+        "signups_started": int(signups_started),
+        "signups": int(signups_started),
         "speed_mobile": mobile,
         "speed_desktop": desktop,
-        "clarity_sessions": None,
-        "clarity_url": None,
+        "clarity_sessions": clarity.get("sessions"),
+        "clarity_url": clarity.get("url"),
         "checks": checks,
-        "sources": [],
-        "pages": [],
-        "unavailable": [{"metric": "visitors", "reason": MISSING["visitors"]},
-                        {"metric": "clarity", "reason": MISSING["clarity"]}],
+        "sources": traffic.get("sources") or [],
+        "pages": traffic.get("pages") or [],
+        "unavailable": unavailable,
     }
+

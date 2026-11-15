@@ -86,12 +86,21 @@ try { ccSession = require('/Users/dan/Scripts/lib/cc-session.js'); } catch (e) {
   const me = await RM.me();
   ok('the mounted /api/auth/me returns the signed-in account', me && me.email === email, JSON.stringify(me));
 
-  const created = await RM.createBoost({ address: '1 Deployed UI Way, Austin TX', campaign_days: 14 });
-  ok('the mounted boost create returns a row', !!(created && created.id), 'id=' + (created && created.id));
+  // "+ Campaign" is deliberately closed until Meta is connected: a brand-new agent must be
+  // stopped at the gate rather than handed a row that could never launch. Assert the rule, not a
+  // campaign that should not exist yet.
+  let created = null, createErr = null;
+  try { created = await RM.createBoost({ address: '1 Deployed UI Way, Austin TX', campaign_days: 14 }); }
+  catch (e) { createErr = e; }
+  const refusal = JSON.stringify(createErr || {});
+  ok('a brand-new agent is stopped at the Meta gate instead of getting a dead campaign',
+     !created && createErr && createErr.status === 409 && /meta_required/.test(refusal),
+     'created=' + (created && created.id) + ' ' + refusal.slice(0, 160));
+  ok('  ...and the refusal points at the real connect route',
+     /\/api\/oauth\/meta\/connect/.test(refusal), refusal.slice(0, 160));
   const list = await RM.boosts();
   ok('the mounted boost list comes back as JSON',
-     Array.isArray(list) && list.some(b => b.id === (created && created.id)),
-     'type=' + (Array.isArray(list) ? 'array[' + list.length + ']' : typeof list));
+     Array.isArray(list), 'type=' + (Array.isArray(list) ? 'array[' + list.length + ']' : typeof list));
 
   // 4. the support desk and the operator cards, over the same public URL
   const ticket = await RM.createTicket('Deployed UI question', 'Does the support desk work through the mount?');

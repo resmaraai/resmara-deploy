@@ -1710,6 +1710,21 @@ function paintMarketing(){
     const s = $('sum-marketing'); if (s) s.textContent = 'not connected yet';
     return;
   }
+  if (m.connected === false) {
+    // Same rule as the Website page: our own counts are real, the ad numbers need Meta. Showing
+    // "null" or "$0" spend would read as "we spent nothing", which is a different claim entirely.
+    const why = ((m.unavailable || []).find(u => u.metric === 'ad_spend') || {}).reason || 'connect Resmara’s own ad account to fill this page';
+    hero_.innerHTML = hero({eyebrow: 'Marketing · last ' + (m.days || 30) + ' days', big: 'Not connected yet', small: why,
+      steps: [{n: '—', l: 'Ad spend', s: 'needs the Meta ad account'},
+              {n: '—', l: 'Leads', s: 'needs the ad account'},
+              {n: Number(m.signups || 0).toLocaleString('en-US'), l: 'Sign-ups', s: 'counted here, and real'},
+              {n: m.paying, l: 'New paying agents', s: 'paid for a first campaign', cls: m.paying ? 'good' : ''}]});
+    ['mkVerdict', 'mkFunnel', 'mkWeeks'].forEach(id => { const el = $(id); if (el) { el.className = 'hint';
+      el.textContent = 'Needs the ad account. The sign-ups and paying agents above are counted from our own database and are real.'; } });
+    const s2 = $('sum-marketing'); if (s2) s2.textContent = 'not connected · ' + Number(m.signups || 0) + ' sign-ups';
+    navBadge('marketing', 0);
+    return;
+  }
   const cpl = m.leads ? m.spend_usd / m.leads : null, cpa = m.paying ? m.spend_usd / m.paying : null;
   const allowed = finData && finData.acquisition ? finData.acquisition.max_cac_usd[3] : null;
   hero_.innerHTML = hero({eyebrow: 'Marketing · last ' + (m.days || 30) + ' days', big: cpa === null ? 'No paying agents yet' : esc(usd(cpa)) + ' <small>per new paying agent</small>',
