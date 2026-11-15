@@ -1752,6 +1752,26 @@ function paintWebsite(){
     const s = $('sum-website'); if (s) s.textContent = 'not connected yet';
     return;
   }
+  if (w.connected === false) {
+    // Half this page is ours to measure (speed, the tags) and half needs Google Analytics. Saying
+    // "0 visitors" would be a lie; saying what is measured and what is missing is not.
+    const why = ((w.unavailable || []).find(u => u.metric === 'visitors') || {}).reason || 'connect Google Analytics to fill this page';
+    const speed = w.speed_mobile != null ? w.speed_mobile : '—', desk = w.speed_desktop != null ? w.speed_desktop : '—';
+    h.innerHTML = hero({eyebrow: 'resmara.com · last ' + (w.days || 30) + ' days', big: 'Not connected yet', small: why,
+      steps: [{n: '—', l: 'Visitors', s: 'needs Google Analytics'},
+              {n: '—', l: 'Sign-ups started', s: 'needs Google Analytics'},
+              {n: '—', l: 'Conversion rate', s: 'needs Google Analytics'},
+              {n: speed, l: 'Page speed', s: 'on phones, out of 100 · ' + desk + ' on desktop', cls: speed >= 90 ? 'good' : speed < 50 && speed !== '—' ? 'alert' : ''}]});
+    $('webChecks').className = ''; $('webChecks').innerHTML = checkGrid(w.checks || []);
+    ['webSources', 'webPages'].forEach(id => { const el = $(id); if (el) { el.className = 'hint'; el.textContent = 'Needs Google Analytics.'; } });
+    $('webHeatTxt').textContent = 'Needs Microsoft Clarity.';
+    const hb = $('webHeatBtn'); if (hb) hb.innerHTML = '';
+    const fails = (w.checks || []).filter(c => c.status === 'fail');
+    attnBox('attn-website', [], fails.length ? attnList(fails.map(c => ({main: c.name + ' is not working', sub: c.detail || ''}))) : '', fails.length);
+    navBadge('website', fails.length);
+    const s = $('sum-website'); if (s) s.textContent = 'not connected · speed ' + speed;
+    return;
+  }
   const conv = w.visitors ? Math.round(w.signups_started / w.visitors * 1000) / 10 : 0;
   const speedCls = w.speed_mobile >= 90 ? 'good' : w.speed_mobile < 50 ? 'alert' : '';
   h.innerHTML = hero({eyebrow: 'resmara.com · last ' + (w.days || 30) + ' days', big: esc(Number(w.visitors).toLocaleString('en-US')) + ' <small>visitors</small>',
