@@ -2,7 +2,7 @@
 import hashlib
 import json
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
@@ -153,6 +153,20 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _naive_utc(dt: datetime) -> datetime:
+    """Normalise a stored timestamp so it can be compared with ``datetime.utcnow()``.
+
+    Postgres gives back timezone-aware datetimes for ``timestamptz`` columns while this app
+    writes and compares naive UTC, and comparing the two raises
+    ``TypeError: can't compare offset-naive and offset-aware datetimes``. SQLite returns naive
+    rows, so nothing local or in the suite ever saw it — in production it was a 500
+    "Internal Server Error" on the reset page, the moment a real link was submitted.
+    """
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
 @router.post("/password-reset/request")
 def request_reset(email: str, request: Request, db: Session = Depends(get_db)):
     """Start a reset. Always answers the same way, so this cannot be used to discover
@@ -217,7 +231,8 @@ def confirm_reset(token: str, new_password: str, db: Session = Depends(get_db)):
     if len(new_password) < 8:
         raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
     row = db.query(PasswordReset).filter(PasswordReset.token_hash == _hash(token)).first()
-    if not row or row.used_at is not None or row.expires_at < datetime.utcnow():
+    if (not row or row.used_at is not None
+            or _naive_utc(row.expires_at) < datetime.utcnow()):
         raise HTTPException(status_code=400, detail="This reset link is invalid or has expired")
     user = db.query(User).filter(User.id == row.user_id).first()
     if not user:
