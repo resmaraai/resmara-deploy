@@ -4,8 +4,12 @@
 to tables that already exist, so new fields on ad_accounts/posts/ads need an explicit
 ALTER. This runs on every startup and is a no-op once the columns are present.
 """
+import logging
+
 from sqlalchemy import inspect, text
 from app.db.session import engine
+
+log = logging.getLogger("resmara.migrate")
 
 # table -> [(column, DDL type/definition)]
 ADDITIONS = {
@@ -168,22 +172,48 @@ def encrypt_stored_tokens() -> int:
 
 def migrate() -> list[str]:
     """Add any missing columns. Returns the list of column names actually added."""
-    added = []
+    added, failed = [], []
     insp = inspect(engine)
+    dialect = engine.dialect.name
     existing_tables = set(insp.get_table_names())
-    with engine.begin() as conn:
-        for table, cols in ADDITIONS.items():
-            if table not in existing_tables:
+    for table, cols in ADDITIONS.items():
+        if table not in existing_tables:
+            continue
+        have = {c["name"] for c in insp.get_columns(table)}
+        for name, ddl in cols:
+            if name in have:
                 continue
-            have = {c["name"] for c in insp.get_columns(table)}
-            for name, ddl in cols:
-                if name not in have:
-                    per_dialect = _DIALECT_TYPES.get((table, name))
-                    if per_dialect:
-                        ddl = per_dialect.get(engine.dialect.name, ddl)
+            per_dialect = _DIALECT_TYPES.get((table, name))
+            if per_dialect:
+                ddl = per_dialect.get(dialect, ddl)
+            ddl = _ddl_for(ddl, dialect)
+            # One statement per transaction, and a failure is logged and skipped: a single bad
+            # ADD COLUMN once took the whole site down with "type datetime does not exist",
+            # because the exception propagated out of startup. A missing column is a bug to fix;
+            # refusing to boot is an outage.
+            try:
+                with engine.begin() as conn:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
-                    added.append(f"{table}.{name}")
+                added.append(f"{table}.{name}")
+            except Exception as exc:  # noqa: BLE001
+                failed.append(f"{table}.{name}: {type(exc).__name__}: {str(exc)[:160]}")
+    if failed:
+        log.error("migrate: %d column(s) could not be added: %s", len(failed), "; ".join(failed))
+    migrate._failed = failed
     return added
+
+
+def _ddl_for(ddl: str, dialect: str) -> str:
+    """Translate the SQLite-flavoured DDL to what this database actually understands."""
+    if dialect == "postgresql":
+        # Postgres has no DATETIME; SQLite has no TIMESTAMPTZ, so this only ever narrows one way.
+        return ddl.replace("DATETIME", "TIMESTAMP")
+    return ddl
+
+
+def failed_additions() -> list[str]:
+    """The ALTERs that could not be applied on the last migrate() - shown by /api/version."""
+    return list(getattr(migrate, "_failed", []))
 
 
 if __name__ == "__main__":

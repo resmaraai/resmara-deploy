@@ -70,6 +70,14 @@ app.include_router(api_router, prefix="/api")
 
 
 @app.get("/api/version", include_in_schema=False)
+def _migrate_failures():
+    try:
+        from app.db.migrate import failed_additions
+        return failed_additions()
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def version():
     """Which commit is actually running here.
 
@@ -83,6 +91,10 @@ def version():
         "commit": (_os.getenv("RENDER_GIT_COMMIT") or _os.getenv("GIT_COMMIT") or "unknown")[:12],
         "branch": _os.getenv("RENDER_GIT_BRANCH") or "",
         "env": settings.ENV,
+        # Any column the last startup could not add. Empty is the healthy answer; a name here
+        # means a feature reads a column that does not exist yet, and it is visible from a curl
+        # instead of only in the dashboard's log.
+        "migrations_failed": _migrate_failures(),
         # Whether transactional mail is connected. No key, no address, just yes or no — so
         # "did the provider I just configured take effect?" is a curl, not a guess.
         "mail": _mail.mail_configured(),
