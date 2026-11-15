@@ -1,9 +1,9 @@
-/* Billing UI: one campaign for $49, or a prepaid pack of campaigns.
+/* Billing UI: one campaign for $49. Nothing else is for sale.
  *
- * A single campaign is bought outright; a pack is a prepaid balance of campaigns that shows up
- * as "campaigns left" and is spent one per build. The pack exists because the business is a
- * repeat one: an agent lists several homes a year and runs several campaigns on each, and
- * asking for a card every fortnight is what makes them stop.
+ * There is no pack and no subscription: a repeat customer buys another campaign, and the one
+ * click that starts it is "Another campaign" on the campaign card (same listing, fresh photos
+ * and new copy). A prepaid balance bought before packs were withdrawn is still honoured, which
+ * is the only reason "campaigns left" exists here.
  *
  * Loaded LAST (after homepage.js and app.js), so these same-named function declarations win
  * over the older credit versions instead of every screen being rewritten in place.
@@ -11,7 +11,6 @@
 'use strict';
 
 var BILLING_PRICE_CENTS = 4900;
-var BILLING_PACK = { size: 4, price_cents: 19600 };   // replaced by /api/billing/balance
 
 function billingMoney(cents) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
@@ -27,21 +26,17 @@ function creditBalance() { return Number(state.campaignsLeft) || 0; }
 function useCampaignCredit() { return creditBalance() > 0; }
 
 function creditQuote(quantity) {
-  var n = Number(quantity) || BILLING_PACK.size;
-  var unit = Math.round((BILLING_PACK.price_cents || 0) / (BILLING_PACK.size || 1));
+  var n = Number(quantity) || 1;
+  var unit = BILLING_PRICE_CENTS;
   return { count: n, unit: unit, total: unit * n, savings: 0 };
 }
 
 function creditCalculator(fromPricePage) {
-  var pack = BILLING_PACK || {};
-  var packLine = pack.size
-    ? `<p class="fine" style="margin:6px 0 0">Buying ${pack.size} at once (${billingMoney(pack.price_cents)})
-       keeps a pack of campaigns ready — one is spent each time you build, and nothing expires.</p>`
-    : '';
   return `<div class="notice"><b>${billingMoney(BILLING_PRICE_CENTS)} per campaign</b>
     <p class="fine" style="margin:6px 0 0">One 14-day listing campaign: branded posts, digital ad
-    creative, and Day 7 and Day 14 reports. No subscription — you pay when you build a campaign.
-    Meta ad spend is separate and paid to Meta.</p>${packLine}</div>`;
+    creative, and Day 7 and Day 14 reports. No subscription and no packs — you pay when you build a
+    campaign, and another campaign on the same listing is another ${billingMoney(BILLING_PRICE_CENTS)}.
+    Meta ad spend is separate and paid to Meta.</p></div>`;
 }
 
 // ---- the paywall ----------------------------------------------------------
@@ -70,14 +65,7 @@ async function startCampaignCheckout(boostId) {
 function showPaywall(boostId, detail) {
   var price = (detail && detail.price_cents) ? billingMoney(detail.price_cents)
     : billingMoney(BILLING_PRICE_CENTS);
-  var pack = (detail && detail.pack) ? detail.pack : BILLING_PACK;
   var left = Number(detail && detail.campaigns_left) || 0;
-  var packBlock = (pack && pack.size)
-    ? `<div class="notice"><b>Or buy ${pack.size} campaigns for ${esc(pack.price_label)}</b>
-        <p class="fine" style="margin:6px 0 0">${esc(billingMoney(pack.per_campaign_cents))} a campaign,
-        ready to use on this house or the next one. Each build spends one; nothing expires.</p>
-        <button class="alt" onclick="startPackCheckout()">Buy the ${pack.size}-campaign pack</button></div>`
-    : '';
   show(`<span class="eyebrow">CAMPAIGN CHECKOUT</span>
     <h2>This campaign is ${esc(price)}</h2>
     <p>${esc((detail && detail.message) || 'Buy the campaign to build its 14 days of posts.')}</p>
@@ -87,33 +75,20 @@ function showPaywall(boostId, detail) {
     <div class="modal-actions">
       <button class="alt" onclick="modal.close()">Not now</button>
       <button class="campaign-primary" onclick="startCampaignCheckout(${Number(boostId)})">Pay ${esc(price)} and build →</button>
-    </div>${packBlock}`);
+    </div>`);
 }
 
-/* Ask Stripe for a pack checkout and go there. The webhook is what adds the campaigns. */
-async function startPackCheckout() {
-  try {
-    var cfg = await RM.billingConfig();
-    if (cfg && cfg.pack) BILLING_PACK = cfg.pack;
-    if (!cfg || !cfg.enabled) { toast('Card payments are not switched on yet.'); return null; }
-    var res = await RM.packCheckout();
-    if (res && res.url) { window.location.href = res.url; return res.url; }
-    toast('Stripe did not return a checkout page.');
-  } catch (err) {
-    toast((err && err.message) || 'Could not start the checkout.');
-  }
-  return null;
-}
-
-/* Start the next campaign on the same house — the repeat purchase, one click. The new
- * campaign is a normal unpaid one, so it costs a credit or a fresh checkout; "again" can
- * never hand out a free campaign. */
+/* Start another campaign on the same listing — one click. Same house and brand, but a fresh
+ * campaign: the photos come along so any can be swapped, the calendar opens on a different photo
+ * and the copy is written new. It is a normal unpaid campaign, so it costs a checkout like any
+ * other; "again" can never hand out a free build. */
 async function campaignAgain(boostId) {
   if (boostId == null) return null;
   try {
     var res = await RM.campaignAgain(boostId);
     if (res && res.id) {
-      toast('New campaign started for ' + (res.address || 'this property') + '.');
+      toast('Another campaign started for ' + (res.address || 'this property') +
+            ' — same photos, new calendar and new copy. Swap any photo before you build.');
       // The campaign list caches its API read for ten seconds, so a brand-new campaign would be
       // invisible for exactly the moment the agent is looking for it. Reset that and re-read.
       try { liveCampaignsSyncedAt = 0; } catch (e) {}
@@ -160,7 +135,7 @@ async function myCredits() {
   // when the network is slow, which on a free instance is most of the time.
   $('#content').innerHTML = `<div class="welcome"><h1>Billing</h1>
       <p>One property campaign costs ${billingMoney(BILLING_PRICE_CENTS)}, paid when you build it.
-      Buy a pack and the campaigns wait for you — nothing expires.</p></div>
+      Another campaign on the same listing is another ${billingMoney(BILLING_PRICE_CENTS)}.</p></div>
     <section class="panel"><h2>Campaigns left</h2>
       <div id="billing-balance"><p class="fine">Checking your balance…</p></div></section>
     <section class="panel"><h2>Purchases</h2>
@@ -168,9 +143,10 @@ async function myCredits() {
     <section class="panel"><h2>Payment method</h2>
       <div id="billing-cards"><p class="fine">Checking your saved card…</p></div></section>
     <section class="panel"><h2>How it works</h2>
-      <p>You pay ${billingMoney(BILLING_PRICE_CENTS)} when you build a campaign, or buy a pack up
-      front and each build spends one campaign from it. Card details go to Stripe; Resmara never
-      stores them. Meta ad spend is separate and paid to Meta from your own ad account.</p></section>
+      <p>You pay ${billingMoney(BILLING_PRICE_CENTS)} when you build a campaign. A second campaign on
+      the same listing is another campaign at the same price, with its own photos and copy. Card
+      details go to Stripe; Resmara never stores them. Meta ad spend is separate and paid to Meta
+      from your own ad account.</p></section>
     <section class="panel"><h2>Your account</h2>
       <p class="fine">Closing your account removes your name, email and brand profile and stops it
       signing in. Purchases stay on record for accounting. This cannot be undone.</p>
@@ -182,17 +158,10 @@ async function myCredits() {
     RM.balance().then(function (res) {
       var left = Number((res && res.campaigns_left) || 0);
       state.campaignsLeft = left;
-      var pack = (res && res.pack) || BILLING_PACK;
-      if (pack && pack.size) BILLING_PACK = pack;
+      // Only a balance bought before packs were withdrawn ever shows here.
       balBox.innerHTML = (left > 0
-        ? `<p><b>${left} campaign${left === 1 ? '' : 's'} ready</b> — the next build uses one, no card needed.</p>`
-        : '<p class="fine">No prepaid campaigns. You can pay for one when you build it.</p>') +
-        (pack && pack.size
-          ? `<div class="notice"><b>${esc(pack.label)}</b>
-             <p class="fine" style="margin:6px 0 0">${esc(billingMoney(pack.per_campaign_cents))} a campaign.
-             Use them on this listing or the next — they do not expire.</p>
-             <button class="campaign-primary" onclick="startPackCheckout()">Buy ${pack.size} campaigns · ${esc(pack.price_label)}</button></div>`
-          : '');
+        ? `<p><b>${left} campaign${left === 1 ? '' : 's'} already paid for</b> — the next build uses one, no card needed.</p>`
+        : `<p class="fine">Nothing prepaid. You pay ${billingMoney(BILLING_PRICE_CENTS)} when you build a campaign.</p>`);
     }).catch(function () {
       balBox.innerHTML = '<p class="fine">Could not read your balance right now.</p>';
     });
@@ -218,12 +187,12 @@ async function myCredits() {
   var box = document.getElementById('billing-orders');
   if (!box) return;
   var rows = [];
-  var packs = [];
+  var legacy = [];
   try { rows = (await RM.orders()) || []; } catch (err) {
     box.innerHTML = '<p class="fine">Could not load your purchases. Check your connection and reload.</p>';
     return;
   }
-  try { packs = ((await RM.balance()) || {}).purchases || []; } catch (err) { packs = []; }
+  try { legacy = ((await RM.balance()) || {}).purchases || []; } catch (err) { legacy = []; }
   var date = function (v) {
     return v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
   };
@@ -232,11 +201,12 @@ async function myCredits() {
       return `<li><strong>${esc(what)}</strong>
         <span class="fine">${esc(o.amount_label || billingMoney(o.amount_cents))} · ${esc(o.status)} · ${date(o.paid_at || o.created_at)}</span></li>`;
     }).join('');
-  var packRows = packs.map(function (p) {
-      return `<li><strong>${esc(p.campaigns)}-campaign pack</strong>
+  // A pack bought before they were withdrawn is still a real payment; it stays on the receipt list.
+  var legacyRows = legacy.map(function (p) {
+      return `<li><strong>${esc(p.campaigns)}-campaign pack <span class="fine">(no longer sold)</span></strong>
         <span class="fine">${esc(p.amount_label || billingMoney(p.amount_cents))} · ${esc(p.status)} · ${date(p.paid_at || p.created_at)}</span></li>`;
     }).join('');
-  var allRows = campaignRows + packRows;
+  var allRows = campaignRows + legacyRows;
   box.innerHTML = allRows
     ? `<ul class="campaign-report-list">${allRows}</ul>`
     : '<p class="fine">No purchases yet. A campaign is charged when you build it.</p>';
@@ -254,6 +224,7 @@ async function myCredits() {
   var clean = location.pathname + (location.hash || '');
   window.history.replaceState({}, document.title, clean);
   if (state_ === 'success') {
+    // A legacy pack return (pack=1) has no campaign to open: it lands on the billing page.
     var isPack = params.get('pack') === '1';
     toast(isPack ? 'Payment received — your campaigns are ready to use.'
                  : 'Payment received — your campaign is unlocked.');

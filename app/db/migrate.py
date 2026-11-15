@@ -66,6 +66,9 @@ ADDITIONS = {
         # changes. A duplicate "boosts" key here would have silently dropped this entry, so
         # every boost column belongs in this one block.
         ("hidden", "BOOLEAN DEFAULT FALSE"),
+        # Which campaign this is for the listing (0 = the first). The build rotates the gallery
+        # and asks for new copy when a repeat campaign runs on the same house.
+        ("repeat_round", "INTEGER DEFAULT 0"),
     ],
     "orders": [
         ("user_id", "INTEGER"),

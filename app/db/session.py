@@ -133,6 +133,9 @@ class Boost(Base):
     # Hidden from the campaign list without destroying it: a finished campaign still has a
     # report worth reading, so "hide" is a flag on the row, not a delete.
     hidden = Column(Boolean, default=False)
+    # Which campaign this is for the listing: 0 for the first, 1 for the next one started from
+    # it, and so on. The build rotates the gallery and asks for new copy when it is above 0.
+    repeat_round = Column(Integer, default=0)
     # A campaign is bought, not credited: $49 at checkout sets these, and the build/launch
     # gates read them. Both null = nobody has paid for this campaign yet.
     paid_at = Column(DateTime(timezone=True), nullable=True)
@@ -339,6 +342,30 @@ class CostReceipt(Base):
     size = Column(Integer, nullable=True)
     data = Column(LargeBinary, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# --- Build room (who is doing what, and who has it claimed) ---
+# Adam works the front end, Dan works the back end, and both touch one repo. The failure mode
+# this table exists to prevent is two people editing the same thing at once, or a piece of work
+# going quiet because each thought the other had it. So a row carries an owner (claimed_by),
+# when it was claimed, what it is about (area), when it is due, and whether it has been tested.
+# A claim is a lock: nobody else may edit the row while a fresh claim is on it.
+class BuildroomTask(Base):
+    __tablename__ = "buildroom_tasks"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(240), nullable=False)
+    area = Column(String(24), nullable=False, default="front_end")   # front_end | back_end | both
+    status = Column(String(16), nullable=False, default="todo")      # todo | doing | review | done | blocked
+    notes = Column(Text, nullable=True)
+    claimed_by = Column(String(160), nullable=True)                  # the lock: an email or a name
+    claimed_at = Column(DateTime(timezone=True), nullable=True)
+    due_on = Column(Date, nullable=True)
+    tested_by = Column(String(160), nullable=True)
+    tested_at = Column(DateTime(timezone=True), nullable=True)
+    test_note = Column(Text, nullable=True)
+    created_by = Column(String(160), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
 
 Base.metadata.create_all(bind=engine)
 

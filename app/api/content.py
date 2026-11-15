@@ -235,6 +235,33 @@ def list_assets(boost_id: int, current_user: User = Depends(get_current_user), d
     } for a in assets]
 
 
+@router.delete("/assets/{asset_id}")
+def delete_asset(asset_id: int, current_user: User = Depends(get_current_user),
+                 db: Session = Depends(get_db)):
+    """Take one photo out of a campaign's gallery.
+
+    The point of a second campaign on the same listing is different photos, so the gallery a
+    repeat campaign inherits has to be editable: without a remove, the only way to change the
+    photo set was to start from an empty campaign and re-import. Posts already carrying the
+    photo keep their image; the next build plans from the photos that remain.
+    """
+    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+    if not asset or (not current_user.is_admin and asset.user_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Photo not found")
+    filename = asset.filename
+    boost_id = asset.boost_id
+    db.delete(asset)
+    db.add(Event(user_id=current_user.id, boost_id=boost_id, event_type="photo_removed",
+                 payload={"asset_id": asset_id, "filename": filename}))
+    db.commit()
+    if filename:
+        try:  # the disk copy is a courtesy; the row is the record
+            os.remove(os.path.join(UPLOAD_DIR, filename))
+        except OSError:
+            pass
+    return {"deleted": asset_id, "boost_id": boost_id}
+
+
 @router.post("/assets/{boost_id}/tag")
 async def tag_assets_endpoint(boost_id: int, current_user: User = Depends(get_current_user),
                               db: Session = Depends(get_db)):
@@ -266,9 +293,14 @@ def gallery(boost_id: int, current_user: User = Depends(get_current_user), db: S
     The photos panel used to list the uploads in upload order, so the strip on screen said nothing
     about the campaign. This is the same ranking the plan reads, with the room each photo shows.
     """
-    from app.services.content_engine import _photo_strength, galleries_ranked, room_family
+    from app.services.content_engine import (_photo_strength, gallery_offset, galleries_ranked,
+                                            room_family)
     boost = _owned_boost(boost_id, current_user, db)
-    photos = galleries_ranked(db.query(Asset).filter(Asset.boost_id == boost.id).all())
+    rows = db.query(Asset).filter(Asset.boost_id == boost.id).all()
+    # Same rotation the build will use, so the strip on screen is the order this campaign's
+    # calendar will follow — a repeat campaign opens on a different photo than the first one.
+    photos = galleries_ranked(rows, offset=gallery_offset(
+        getattr(boost, "repeat_round", 0) or 0, len([a for a in rows if a.kind == "photo"])))
     return {"boost_id": boost.id, "count": len(photos), "photos": [{
         "id": a.id, "url": a.url, "file": a.filename, "original_name": a.original_name,
         "room": a.room or "", "space": room_family(a), "score": a.social_score,

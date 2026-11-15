@@ -1,11 +1,13 @@
-"""Billing endpoints: buy one campaign for $49 or a prepaid pack of campaigns (Stripe
-Checkout), and the webhook that turns a completed payment into buildable campaigns.
+"""Billing endpoints: buy one campaign for $49 (Stripe Checkout), and the webhook that turns a
+completed payment into a buildable campaign.
 
-Two ways to pay, one gate. A single campaign is recorded in `orders` and mirrored on the boost
-as `paid_at`. A pack is recorded in `credit_purchases` and lands on `users.campaign_credits`;
-building an unpaid campaign spends one credit instead of asking for a card again, which is what
-makes a repeat customer possible. Everything that costs us model calls or Meta spend asks
-`require_paid()` first.
+One product, one price. A campaign is recorded in `orders` and mirrored on the boost as
+`paid_at`; everything that costs us model calls or Meta spend asks `require_paid()` first.
+
+A prepaid four-campaign pack used to be sold here. It was not wanted: a second campaign on the
+same listing is simply another $49 campaign, started with POST /boosts/{id}/again. The
+`credit_purchases` table and `users.campaign_credits` stay readable so a balance already paid
+for is still spendable, but no pack is offered and no pack checkout can be created.
 """
 from datetime import datetime
 
@@ -75,26 +77,11 @@ def require_paid(boost: Boost, user: User, db: Session) -> None:
         "message": "This campaign is %s. Buy it to build the posts." % billing.price_label(),
         "price_cents": billing.price_cents(),
         "checkout": "/api/billing/checkout",
-        # A repeat customer should be offered the pack, not one campaign at a time.
-        "pack": pack_offer(),
-        "checkout_pack": "/api/billing/checkout/pack",
+        # A credit left over from a pack bought before packs were withdrawn still builds this
+        # campaign; the number is reported so the paywall can say so instead of asking for a card.
         "campaigns_left": int(getattr(user, "campaign_credits", 0) or 0),
         "boost_id": boost.id,
     })
-
-
-def pack_offer() -> dict:
-    """The pack as the UI needs it: size, price, label, and whether it can be bought."""
-    size = billing.pack_size()
-    cents = billing.pack_price_cents(size)
-    return {
-        "size": size,
-        "price_cents": cents,
-        "price_label": billing.price_label(cents),
-        "label": billing.pack_label(size),
-        "per_campaign_cents": int(round(cents / float(size))),
-        "per_campaign_label": billing.price_label(int(round(cents / float(size)))),
-    }
 
 
 async def customer_for(user: User, db: Session) -> str:
@@ -135,7 +122,6 @@ def billing_config():
         "enabled": billing.billing_enabled(),
         "publishable_key": billing.publishable_key(),
         "product": "One property campaign",
-        "pack": pack_offer(),
     }
 
 
@@ -202,73 +188,22 @@ async def create_checkout(body: CheckoutRequest, current_user: User = Depends(ge
             "session_id": session.get("id"), "price_cents": order.amount_cents}
 
 
-@router.post("/billing/checkout/pack")
-async def create_pack_checkout(current_user: User = Depends(get_current_user),
-                               db: Session = Depends(get_db)):
-    """Start a Stripe Checkout for a prepaid pack of campaigns (the repeat purchase).
-
-    Reuses a still-open pack session so a double-click cannot create two payable pages, and
-    reuses the account's Customer so the saved card shows up instead of an empty form.
-    """
-    if not billing.billing_enabled():
-        raise HTTPException(status_code=503, detail=(
-            "Billing is not configured yet: set STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY "
-            "on the service."))
-    size = billing.pack_size()
-    cents = billing.pack_price_cents(size)
-
-    existing = (db.query(CreditPurchase)
-                .filter(CreditPurchase.user_id == current_user.id,
-                        CreditPurchase.status == "pending",
-                        CreditPurchase.checkout_url.isnot(None))
-                .order_by(CreditPurchase.id.desc()).first())
-    if existing:
-        return {"status": "pending", "url": existing.checkout_url,
-                "session_id": existing.stripe_session_id, "amount_cents": existing.amount_cents,
-                "campaigns": existing.campaigns}
-
-    customer_id = await customer_for(current_user, db)
-
-    try:
-        session = await billing.create_pack_checkout_session(
-            user_id=current_user.id, base_url=settings.PUBLIC_BASE_URL, size=size, cents=cents,
-            customer_id=customer_id, save_card=True)
-    except httpx.HTTPStatusError as e:
-        detail = "Stripe refused the checkout"
-        try:
-            detail = (e.response.json().get("error") or {}).get("message") or detail
-        except Exception:  # noqa: BLE001 - a non-JSON error body still has to surface
-            pass
-        raise HTTPException(status_code=502, detail=detail)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-    purchase = CreditPurchase(user_id=current_user.id, campaigns=size, amount_cents=cents,
-                              currency=billing.CURRENCY, status="pending",
-                              stripe_session_id=session.get("id"),
-                              checkout_url=session.get("url"))
-    db.add(purchase)
-    db.add(Event(user_id=current_user.id, event_type="pack_checkout_started",
-                 payload={"session_id": session.get("id"), "amount_cents": cents,
-                          "campaigns": size}))
-    db.commit()
-    return {"status": "pending", "url": session.get("url"), "session_id": session.get("id"),
-            "amount_cents": cents, "campaigns": size}
-
-
 @router.get("/billing/balance")
 def my_balance(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """How many campaigns this account has paid for and not yet built, plus the pack offer."""
+    """How many campaigns this account has already paid for and not yet built.
+
+    Packs are no longer sold, so the only way this is above zero is a pack bought before they
+    were withdrawn — the balance is still honoured, and reported honestly.
+    """
     rows = (db.query(CreditPurchase)
             .filter(CreditPurchase.user_id == current_user.id)
             .order_by(CreditPurchase.id.desc()).limit(20).all())
     return {
         "campaigns_left": int(getattr(current_user, "campaign_credits", 0) or 0),
-        "pack": pack_offer(),
         "single": {"price_cents": billing.price_cents(),
                    "price_label": billing.price_label()},
         "enabled": billing.billing_enabled(),
-        "checkout_pack": "/api/billing/checkout/pack",
+        # Packs bought before they were withdrawn, newest first, so the record is not lost.
         "purchases": [{
             "id": p.id, "campaigns": p.campaigns, "amount_cents": p.amount_cents,
             "amount_label": billing.price_label(p.amount_cents or 0), "status": p.status,
@@ -278,10 +213,19 @@ def my_balance(current_user: User = Depends(get_current_user), db: Session = Dep
     }
 
 
-def settle_pack(outcome: dict, db: Session) -> dict:
-    """Apply a pack payment: add its campaigns to the account's balance, once.
+# A pack session created before packs were withdrawn can still complete (a Checkout link lives
+# for 24 hours). Its metadata names its own size and price; these are the last values the offer
+# ever used, so a session with no metadata is still honoured rather than paid for and dropped.
+LEGACY_PACK_SIZE = 4
+LEGACY_PACK_CENTS = 19600
 
-    Idempotent on the purchase status, so a webhook Stripe retries cannot mint a second pack.
+
+def settle_pack(outcome: dict, db: Session) -> dict:
+    """Apply a legacy pack payment: add its campaigns to the account's balance, once.
+
+    Nothing creates a pack session any more; this keeps a completion that was already in flight
+    from taking money and giving nothing. Idempotent on the purchase status, so a webhook Stripe
+    retries cannot mint a second pack.
     """
     session_id = outcome.get("session_id")
     purchase = (db.query(CreditPurchase)
@@ -296,8 +240,8 @@ def settle_pack(outcome: dict, db: Session) -> dict:
                 return {"received": True, "status": "unmatched"}
             purchase = CreditPurchase(
                 user_id=user.id,
-                campaigns=outcome.get("campaigns") or billing.pack_size(),
-                amount_cents=outcome.get("amount_cents") or billing.pack_price_cents(),
+                campaigns=outcome.get("campaigns") or LEGACY_PACK_SIZE,
+                amount_cents=outcome.get("amount_cents") or LEGACY_PACK_CENTS,
                 currency=billing.CURRENCY, status="pending", stripe_session_id=session_id)
             db.add(purchase)
             db.flush()

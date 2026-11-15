@@ -20,10 +20,27 @@ async function refreshPhotoAssets(){
       ? ' on this campaign · '+rooms+' different space'+(rooms===1?'':'s')+' · in the order Resmara will use them, best first.'
       : ' uploaded. Resmara reads each one when it builds — that is when the spaces are labelled and the strongest shot leads.');
   const strip=document.querySelector('[data-photo-thumbs]');
+  // Every thumb carries its own remove: a second campaign on this listing is meant to run
+  // different photos, and without this the inherited gallery could only grow.
   if(strip)strip.innerHTML=photos.map((a,i)=>'<figure class="photo-thumb'+(a.usable===false?' unusable':'')+'">'
     +'<img src="'+esc(a.url)+'" alt="'+esc(a.room||a.original_name||'Listing photo')+'" loading="lazy">'
+    +'<button type="button" class="photo-remove" title="Remove this photo from this campaign" aria-label="Remove photo '+esc(a.room||a.original_name||String(i+1))+'" onclick="removeCampaignPhoto('+Number(a.id)+',this)">×</button>'
     +'<figcaption><b>'+(i+1)+'</b>'+(a.room?' '+esc(a.room):'')+(a.score!=null?' · '+esc(String(a.score)):'')+'</figcaption></figure>').join('');
  }catch(e){node.textContent='Could not read this campaign’s photos. Refresh and try again.'}
+}
+async function removeCampaignPhoto(assetId,button){
+ const boostId=reviewCampaignBoostId();
+ if(boostId==null||!window.RM||!window.confirm('Remove this photo from this campaign? The listing and any other campaign keep it.'))return;
+ if(button)button.disabled=true;
+ const status=document.querySelector('[data-photo-status]');
+ try{
+  await RM.deletePhoto(assetId);
+  await refreshPhotoAssets();
+  if(status)status.textContent='Photo removed. Rebuild the campaign and the calendar is re-planned from the photos that are left.';
+ }catch(e){
+  if(button)button.disabled=false;
+  if(status)status.textContent=(e&&e.message)||'Could not remove that photo.';
+ }
 }
 /* Photos the engine can actually use. Posts carry an image only when the plan names an
  * Asset, so this panel is the difference between a photo calendar and a text one. */

@@ -271,14 +271,41 @@ tr.testrow td{background:#fbfdff;color:#849bae}
     <div class="triage" id="triage"></div>
 
     <details class="card sec" data-sec="buildroom" id="sec-buildroom">
-      <summary><h2>Build room</h2><span class="secsum">the design bench — one click, no second bookmark</span><span class="chev">›</span></summary>
+      <summary><h2>Build room</h2><span class="secsum" id="sum-buildroom">…</span><span class="chev">›</span></summary>
       <div class="body">
-        <p class="hint" style="margin-top:0">Campaign concepts, listings and creatives are worked out in the build room.
-          It runs on its own host and refuses to be framed (<code>X-Frame-Options: SAMEORIGIN</code>), so the button
-          opens it in a tab rather than inside this page.</p>
-        <p style="margin:12px 0 0"><a id="openBuildroom" href="https://resmara-buildroom.adambapdigital.chatgpt.site/"
-           target="_blank" rel="noopener"
-           style="display:inline-block;padding:10px 16px;border-radius:10px;background:var(--blue);color:#fff;text-decoration:none;font-weight:600">Open the build room ↗</a></p>
+        <div class="hint" style="margin:0 0 12px">Who is on what, and who has it claimed. Adam works the front end
+          (<code>static/</code>), Dan works the back end (<code>app/</code>, <code>render.yaml</code>). A claim is a lock:
+          while somebody holds a task, anyone else's edit is refused and the refusal names the holder and how long they
+          have had it. It lives here now — the ChatGPT Sites tracker is retired.</div>
+        <div id="brSquares"><div class="hint">Reading the board…</div></div>
+
+        <h3 style="margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)">Add a task</h3>
+        <div class="row" id="brForm">
+          <div style="flex:3 1 260px"><label for="brTitle">What needs doing</label><input id="brTitle" placeholder="Homepage hero: new headline and a wider photo"></div>
+          <div style="flex:0 0 150px"><label for="brArea">Which half</label>
+            <select id="brArea">
+              <option value="front_end">Front end (static/)</option>
+              <option value="back_end">Back end (app/, scripts/)</option>
+              <option value="both">Both halves</option>
+            </select></div>
+          <div style="flex:0 0 140px"><label for="brDue">Due</label><input type="date" id="brDue"></div>
+          <div style="flex:0 0 170px"><label for="brWho">Who has it</label><input id="brWho" placeholder="leave blank: nobody yet"></div>
+          <div style="flex:0 0 auto"><label>&nbsp;</label><button id="brAdd">Add it</button></div>
+        </div>
+        <div class="msg" id="brMsg"></div>
+
+        <div class="brfilters" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+          <button class="chip brchip" data-brf="open" aria-pressed="true">Still open</button>
+          <button class="chip brchip" data-brf="unclaimed" aria-pressed="false">Nobody has it</button>
+          <button class="chip brchip" data-brf="claimed" aria-pressed="false">Claimed</button>
+          <button class="chip brchip" data-brf="blocked" aria-pressed="false">Blocked</button>
+          <button class="chip brchip" data-brf="all" aria-pressed="false">Everything</button>
+        </div>
+        <div class="scrollx"><table id="brTable">
+          <thead><tr><th>task</th><th>half</th><th>status</th><th>claimed by</th><th>due</th><th>tested</th><th></th></tr></thead>
+          <tbody><tr><td colspan="7" class="hint">Loading…</td></tr></tbody>
+        </table></div>
+        <div class="hint" id="brCount" style="margin-top:6px"></div>
       </div>
     </details>
 
@@ -327,10 +354,10 @@ tr.testrow td{background:#fbfdff;color:#849bae}
 
         <h3 style="margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)">Who has paid, and who came back</h3>
         <div class="scrollx"><table id="finCustomers">
-          <thead><tr><th>account</th><th>campaigns</th><th>packs</th><th>paid</th><th>last payment</th></tr></thead>
-          <tbody><tr><td colspan="5" class="hint">Loading…</td></tr></tbody>
+          <thead><tr><th>account</th><th>campaigns</th><th>paid</th><th>last payment</th></tr></thead>
+          <tbody><tr><td colspan="4" class="hint">Loading…</td></tr></tbody>
         </table></div>
-        <div class="hint" style="margin-top:8px">Two or more payments is the repeat business the pricing depends on. A pack counts as one payment that buys several campaigns.</div>
+        <div class="hint" style="margin-top:8px">Two or more paid campaigns is the repeat business the pricing depends on — a second campaign on the same listing counts.</div>
       </div>
     </details>
 
@@ -530,16 +557,22 @@ const WHY = {
   'subscriptions running': 'Repeating costs with no end date. Ended ones stop counting.',
   'next renewal': 'The soonest subscription charge still to come.',
   'receipts on file': 'Costs with a photo or PDF attached. The rest have none yet.',
+  // build room — the claim board, one square per question a person asks of it
+  'still open': 'Tasks on the board not marked done, whatever their owner.',
+  'claimed by somebody': 'Open tasks a person is holding right now — a fresh claim, under 24 hours old.',
+  'nobody has it': 'Open tasks with no fresh claim: the ones that go quiet if nobody picks them up.',
+  'blocked': 'Open tasks marked blocked, meaning something outside the task is stopping it.',
+  'overdue': 'Open tasks whose due date has already passed.',
+  'tested': 'Tasks with a person recorded as having tested the change.',
   // finance — every square on that tab names what it counts
   'hosting per month': 'Web service, database, publisher cron and domain, added up.',
   'our cost per sale': 'Stripe’s cut, model cost, photo storage, hosting share and the refund buffer for one campaign.',
   'we keep per campaign': 'What is left of one sale after it is delivered. Not profit yet: acquisition comes out of this.',
   'sales to cover hosting': 'How many campaigns a month pay the fixed bill, before a single customer is bought.',
   'price for target margin': 'The price that would leave the target margin at today’s volume. A floor, not a recommendation.',
-  'revenue collected': 'Paid orders plus paid packs, as Stripe reported them. Refunds are not netted out here.',
-  'customers who paid': 'Accounts with at least one paid campaign or pack.',
+  'revenue collected': 'Paid campaigns, as Stripe reported them. Refunds are not netted out here.',
+  'customers who paid': 'Accounts with at least one paid campaign.',
   'repeat customers': 'Accounts with two or more payments — the repeat business the price relies on.',
-  'prepaid campaigns unspent': 'Campaigns bought in a pack and not yet built. Each one is a build we already have the money for.',
   'one agent, one year': 'Contribution from an agent buying the assumed number of campaigns a year.',
   'one agent, all years': 'That annual contribution times the assumed years they stay. Acquisition is budgeted against this.',
   'most we may pay per customer': 'Lifetime contribution divided by three: $1 of acquisition has to buy $3 of contribution.',
@@ -917,6 +950,8 @@ async function boot(){
   $('logout').classList.remove('hidden');
   $('tools').classList.remove('hidden');
   $('who').textContent = me.email + (me.is_admin ? ' · admin' : ' · NOT admin');
+  // The build room records who claimed a task; "who" is this signed-in operator.
+  window.resmaraMe = me;
   if (!me.is_admin) {
     // A logged-in non-admin used to see four empty sections and a 403 buried in one of them.
     // Say it at the top: this is refused, not empty.
@@ -1122,7 +1157,193 @@ if ($('cAdd')) {
 }
 
 
-function refreshAll(){ loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); loadFinance(); }
+function refreshAll(){ loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); loadFinance(); loadBuildroom(); }
+
+// ── build room ────────────────────────────────────────────────────────────────────
+// Who is working on what, and who has it claimed. The server owns the lock: a claimed task
+// refuses another person's edit with 409 naming the holder, and this only paints that answer.
+// Two people share this board (front end / back end), so "who" is the signed-in account.
+let brRows = [], brSummary = null, brFilter = 'open';
+
+function brMe(){
+  return (window.resmaraMe && window.resmaraMe.email) || 'operator';
+}
+function brNote(text, ok){
+  const m = $('brMsg'); if (!m) return;
+  m.className = 'msg ' + (ok ? 'ok' : 'bad');
+  m.textContent = text;
+  clearTimeout(brNote._t);
+  brNote._t = setTimeout(() => { m.textContent = ''; m.className = 'msg'; }, 8000);
+}
+// A 409 from the server carries the holder's name; showing the raw JSON would read as a bug.
+function brExplain(err){
+  const raw = String(err && err.message || '');
+  try {
+    const d = JSON.parse(raw);
+    if (d && d.held_by) {
+      const age = d.age_hours != null ? (d.age_hours < 24 ? Math.round(d.age_hours) + 'h' : Math.round(d.age_hours / 24) + 'd') : '?';
+      return d.held_by + ' has this claimed (' + age + ' ago). Release it, or take it over — a claim older than 24h is stale and can be taken.';
+    }
+    if (d && d.why) return d.why;
+  } catch (e) { /* not JSON: fall through to the text */ }
+  return raw || 'That did not save.';
+}
+function brAge(h){
+  if (h == null) return '';
+  if (h < 1) return 'minutes';
+  if (h < 24) return Math.round(h) + 'h';
+  return Math.round(h / 24) + 'd';
+}
+
+async function loadBuildroom(){
+  try {
+    const d = await api('/api/admin/buildroom');
+    brRows = d.items || [];
+    brSummary = d.summary || {};
+    renderBuildroom();
+  } catch (err) {
+    brSummary = null;
+    const sq = $('brSquares');
+    if (sq) sq.innerHTML = '<div class="msg bad">Could not read the board — ' + esc(brExplain(err)) + '</div>';
+    const s = $('sum-buildroom'); if (s) s.textContent = 'unavailable';
+  }
+}
+
+function renderBuildroom(){
+  const s = brSummary || {};
+  const sq = $('brSquares'); if (!sq) return;
+  const owners = Object.keys(s.by_owner || {});
+  sq.innerHTML = '<div class="grid">' +
+    stat(String(s.open || 0), 'still open', 'wide',
+         (s.tasks || 0) + ' task' + (s.tasks === 1 ? '' : 's') + ' on the board in total') +
+    stat(String(s.claimed || 0), 'claimed by somebody', '', owners.length ? owners.join(' & ') : 'nobody yet') +
+    stat(String(s.unclaimed || 0), 'nobody has it', '') +
+    stat(String(s.blocked || 0), 'blocked', '') +
+    stat(String(s.overdue || 0), 'overdue', '') +
+    stat(String(s.tested || 0), 'tested', '', (s.untested_and_done || 0) + ' done but untested') +
+    '</div>' +
+    (s.stale_claims ? '<div class="hint" style="margin-top:8px">' + s.stale_claims +
+      ' stale claim(s) — held for more than ' + (s.stale_after_hours || 24) + 'h, so anybody can take them over.</div>' : '');
+
+  const rows = brRows.filter(t => {
+    if (brFilter === 'all') return true;
+    if (brFilter === 'blocked') return t.status === 'blocked';
+    if (brFilter === 'claimed') return t.status !== 'done' && t.claimed_by && t.claim_fresh;
+    if (brFilter === 'unclaimed') return t.status !== 'done' && !(t.claimed_by && t.claim_fresh);
+    return t.status !== 'done';
+  });
+
+  const tb = $('brTable').querySelector('tbody');
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="7"><span class="hint">' +
+      (brFilter === 'all' ? 'Nothing on the board yet. Add the first task above — the one you are on right now is a good start.'
+                          : 'Nothing in this view.') + '</span></td></tr>';
+  } else {
+    const me = brMe().toLowerCase();
+    tb.innerHTML = rows.map(t => {
+      const mine = t.claimed_by && t.claimed_by.toLowerCase() === me;
+      const claimCell = t.claimed_by
+        ? '<b>' + esc(t.claimed_by) + '</b><div class="tiny">' + esc(brAge(t.claim_age_hours)) + ' ago' +
+          (t.claim_fresh ? '' : ' · stale') + (mine ? ' · you' : '') + '</div>'
+        : '<span class="tiny">nobody</span>';
+      const testedCell = t.tested_at
+        ? esc(t.tested_by || 'yes') + '<div class="tiny">' + esc(String(t.tested_at).slice(0, 10)) + '</div>'
+        : '<span class="tiny">not tested</span>';
+      const statusSel = '<select class="tiny" data-brstatus="' + t.id + '">' +
+        ['todo', 'doing', 'review', 'done', 'blocked'].map(v =>
+          '<option value="' + v + '"' + (t.status === v ? ' selected' : '') + '>' + v + '</option>').join('') +
+        '</select>';
+      // Who may do what is the server's call; this only offers the move that is open to you.
+      // A fresh claim held by somebody else offers nothing — the lock is the point. A stale one
+      // offers "take over", because its holder has gone quiet and waiting is worse than asking.
+      const actions =
+        (!t.claimed_by
+          ? '<button class="ghost tiny" data-brclaim="' + t.id + '">claim</button>'
+          : mine
+            ? '<button class="ghost tiny" data-brrelease="' + t.id + '">release</button>'
+            : (t.claim_fresh
+                ? '<span class="tiny" title="' + esc(t.claimed_by) + ' has this claimed. Editing it is refused until they release it or the claim goes stale.">held</span>'
+                : '<button class="ghost tiny" data-brtake="' + t.id + '">take over</button>')) +
+        ' <button class="ghost tiny" data-brtest="' + t.id + '">tested</button>' +
+        ' <button class="ghost tiny" data-brdel="' + t.id + '">delete</button>';
+      return '<tr>' +
+        '<td><b>' + esc(t.title) + '</b>' +
+          (t.notes ? '<div class="tiny" title="' + esc(t.notes) + '">' + esc(t.notes.split('\n').slice(-1)[0].slice(0, 90)) + '</div>' : '') +
+          '</td>' +
+        '<td class="nw">' + esc(t.area === 'front_end' ? 'front end' : (t.area === 'back_end' ? 'back end' : 'both')) + '</td>' +
+        '<td>' + statusSel + '</td>' +
+        '<td>' + claimCell + '</td>' +
+        '<td class="nw">' + esc(t.due_on || '—') + (t.overdue ? '<div class="tiny bad">overdue</div>' : '') + '</td>' +
+        '<td>' + testedCell + '</td>' +
+        '<td class="tiny">' + actions + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+  const cnt = $('brCount');
+  if (cnt) cnt.textContent = rows.length + ' of ' + brRows.length + ' task(s) shown · ' + brFilter.replace('_', ' ');
+  const sum = $('sum-buildroom');
+  if (sum) sum.textContent = (s.open || 0) + ' open · ' + (s.claimed || 0) + ' claimed · ' +
+    (s.unclaimed || 0) + ' nobody has' + (s.overdue ? ' · ' + s.overdue + ' overdue' : '');
+}
+
+async function brAct(id, path, body){
+  try {
+    await api('/api/admin/buildroom/' + id + path, { method: 'POST', body: body || { by: brMe() } });
+    await loadBuildroom();
+    return true;
+  } catch (err) { brNote(brExplain(err), false); return false; }
+}
+
+async function brAdd(){
+  const title = ($('brTitle').value || '').trim();
+  if (!title) { brNote('A task needs a title.', false); return; }
+  try {
+    await api('/api/admin/buildroom', { method: 'POST', body: {
+      title: title,
+      area: $('brArea').value,
+      due_on: $('brDue').value || null,
+      claimed_by: ($('brWho').value || '').trim() || null,
+      created_by: brMe(),
+    }});
+    $('brTitle').value = ''; $('brDue').value = ''; $('brWho').value = '';
+    brNote('Added to the board.', true);
+    await loadBuildroom();
+  } catch (err) { brNote(brExplain(err), false); }
+}
+
+async function brStatus(id, status){
+  try {
+    await api('/api/admin/buildroom/' + id, { method: 'PATCH', body: { status: status, who: brMe() } });
+    await loadBuildroom();
+  } catch (err) {
+    brNote(brExplain(err), false);
+    await loadBuildroom();   // put the select back to what the server actually holds
+  }
+}
+
+$('brAdd').addEventListener('click', brAdd);
+$('brTable').addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-brstatus]');
+  if (sel) brStatus(sel.dataset.brstatus, sel.value);
+});
+$('brTable').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.brclaim) brAct(b.dataset.brclaim, '/claim');
+  else if (b.dataset.brtake) brAct(b.dataset.brtake, '/claim', { by: brMe(), force: true });
+  else if (b.dataset.brrelease) brAct(b.dataset.brrelease, '/release', { by: brMe(), force: true });
+  else if (b.dataset.brtest) brAct(b.dataset.brtest, '/tested');
+  else if (b.dataset.brdel) {
+    if (!confirm('Delete this task from the board? The claim lock goes with it.')) return;
+    api('/api/admin/buildroom/' + b.dataset.brdel, { method: 'DELETE' })
+      .then(loadBuildroom)
+      .catch(err => brNote(brExplain(err), false));
+  }
+});
+document.querySelectorAll('.brchip').forEach(chip => chip.addEventListener('click', () => {
+  document.querySelectorAll('.brchip').forEach(c => c.setAttribute('aria-pressed', String(c === chip)));
+  brFilter = chip.dataset.brf;
+  renderBuildroom();
+}));
 
 // ── finance ───────────────────────────────────────────────────────────────────────
 // The business in money. Every figure is computed server-side in app/api/finance.py so this tab
@@ -1153,7 +1374,7 @@ function renderFinance(){
   const u = d.unit, a = d.actuals, f = d.fixed, b = d.breakeven, v = d.volume;
   sq.innerHTML = '<div class="grid">' +
     stat(d.price.label, 'price per campaign', '',
-         d.price.pack_size + ' for ' + d.price.pack_label + ' · ' + usd(d.price.per_campaign_in_pack) + ' each') +
+         'one campaign, paid when it is built · no subscription, no packs') +
     stat(usd(f.total_monthly_usd), 'hosting per month', '', usd(f.annual_usd) + ' a year') +
     stat(usd(u.costs_usd), 'our cost per sale', '',
          'delivery ' + usd(u.delivery_usd) + ' + hosting ' + usd(u.hosting_usd) + ' + refund buffer') +
@@ -1165,13 +1386,11 @@ function renderFinance(){
     stat(d.price_floor.at_current_volume_usd === null ? '—' : usd(d.price_floor.at_current_volume_usd),
          'price for target margin', '', d.price_floor.target_margin_pct + '% after delivery') +
     stat(usd(a.gross_usd), 'revenue collected', '',
-         a.paid_campaigns + ' campaign(s), ' + a.paid_packs + ' pack(s), ' + usd(a.gross_last_30d_usd) + ' in 30 days') +
+         a.paid_campaigns + ' campaign(s) paid, ' + usd(a.gross_last_30d_usd) + ' in 30 days') +
     stat(String(a.customers), 'customers who paid', '',
          a.repeat_customers + ' came back more than once') +
     stat(String(a.repeat_customers), 'repeat customers', a.repeat_customers ? 'good' : '',
          a.repeat_rate_pct + '% of buyers') +
-    stat(String(a.credits_outstanding), 'prepaid campaigns unspent', '',
-         'money in the bank, work still owed') +
     stat(d.capacity.storage_mode === 'r2' ? 'R2' : 'Database', 'photo storage',
          d.capacity.storage_mode === 'r2' ? 'good' : '', d.capacity.r2_note) +
     stat(d.capacity.asset_mb + ' MB', 'photos kept in the database', '',
@@ -1205,8 +1424,8 @@ function renderFinance(){
   if (tb) {
     tb.innerHTML = (d.customers && d.customers.length)
       ? d.customers.map(c => '<tr><td>' + esc(c.email) + '</td><td>' + c.campaigns + '</td><td>' +
-          c.packs + '</td><td>' + usd(c.paid_usd) + '</td><td>' + finDate(c.last_paid) + '</td></tr>').join('')
-      : '<tr><td colspan="5" class="hint">Nobody has paid yet — the model above is what the pricing will do when they do.</td></tr>';
+          usd(c.paid_usd) + '</td><td>' + finDate(c.last_paid) + '</td></tr>').join('')
+      : '<tr><td colspan="4" class="hint">Nobody has paid yet — the model above is what the pricing will do when they do.</td></tr>';
   }
 
   const s = $('sum-finance');

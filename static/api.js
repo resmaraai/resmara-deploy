@@ -396,8 +396,10 @@
     return request('/api/billing/balance');
   }
 
-  function packCheckout() {
-    return json('/api/billing/checkout/pack', 'POST', {});
+  /* Take one photo out of a campaign's gallery. A repeat campaign on the same listing is
+   * supposed to run different photos, so the gallery it inherits has to be editable. */
+  function deletePhoto(assetId) {
+    return json('/api/content/assets/' + segment(assetId), 'DELETE');
   }
 
   function campaignAgain(boostId) {
@@ -538,7 +540,7 @@
     orders: orders,
     boostBilling: boostBilling,
     balance: balance,
-    packCheckout: packCheckout,
+    deletePhoto: deletePhoto,
     campaignAgain: campaignAgain,
     launch: launch,
     publishStatus: publishStatus,
