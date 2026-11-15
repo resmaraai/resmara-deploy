@@ -654,6 +654,10 @@ html.dark .goal-card .goal-step.alert small{color:#ffe1d3}
 .side-switch i{background:rgba(255,255,255,.25)}
 html.dark .theme-switch:not(.side-switch){background:#13283a;color:#d6e6f1}
 @media(max-width:900px){.side-switch{display:none}}
+.rel-line{grid-template-columns:minmax(220px,1fr) 230px 150px 130px!important}
+.rel-body{flex:1;color:#12354d;font-size:14px}.rel-body ul{margin:6px 0 10px;padding-left:18px}.rel-body b{display:block;margin-top:6px;color:#b23c08}
+a.cb{text-decoration:none;display:inline-block;white-space:nowrap;align-self:flex-start}
+html.dark .rel-body{color:#d6e6f1}
 </style>
 </head>
 <body>
@@ -664,6 +668,7 @@ html.dark .theme-switch:not(.side-switch){background:#13283a;color:#d6e6f1}
       <a href="#overview" data-go="overview">Overview</a>
       <div class="nav-group">Build</div>
       <a href="#sec-buildroom" data-go="buildroom">Build room</a>
+      <a href="#sec-releases" data-go="releases">Releases</a>
       <div class="nav-group">Agents</div>
       <a href="#sec-users" data-go="users">Accounts</a>
       <a href="#sec-support" data-go="support">Support</a>
@@ -917,6 +922,15 @@ html.dark .theme-switch:not(.side-switch){background:#13283a;color:#d6e6f1}
       <div id="connHero"></div>
       <div class="attn" id="attn-advertising"></div>
       <div class="body" id="advertisingBody"></div>
+    </details>
+
+    <details class="card sec" data-sec="releases" id="sec-releases">
+      <summary><h2>Releases</h2><span class="secsum" id="sum-releases">…</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div id="relHero"></div>
+        <div class="br-card" style="margin-top:0"><h3 class="card-title">Waiting to go live</h3><div id="relOpen" class="hint">Loading…</div></div>
+        <div class="br-card"><h3 class="card-title">Live on resmara.com</h3><div id="relDone" class="hint">Loading…</div></div>
+      </div>
     </details>
 
     <details class="card sec" data-sec="settings" id="sec-settings">
@@ -1766,7 +1780,7 @@ function paintWebsite(){
 // must refuse a section's data to anyone without access to it; hiding it here is only the look.
 const ACCESS_NOTE = 'Settings is open to everyone for their own appearance; only super admins see the team.';
 const ACCESS = [
-  ['build', 'Build', 'Build room', ['buildroom']],
+  ['build', 'Build', 'Build room, Releases', ['buildroom', 'releases']],
   ['agents', 'Agents', 'Accounts, Support, Connections', ['users', 'support', 'advertising']],
   ['campaigns', 'Campaigns', 'Campaigns and their posts', ['campaigns']],
   ['money', 'Money', 'Finance, Start-up costs', ['finance', 'costs']],
@@ -1860,6 +1874,54 @@ function setTheme(t){ document.documentElement.classList.toggle('dark', t === 'd
   document.querySelectorAll('.theme-switch').forEach(b => b.setAttribute('aria-checked', String(t === 'dark'))); }
 document.addEventListener('click', e => { if (e.target.closest('.theme-switch')) setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark'); });
 setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+
+// ── releases: what's waiting to go live, and what went live ──
+// Needs GET /api/admin/releases from the back end (reads the GitHub pull requests and the Render deploys).
+let relData = null; const relOpenSet = new Set();
+async function loadReleases(){
+  try { relData = await api('/api/admin/releases'); } catch (err) { relData = null; }
+  paintReleases();
+}
+function relStatus(r){
+  if (r.state === 'open') return '<span class="cost-chip bad">Waiting on ' + esc(r.waiting_on || 'Dan') + ' to merge</span>';
+  if (r.deploy === 'live') return '<span class="cost-chip ok">Live</span>';
+  if (r.deploy === 'failed') return '<span class="cost-chip bad">Deploy failed</span>';
+  return '<span class="cost-chip on">Merged · deploying</span>';
+}
+function relRow(r){
+  const open = relOpenSet.has(String(r.number));
+  return '<div class="cost' + (open ? ' open' : '') + '"><div class="cost-line rel-line">' +
+    '<div class="cost-main"><b>#' + esc(r.number) + ' · ' + esc(r.title) + '</b><span>by ' + esc(r.author || '') + ' · ' + esc(r.side || '') + '</span></div>' +
+    '<div>' + relStatus(r) + '</div>' +
+    '<div class="cost-meta"><span>' + (r.state === 'open' ? 'Opened' : 'Live') + '</span><span>' + esc(when(r.state === 'open' ? r.opened_at : (r.live_at || r.merged_at))) + '</span></div>' +
+    '<button class="tk-toggle" data-relopen="' + esc(r.number) + '">' + (open ? 'Close' : 'What’s in it') + '</button></div>' +
+    '<div class="cost-actions' + (open ? '' : ' hidden') + '"><div class="rel-body">' +
+      ((r.summary || []).length ? '<ul>' + r.summary.map(s => '<li>' + esc(s) + '</li>').join('') + '</ul>' : '<p class="hint">No summary.</p>') +
+      ((r.backend_tasks || []).length ? '<b>Back end still needed</b><ul>' + r.backend_tasks.map(s => '<li>' + esc(s) + '</li>').join('') + '</ul>' : '') +
+    '</div><a class="cb light" href="' + esc(r.url) + '" target="_blank" rel="noopener">Open on GitHub</a></div></div>';
+}
+function paintReleases(){
+  const h = $('relHero'); if (!h) return;
+  if (!relData) {
+    h.innerHTML = '';
+    ['relOpen', 'relDone'].forEach(id => { $(id).className = 'hint'; $(id).textContent = 'Appears once the back end reads the pull requests from GitHub.'; });
+    navBadge('releases', 0); return;
+  }
+  const openR = (relData.open || []), doneR = (relData.recent || []);
+  const lastLive = doneR.find(r => r.deploy === 'live');
+  h.innerHTML = hero({eyebrow: 'Releases', big: openR.length ? esc(openR.length) + ' waiting to go live' : 'Everything is live',
+    small: lastLive ? 'last update went live ' + esc(when(lastLive.live_at || lastLive.merged_at)) : '',
+    steps: [
+      {n: openR.length, l: 'Waiting to merge', s: 'pull requests open', cls: openR.length ? 'alert' : ''},
+      {n: doneR.filter(r => r.deploy !== 'live' && r.deploy !== 'failed').length, l: 'Deploying', s: 'merged, going live'},
+      {n: doneR.filter(r => r.deploy === 'failed').length, l: 'Failed deploys', s: 'need a look', cls: doneR.some(r => r.deploy === 'failed') ? 'alert' : ''},
+      {n: doneR.filter(r => r.deploy === 'live').length, l: 'Went live', s: 'in the last 30 days', cls: 'good'}]});
+  $('relOpen').className = ''; $('relOpen').innerHTML = openR.length ? '<div class="cost-list">' + openR.map(relRow).join('') + '</div>' : '<div class="attn-ok">✓ Nothing waiting.</div>';
+  $('relDone').className = ''; $('relDone').innerHTML = doneR.length ? '<div class="cost-list">' + doneR.map(relRow).join('') + '</div>' : '<div class="hint">Nothing yet.</div>';
+  navBadge('releases', openR.length);
+  const s = $('sum-releases'); if (s) s.textContent = openR.length ? openR.length + ' waiting to go live' : 'everything is live';
+}
+document.addEventListener('click', e => { const t = e.target.closest('[data-relopen]'); if (!t) return; const n = t.dataset.relopen; relOpenSet.has(n) ? relOpenSet.delete(n) : relOpenSet.add(n); paintReleases(); });
 function paintFinanceHero(){
   const el = $('finOrders'); if (!el || !lastMetrics) return;
   const rev = lastMetrics.revenue || {}; if (rev.error) { el.innerHTML = ''; return; }
@@ -2005,7 +2067,7 @@ async function loadMetrics(){
     $('advertisingBody').innerHTML = a.error ? groupError('connections', a.error) :
       '<div class="br-card" style="margin-top:0"><h3 class="card-title">Every connection</h3><div id="connList" class="hint">Loading…</div></div>';
     loadConnections();
-    loadCampaigns(); loadActivity(); loadSystemCheck(); loadMarketing(); loadWebsite(); loadTeam();
+    loadCampaigns(); loadActivity(); loadSystemCheck(); loadMarketing(); loadWebsite(); loadTeam(); loadReleases();
 
     $('activityBody').innerHTML = act.error ? groupError('activity', act.error) :
       sparkline(act.per_day) + '<div class="hint" style="margin-top:8px">Click a day to see what happened.</div>';
@@ -2940,7 +3002,7 @@ boot();
 /* One section at a time. The sidebar picks a view; Overview shows the pulse and a card per section. */
 (function(){
   document.body.classList.add('views');
-  const GROUP={buildroom:'Build',users:'Agents',growth:'Business',marketing:'Business',website:'Business',support:'Agents',advertising:'Agents',campaigns:'Campaigns',finance:'Money',costs:'Money',health:'System',activity:'System',settings:'System'};
+  const GROUP={buildroom:'Build',releases:'Build',users:'Agents',growth:'Business',marketing:'Business',website:'Business',support:'Agents',advertising:'Agents',campaigns:'Campaigns',finance:'Money',costs:'Money',health:'System',activity:'System',settings:'System'};
   function paintOverview(){
     const box=document.getElementById('overviewList'); if(!box) return;
     box.innerHTML=[...document.querySelectorAll('#index a[data-go]')].filter(a=>a.dataset.go!=='overview').map(a=>{
