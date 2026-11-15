@@ -1907,7 +1907,7 @@ function paintReleases(){
     ['relOpen', 'relDone'].forEach(id => { $(id).className = 'hint'; $(id).textContent = 'Appears once the back end reads the pull requests from GitHub.'; });
     navBadge('releases', 0); return;
   }
-  if relData && relData.connected === false {
+  if (relData && relData.connected === false) {
     h.innerHTML = hero({eyebrow: 'Releases', big: 'Not connected', small: (relData.problems || [])[0] || 'the service has no GitHub or Render credential'});
     ['relOpen', 'relDone'].forEach(id => { const el = $(id); if (!el) return; el.className = 'hint';
       el.textContent = (relData.problems || [])[0] || 'Connect GitHub to see what is waiting to go live.'; });
