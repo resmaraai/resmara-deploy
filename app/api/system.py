@@ -60,8 +60,10 @@ def _run_checks(db: Session) -> List[Dict[str, Any]]:
     base = settings.PUBLIC_BASE_URL.rstrip("/")
     rows: List[Dict[str, Any]] = []
 
-    # The website and the dashboard, actually fetched.
-    for name, path in (("Website", "/"), ("Agent dashboard", "/dashboard")):
+    # The public site and the console, actually fetched. The agent app is the single page at "/"
+    # (static/index.html), so there is no /dashboard to fetch - that check failed from the day it
+    # was written and taught everyone to ignore a red row.
+    for name, path in (("Website", "/"), ("Team room", "/admin.html")):
         code, ms, body = _http_get(f"{base}{path}")
         if code is None:
             rows.append(_row(name, "fail", f"No answer from {base}{path}: {body}", checked_at))
