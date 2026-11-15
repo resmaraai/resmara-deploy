@@ -151,6 +151,11 @@ def approve_creative(creative_id: int, current_user=Depends(get_current_user), d
 # --- Boosts (Campaigns) ---
 @router.post("/boosts", response_model=BoostOut, status_code=201)
 def create_boost(boost: BoostCreate, current_user=Depends(get_current_user), db: Session = Depends(get_db)):
+    # "+ Campaign" is closed until Meta is connected (owner item 8). A booking is help, not a
+    # substitute: without the connection there is nothing Resmara could post or spend through,
+    # and creating the row would only delay that discovery to launch day.
+    from app.api.onboarding import require_meta
+    require_meta(db, current_user)
     new_boost = Boost(user_id=current_user.id, **boost.model_dump())
     db.add(new_boost)
     db.flush()
@@ -439,7 +444,8 @@ def notify_operators(ticket: SupportTicket, author: User, db: Session) -> dict:
                 ok = False
             (outcome["delivered"] if ok else outcome["failed"]).append(address)
         if not outcome["delivered"]:
-            outcome["reason"] = "mail is configured but every send failed"
+            outcome["reason"] = ("mail is configured but every send failed: %s"
+                                 % (mail.last_attempt().get("reason") or "no reason reported"))
     elif _alert_webhook():
         outcome["channel"] = "webhook"
         try:
@@ -596,9 +602,8 @@ def admin_update_ticket(ticket_id: int, status: str = None, reply: str = None, c
         db.add(Event(user_id=ticket.user_id, event_type="ticket_reply_notified",
                      payload={"ticket_id": ticket.id, "email": bool(owner and owner.email),
                               "delivered": delivered,
-                              "reason": "" if delivered else ("no mail provider configured"
-                                                              if not mail.mail_configured()
-                                                              else "every send failed")}))
+                              "reason": "" if delivered else (mail.last_attempt().get("reason")
+                                                              or "no mail provider configured")}))
     db.add(Event(user_id=ticket.user_id, event_type="ticket_updated",
                  payload={"ticket_id": ticket.id, "status": ticket.status,
                           "by": current_user.email}))
@@ -641,5 +646,7 @@ def admin_mail_test(to: str = None, current_user=Depends(get_admin_user)):
     sent = mail.send_email(recipient, "Resmara email test",
                            "If you are reading this, Resmara can send email.\n\n"
                            "Sent by the operator console test button.")
-    return {"sent": bool(sent), "to": recipient,
+    # Which provider actually carried it, and why the others did not: "sent" alone cannot tell an
+    # operator whether Resend worked or SMTP quietly rescued it.
+    return {"sent": bool(sent), "to": recipient, "attempt": mail.last_attempt(),
             **mail.delivery_state()}

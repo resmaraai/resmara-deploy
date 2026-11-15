@@ -342,7 +342,14 @@
 
   function buildCampaign(boostId, opts) {
     opts = opts || {};
-    return json('/api/boosts/' + segment(boostId) + '/build', 'POST', { force: !!opts.force });
+    return json('/api/boosts/' + segment(boostId) + '/build', 'POST',
+                { force: !!opts.force, photo_permission: !!opts.photo_permission });
+  }
+
+  // Records the "I have permission to use these photos" answer with its timestamp (item 9).
+  function setPhotoPermission(boostId, granted) {
+    return json('/api/boosts/' + segment(boostId) + '/photo-permission', 'PATCH',
+                { granted: !!granted });
   }
 
   function buildStatus(boostId) {
@@ -361,8 +368,15 @@
     return request('/api/posts/' + segment(postId) + '/approve', { method: 'PATCH' });
   }
 
-  function approveAll(boostId) {
-    return request('/api/boosts/' + segment(boostId) + '/approve', { method: 'POST' });
+  function approveAll(boostId, opts) {
+    // The server refuses to approve posts the agent never opened unless this second answer
+    // comes back with confirm: true (item 20 — no go-live without review).
+    const body = {};
+    if (opts && opts.unreviewed) body.unreviewed = opts.unreviewed;
+    if (opts && opts.confirm) body.confirm = true;
+    if (opts && opts.post_ids) body.post_ids = opts.post_ids;
+    return request('/api/boosts/' + segment(boostId) + '/approve',
+                   { method: 'POST', body: JSON.stringify(body) });
   }
 
   // ---- billing ------------------------------------------------------------
@@ -413,7 +427,8 @@
     return json('/api/launch', 'POST', {
       platform: 'meta',
       boost_id: boostId,
-      auto_approve: !!opts.auto_approve,
+      // No auto_approve: the server ignores it now and approval is always a human reading the
+      // posts (item 20), so sending the flag would only pretend otherwise.
       meta_custom_configs: opts.meta_custom_configs || {},
     });
   }
@@ -456,6 +471,22 @@
   /* Re-check every connected ad account against Meta right now.
    * This is a POST with no body: it makes the app go and ask Meta, and it can refresh a
    * token that is close to expiring, so it must never be cached or done on page load. */
+  // Onboarding answers come from the server (item 8), not from whatever this browser kept:
+  // the Meta gate, the booked session and the tour must be the same on any device.
+  function onboardingState() {
+    return request('/api/onboarding/state');
+  }
+  function onboardingAudit() {
+    return request('/api/onboarding/meta-audit');
+  }
+  function bookSetupSession(payload) {
+    return request('/api/onboarding/setup-session',
+                   { method: 'POST', body: JSON.stringify(payload || { booked: true }) });
+  }
+  function tourSeen() {
+    return request('/api/onboarding/tour-seen', { method: 'POST' });
+  }
+
   function checkConnections() {
     return request('/api/ad-accounts/check-all', { method: 'POST' });
   }
@@ -535,6 +566,7 @@
     uploadPhoto: uploadPhoto,
     assets: assets,
     buildCampaign: buildCampaign,
+    setPhotoPermission: setPhotoPermission,
     buildStatus: buildStatus,
     plan: plan,
     posts: posts,
@@ -565,6 +597,10 @@
     saveBrandProfile: saveBrandProfile,
     adAccounts: adAccounts,
     checkConnections: checkConnections,
+    onboardingState: onboardingState,
+    onboardingAudit: onboardingAudit,
+    bookSetupSession: bookSetupSession,
+    tourSeen: tourSeen,
     checkHealth: checkHealth,
     apiVersion: apiVersion,
   };

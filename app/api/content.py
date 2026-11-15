@@ -393,7 +393,13 @@ async def publish_boost(boost_id: int, current_user: User = Depends(get_current_
 
 @router.get("/publish/status/{boost_id}")
 def publish_status(boost_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """What is scheduled, what went out, and what failed (with the error)."""
+    """What is scheduled, what went out, and what failed (with the error).
+
+    Each post that did not go out also carries ``failure``: the red "Didn't post" the calendar
+    shows, with the kind, the sentence the agent reads and the buttons that apply to that kind.
+    The key is new, so a client that only reads ``publish_status``/``last_error`` is unaffected.
+    """
+    from app.services.post_retry import failure_payload, MAX_ATTEMPTS
     _owned_boost(boost_id, current_user, db)
     posts = db.query(Post).filter(Post.boost_id == boost_id).order_by(Post.day, Post.slot).all()
     now = datetime.utcnow().isoformat()
@@ -404,6 +410,7 @@ def publish_status(boost_id: int, current_user: User = Depends(get_current_user)
     return {
         "boost_id": boost_id,
         "counts": counts,
+        "max_attempts": MAX_ATTEMPTS,
         "next_due": next((p.publish_at for p in posts
                           if (p.publish_status or "scheduled") == "scheduled"
                           and p.publish_at and p.publish_at > now), None),
@@ -411,8 +418,52 @@ def publish_status(boost_id: int, current_user: User = Depends(get_current_user)
                    "client_status": p.client_status, "publish_status": p.publish_status,
                    "publish_at": p.publish_at, "publish_target": p.publish_target,
                    "fb_post_id": p.fb_post_id, "ig_media_id": p.ig_media_id,
-                   "last_error": p.last_error} for p in posts],
+                   "last_error": p.last_error,
+                   "attempts": p.publish_attempts or 0,
+                   "next_attempt_at": p.next_attempt_at,
+                   "failure": failure_payload(p)} for p in posts],
     }
+
+
+def _owned_post(post_id: int, current_user: User, db: Session) -> Post:
+    """A post the caller may act on (through its campaign's owner), or 404."""
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    boost = db.query(Boost).filter(Boost.id == post.boost_id).first()
+    if not boost or (not current_user.is_admin and boost.user_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Post not found")
+    return post
+
+
+@router.post("/publish/post/{post_id}/retry")
+def retry_post(post_id: int, edited: bool = False,
+               current_user: User = Depends(get_current_user),
+               db: Session = Depends(get_db)):
+    """The calendar's Try again (and Edit and post, with ``edited=true``).
+
+    Puts the post back in the queue with a fresh ladder. A post Meta rejected needs
+    ``edited=true`` - the editor saves the new copy first, so the repost is a different post
+    rather than the same refusal again.
+    """
+    from app.services import post_retry
+    post = _owned_post(post_id, current_user, db)
+    try:
+        return post_retry.try_again(db, post, edited=edited)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/publish/post/{post_id}/skip")
+def skip_post(post_id: int, current_user: User = Depends(get_current_user),
+              db: Session = Depends(get_db)):
+    """Take a post out of the calendar for good without publishing it."""
+    from app.services import post_retry
+    post = _owned_post(post_id, current_user, db)
+    try:
+        return post_retry.skip(db, post)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # --- Reports ------------------------------------------------------------------
@@ -483,6 +534,20 @@ async def get_report(boost_id: int, day: int = 7, current_user: User = Depends(g
 
 @router.get("/reports/{boost_id}/download")
 async def download_report(boost_id: int, day: int = 7, current_user: User = Depends(get_current_user),
-                          db: Session = Depends(get_db)):
-    """Same payload as the report (JSON for now; the PDF step is a later delivery)."""
-    return await get_report(boost_id, day, current_user, db)
+                          db: Session = Depends(get_db), fmt: str = "pdf"):
+    """The report as a file. ``fmt=json`` keeps the old behaviour for anyone scripting it.
+
+    Day 7 and Day 14 are the same endpoint with a different ``day``; the PDF is generated from the
+    very payload the page renders, so the download cannot say something the screen does not.
+    """
+    report = await get_report(boost_id, day, current_user, db)
+    if fmt == "json":
+        return report
+    from app.services.report_pdf import campaign_report_pdf
+    from fastapi import Response as _Response
+    pdf = campaign_report_pdf(report)
+    safe = "".join(ch if ch.isalnum() or ch in "- _" else "_" for ch in str(report.get("address") or "campaign"))
+    safe = "_".join(safe.split())[:60] or "campaign"
+    return _Response(content=pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="Resmara Day {day} - {safe}.pdf"',
+        "Cache-Control": "no-store"})

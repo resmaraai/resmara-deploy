@@ -220,6 +220,10 @@ async def meta_callback(code: str = "", state: str = "", error: str = "",
             db.commit()
             db.refresh(existing)
             created.append(existing)
+            # This is the agent's own fix for a dead token, so it is also the moment the posts
+            # that died waiting on it go back in the queue - no second sweep, no manual repost.
+            from app.services import post_retry
+            post_retry.requeue_connection_failures(db, existing)
         else:
             new_acct = AdAccount(
                 user_id=current_user.id, platform="meta",
@@ -239,6 +243,13 @@ async def meta_callback(code: str = "", state: str = "", error: str = "",
               "ig_id": (p.get("instagram_business_account") or {}).get("id"),
               "ig_username": (p.get("instagram_business_account") or {}).get("username")}
              for p in pages_data.get("data", [])]
+
+    if created:
+        # Remember on the account that this agent connected Meta (item 8). The gate and the
+        # "every sign-in lands on Accounts" rule both read this, not a browser flag.
+        from datetime import datetime as _dt, timezone as _tz
+        current_user.meta_connected_at = _dt.now(_tz.utc)
+        db.commit()
 
     return _back({
         "meta": "connected" if created else "no_accounts",
@@ -267,12 +278,13 @@ async def meta_check_all(x_resmara_token: str = Depends(_require_system_token),
     honouring it, so a client hears about a broken connection from their dashboard instead of
     from a campaign that quietly never ran.
     """
-    from app.services import token_health
+    from app.services import post_retry, token_health
     rows = (db.query(AdAccount)
             .filter(AdAccount.platform == "meta", AdAccount.is_active == True).all())
     checks = [await token_health.refresh_account(a, db) for a in rows]
     reconnect, not_ready, refreshed = [], [], []
     simulated = 0
+    requeued = 0
     for c in checks:
         if c.get("simulated"):
             # A demo connection has no token and bills nobody, so it can never be "not ready
@@ -285,8 +297,14 @@ async def meta_check_all(x_resmara_token: str = Depends(_require_system_token),
             not_ready.append(c["account"])
         if c.get("refreshed"):
             refreshed.append(c["account"])
+        requeued += int(c.get("posts_requeued") or 0)
+    # The day's failed posts, by kind, ride along with the sweep that already runs on a
+    # timer: a summary to us, not a second mail blast of its own.
     return {"checked": len(checks), "simulated": simulated, "refreshed": refreshed,
-            "needs_reconnect": reconnect, "not_ready_to_spend": not_ready, "checks": checks}
+            "needs_reconnect": reconnect, "not_ready_to_spend": not_ready,
+            "posts_requeued": requeued,
+            "failed_posts": post_retry.daily_summary(db),
+            "checks": checks}
 
 
 @router.post("/meta/demo-connect")

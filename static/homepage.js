@@ -102,6 +102,20 @@ async function requestResetLink(form){
   status.textContent=(err&&err.message)||'Could not start the reset.';
  }
 }
+// The sign-up email's link lands on /confirm?token=... (see app.js), and this is the screen a
+// new agent sees when the confirmation was actually sent.
+function confirmEmailPage(email){
+ show(`<span class="eyebrow">CHECK YOUR EMAIL</span><h2>Confirm your address</h2><p>We sent a link to ${esc(email||'your inbox')}. Open it and you are in - the account is ready, it just needs the address proved first.</p><p class="fine" role="status">Nothing after a minute? Check the spam folder, then ask for another link.</p><div class="modal-actions"><button onclick="resendConfirm('${esc(String(email||'').replace(/'/g,''))}')">Send it again</button><button type="button" class="alt" onclick="clientAccess()">Back to sign in</button></div>`);
+}
+async function resendConfirm(email){
+ const box=document.querySelector('[role="status"]');
+ if(box)box.textContent='Sending…';
+ try{
+  const r=await RM.request('/api/auth/confirm/resend?email='+encodeURIComponent(email||''),{method:'POST'});
+  if(box)box.textContent=(r&&r.delivery==='sent')?'Another link is on its way.':'Email is not connected yet, so there is nothing to resend - tell us and we will confirm it by hand.';
+ }catch(e){if(box)box.textContent=(e&&e.message)||'Could not resend that link.'}
+}
+
 function resetPasswordPage(token){
  location.hash='';document.title='Choose a new password — Resmara';
  app.innerHTML=`<div class="marketing-home">${siteNav('')}<main><section class="home-section package-page"><div><span class="home-kicker">PASSWORD RESET</span><h2>Choose a new password.</h2>${token?'<p>Type it twice. This link works once, so choose something you will remember.</p>':'<p>This link is missing its reset code. Ask for a new one from the sign-in page.</p>'}<form onsubmit="event.preventDefault();submitNewPassword(this)" data-token="${esc(token)}"><label class="field">New password<input name="password" type="password" required minlength="8" autocomplete="new-password"></label><label class="field">Type it again<input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label><p class="fine" role="status"></p><div class="modal-actions"><button${token?'':' disabled'}>Save new password →</button><button type="button" class="alt" onclick="clientAccess()">Back to sign in</button></div></form></div></section></main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
@@ -136,8 +150,12 @@ function submitTestClient(form,creating){
   let account;
   if(creating){
    account=await RM.register(email,password,name,invite);
-   // Register returns the account (no token), so sign in to obtain one. Best effort.
-   try{const session=await RM.login(email,password);if(session&&session.access_token)RM.setToken(session.access_token)}catch{}
+   // Register returns the account (no token), so sign in to obtain one. Best effort - except
+   // when the account is waiting on its confirmation email (item 8): then there is nothing to
+   // sign in to yet, and pretending otherwise lands them in an empty dashboard.
+   try{const session=await RM.login(email,password);if(session&&session.access_token)RM.setToken(session.access_token)}catch(err){
+    if(/confirm/i.test(String((err&&err.message)||''))){confirmEmailPage(email);return}
+   }
   }else{
    account=await RM.login(email,password);
    if(account&&account.access_token)RM.setToken(account.access_token);

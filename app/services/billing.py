@@ -331,3 +331,71 @@ def load_event(payload: bytes) -> dict:
     except (UnicodeDecodeError, json.JSONDecodeError):
         return {}
     return data if isinstance(data, dict) else {}
+
+
+async def refund_failed_build(boost, db) -> dict:
+    """A build that dies after the agent paid gives the money back (owner item 16).
+
+    "If a build fails after charging, refund or retry automatically." Both, in the order that
+    costs the agent least: a prepaid campaign returns to their balance, and a card payment is
+    refunded at Stripe. The campaign is left unpaid either way, so the retry the UI offers is
+    genuinely free instead of quietly charging a second time.
+    """
+    from app.db.session import Event, Order, User
+
+    if not getattr(boost, "paid_at", None):
+        return {"refunded": False, "reason": "this campaign was never charged"}
+    amount = int(getattr(boost, "paid_amount_cents", 0) or 0)
+
+    if amount == 0:
+        # Paid from a prepaid balance: the credit goes back where it came from.
+        owner = db.query(User).filter(User.id == boost.user_id).first()
+        if owner:
+            owner.campaign_credits = int(owner.campaign_credits or 0) + 1
+        boost.paid_at = None
+        db.add(Event(user_id=boost.user_id, boost_id=boost.id, event_type="credit_returned",
+                     payload={"reason": "the build failed before any posts were made"}))
+        db.commit()
+        return {"refunded": True, "kind": "credit", "credits": int(owner.campaign_credits or 0)
+                if owner else None}
+
+    order = (db.query(Order).filter(Order.boost_id == boost.id, Order.status == "paid")
+             .order_by(Order.id.desc()).first())
+    intent = (order.stripe_payment_intent if order else "") or ""
+    if not intent or not billing_enabled():
+        # No intent on record (an admin-built campaign, or a payment taken before we stored it)
+        # is not refundable by us; record it so the operator can do it in Stripe, and do not
+        # pretend the money moved.
+        db.add(Event(user_id=boost.user_id, boost_id=boost.id, event_type="refund_pending",
+                     payload={"amount_cents": amount,
+                              "reason": "no payment intent on this order" if order
+                              else "no paid order found"}))
+        db.commit()
+        return {"refunded": False, "pending": True, "amount_cents": amount,
+                "reason": "This one has to be refunded in Stripe."}
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post("https://api.stripe.com/v1/refunds",
+                                     auth=(secret_key(), ""),
+                                     data={"payment_intent": intent},
+                                     headers={"Idempotency-Key": f"refund-boost-{boost.id}"})
+        body = resp.json() if resp.content else {}
+    except Exception as exc:  # noqa: BLE001 - a failed refund is reported, never assumed
+        body, resp = {"error": {"message": f"{type(exc).__name__}: {exc}"}}, None
+    if resp is not None and resp.status_code < 300 and body.get("id"):
+        boost.paid_at = None
+        if order:
+            order.status = "refunded"
+        db.add(Event(user_id=boost.user_id, boost_id=boost.id, event_type="refund_issued",
+                     payload={"amount_cents": amount, "refund_id": body["id"],
+                              "payment_intent": intent}))
+        db.commit()
+        return {"refunded": True, "kind": "card", "amount_cents": amount,
+                "refund_id": body["id"]}
+
+    message = ((body.get("error") or {}).get("message") or "Stripe refused the refund")[:300]
+    db.add(Event(user_id=boost.user_id, boost_id=boost.id, event_type="refund_failed",
+                 payload={"amount_cents": amount, "error": message}))
+    db.commit()
+    return {"refunded": False, "error": message, "amount_cents": amount}

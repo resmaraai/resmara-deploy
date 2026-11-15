@@ -86,6 +86,17 @@ client.post("/api/auth/register", json={"email": "agent@example.com", "password"
                                        "name": "Agent", "invite_code": "beta-code-123"})
 client.post("/api/auth/register", json={"email": "owner@example.com", "password": "long enough",
                                         "name": "Owner"})
+def connect_meta(email):
+    """Mark the account as Meta-connected: + Campaign is closed until it is (item 8)."""
+    from datetime import datetime, timezone
+    from app.db.session import SessionLocal, User
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == email).first()
+    user.meta_connected_at = datetime.now(timezone.utc)
+    db.commit()
+    db.close()
+
+
 def login(email, password="long enough"):
     """The token endpoint is OAuth2 form-encoded, not JSON."""
     token = client.post("/api/auth/login", data={"username": email,
@@ -93,6 +104,7 @@ def login(email, password="long enough"):
     return {"Authorization": f"Bearer {token}"}
 
 
+connect_meta("agent@example.com")
 agent = login("agent@example.com")
 ADMIN = login("owner@example.com")
 
@@ -251,6 +263,78 @@ check("  ...with fresh copy and no reused plan", child is not None and not child
 check("  ...and no paid stamp until it is actually bought",
       child is not None and child.paid_at is None)
 db.close()
+
+print("\n=== 6. the agent's photo permission is recorded before the engine runs ===")
+from app.db.session import Asset  # noqa: E402
+
+photo = make_boost("88 Oak Avenue, Austin, TX 78704")
+db = SessionLocal()
+db.add(Asset(user_id=db.query(User).filter(User.email == "agent@example.com").first().id,
+             boost_id=photo["id"], filename="front.jpg", url="/uploads/front.jpg",
+             original_name="front.jpg", kind="photo", data=b"", content_type="image/jpeg"))
+# Paid first: money is the outer gate (item 16), permission is what Build asks after it.
+db.query(Boost).filter(Boost.id == photo["id"]).first().paid_at = datetime.now(timezone.utc)
+db.commit()
+db.close()
+
+resp = client.post(f"/api/boosts/{photo['id']}/build", headers=agent, json={})
+detail = resp.json().get("detail") or {}
+check("a gallery with no permission on record cannot be built",
+      resp.status_code == 409 and detail.get("error") == "photo_permission_required",
+      resp.text[:200])
+check("  ...and the answer says what to confirm",
+      "permission" in (detail.get("message") or "").lower(), str(detail)[:200])
+
+resp = client.patch(f"/api/boosts/{photo['id']}/photo-permission", headers=agent,
+                    json={"granted": True})
+check("ticking the box records the moment", resp.status_code == 200
+      and resp.json().get("photo_permission_at"), resp.text[:200])
+stamp = resp.json().get("photo_permission_at")
+
+resp = client.patch(f"/api/boosts/{photo['id']}/photo-permission", headers=agent,
+                    json={"granted": True})
+check("  ...and a second tick does not move it", resp.json().get("photo_permission_at") == stamp)
+
+row = client.get("/api/boosts", headers=agent).json()
+entry = next((b for b in row if b.get("id") == photo["id"]), {})
+check("  ...and it is visible on the campaign itself",
+      bool(entry.get("photo_permission_at")), str(entry)[:200])
+
+print("\n=== 7. the old test posts can be audited and cleared, and only on purpose ===")
+from app.db.session import Post  # noqa: E402
+
+db = SessionLocal()
+for n in range(3):
+    db.add(Post(boost_id=boost["id"], day=n + 1, slot=1, kind="static",
+                caption=f"Test caption {n}\nsecond line", publish_status="scheduled"))
+db.commit()
+db.close()
+
+resp = client.get("/api/admin/posts/audit", headers=agent)
+check("an agent cannot read the post audit", resp.status_code == 403, resp.text[:120])
+
+audit = client.get("/api/admin/posts/audit", headers=ADMIN).json()
+check("an operator can see every campaign's posts", audit["total_posts"] >= 3, str(audit)[:200])
+row = next((c for c in audit["campaigns"] if c["boost_id"] == boost["id"]), {})
+check("  ...with a sample of what each post says",
+      row.get("sample") and row["sample"][0]["caption"].startswith("Test caption"),
+      str(row)[:200])
+
+resp = client.post("/api/admin/posts/purge", headers=ADMIN, json={})
+check("a purge without the count is refused", resp.status_code == 428, resp.text[:200])
+check("  ...and the refusal names the exact phrase",
+      resp.json()["detail"].get("expect_confirm", "").startswith("DELETE "), resp.text[:200])
+
+resp = client.post("/api/admin/posts/purge", headers=ADMIN, json={
+    "confirm": f"DELETE {audit['total_posts']} POSTS", "expect_total": audit["total_posts"],
+    "keep_boost_ids": [boost["id"]]})
+check("keeping one campaign deletes the rest",
+      resp.status_code == 200 and resp.json()["deleted"] >= 0, resp.text[:200])
+
+after = client.get("/api/admin/posts/audit", headers=ADMIN).json()
+kept = next((c for c in after["campaigns"] if c["boost_id"] == boost["id"]), {})
+check("  ...and the campaign that was kept still has its posts", kept.get("posts") == 3,
+      str(kept)[:200])
 
 print()
 if FAILS:

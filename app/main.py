@@ -105,4 +105,20 @@ if os.path.isdir("static"):
     def reset_page():
         return FileResponse(os.path.join("static", "index.html"))
 
+    # The confirmation link in the sign-up email lands here, and the script calls the API with
+    # ?token= and shows the result (item 8: confirm the address before the first sign-in).
+    @app.get("/confirm", include_in_schema=False)
+    def confirm_page():
+        return FileResponse(os.path.join("static", "index.html"))
+
+    # The legal pages at the clean URLs Meta asks for. They were only reachable as
+    # /privacy.html, and "Privacy policy URL: https://www.resmara.com/privacy" is what the app
+    # dashboard requires - a 404 there is an app-review rejection, not a broken link.
+    _LEGAL = {"privacy": "privacy.html", "terms": "terms.html",
+              "data-deletion": "data-deletion.html"}
+    for _path, _file in _LEGAL.items():
+        def _legal_page(_file=_file):
+            return FileResponse(os.path.join("static", _file), media_type="text/html")
+        app.add_api_route(f"/{_path}", _legal_page, methods=["GET"], include_in_schema=False)
+
     app.mount("/", StaticFiles(directory="static", html=True), name="static")

@@ -6,8 +6,9 @@ The launch half mirrors the Creatify ad flow the dashboard was reverse-engineere
 by the same PENDING -> PENDING_APPROVAL -> APPROVED -> DEPLOYED -> LIVE state machine.
 
 The gate itself lives in app/services/launch.py so /api/resmara/launch and
-/api/boosts/{id}/launch cannot drift apart. Nothing here spends money: every campaign is
-created PAUSED.
+/api/boosts/{id}/launch cannot drift apart. Nothing here spends money: the campaign is
+created ACTIVE and held back by the ad set's start_time, which is the go-live date the agent
+approved (Ad Engine §4.4).
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -17,7 +18,7 @@ import asyncio
 import time
 from datetime import datetime, timezone
 
-from app.db.session import get_db, SessionLocal, User, Boost, AdAccount, Post, Event
+from app.db.session import get_db, SessionLocal, User, Boost, AdAccount, Asset, Post, Event
 from app.core.security import get_current_user
 from app.services.credits import CampaignStage, CampaignAction
 from app.api.billing import require_paid
@@ -66,6 +67,9 @@ class BuildRequest(BaseModel):
     force: bool = False
     # Manual facts win over the AI (the spec's AI Notes / team corrections rule).
     openings: Optional[dict] = None
+    # The agent ticked "I have permission to use these photos" before Build (item 9). The
+    # timestamp it produces is what the campaign keeps; the flag itself is not stored.
+    photo_permission: bool = False
 
 
 async def _run_build(boost_id: int, user_id: int, force: bool, openings: Optional[dict]):
@@ -128,6 +132,10 @@ async def _run_build(boost_id: int, user_id: int, force: bool, openings: Optiona
                     "tokens": spent.get("total_tokens"), "calls": spent.get("calls"),
                 })
                 db.commit()
+            # Paid and empty is not a state the agent should be left in (item 16): hand the
+            # money back now rather than waiting for someone to notice.
+            if boost and (state.get("posts_created") or 0) == 0:
+                state["refund"] = await refund_after_failure_async(db, boost)
         except Exception:
             db.rollback()
     finally:
@@ -145,6 +153,21 @@ async def build_campaign(boost_id: int, body: BuildRequest = BuildRequest(),
     """
     boost = _owned_boost(boost_id, current_user, db)
     require_paid(boost, current_user, db)
+    if body.photo_permission and not boost.photo_permission_at:
+        # Stored, not just acknowledged: the timestamp is the record, and it is taken once so
+        # a later build cannot move it.
+        boost.photo_permission_at = datetime.now(timezone.utc)
+        db.commit()
+    if not boost.photo_permission_at:
+        photos_in_gallery = db.query(Asset).filter(Asset.boost_id == boost.id,
+                                                   Asset.kind == "photo").count()
+        if photos_in_gallery:
+            raise HTTPException(status_code=409, detail={
+                "error": "photo_permission_required",
+                "message": ("Before we design your posts, confirm you have permission to use "
+                            "the photos in this gallery."),
+                "photos": photos_in_gallery,
+            })
     running = _durable_build_state(db, boost)
     if running.get("status") == "running" and not body.force:
         return {"status": "running", "boost_id": boost.id,
@@ -219,12 +242,64 @@ def _progress(db: Session, user_id: int, boost_id: int, stage: str, **extra):
 
 
 def _mark_interrupted(db: Session, boost: Boost, reason: str, user_id: int | None = None):
-    """Say out loud that a build died, once, so the next status read is honest."""
+    """Say out loud that a build died, once, so the next status read is honest.
+
+    A build that dies is also a build the agent paid for and did not get, so the same call
+    hands the money back (item 16) — once, because the refund leaves the campaign unpaid.
+    """
     boost.main_status = "Build failed"
     uid = user_id or boost.user_id
     if uid:
         _log(db, User(id=uid), boost.id, "error", {"where": "build_campaign", "error": reason})
     db.commit()
+    return refund_after_failure(db, boost)
+
+
+async def refund_after_failure_async(db: Session, boost: Boost) -> dict:
+    """The refund, awaited where the caller is already async."""
+    try:
+        from app.services.billing import refund_failed_build
+        return await refund_failed_build(boost, db)
+    except Exception as exc:  # noqa: BLE001
+        db.add(Event(user_id=boost.user_id, boost_id=boost.id, event_type="refund_failed",
+                     payload={"error": f"{type(exc).__name__}: {exc}"[:300]}))
+        db.commit()
+        return {"refunded": False, "error": str(exc)[:300]}
+
+
+def refund_after_failure(db: Session, boost: Boost) -> dict:
+    """Refund a paid build that failed, without ever raising into the failure path."""
+    try:
+        from app.services.billing import refund_failed_build
+        return asyncio.run(refund_failed_build(boost, db))
+    except Exception as exc:  # noqa: BLE001 - the failure is already being reported
+        db.add(Event(user_id=boost.user_id, boost_id=boost.id, event_type="refund_failed",
+                     payload={"error": f"{type(exc).__name__}: {exc}"[:300]}))
+        db.commit()
+        return {"refunded": False, "error": str(exc)[:300]}
+
+
+@router.patch("/boosts/{boost_id}/photo-permission")
+def photo_permission(boost_id: int, body: Optional[dict] = None,
+                     current_user: User = Depends(get_current_user),
+                     db: Session = Depends(get_db)):
+    """Record the agent's permission to use the gallery's photos, with the moment (item 9).
+
+    Taken once and kept: a ticked box is an answer about the photographs, and it does not stop
+    being true because the campaign was rebuilt.
+    """
+    boost = _owned_boost(boost_id, current_user, db)
+    body = body or {}
+    if not body.get("granted"):
+        return {"boost_id": boost.id, "granted": False,
+                "photo_permission_at": boost.photo_permission_at.isoformat()
+                if boost.photo_permission_at else None}
+    if not boost.photo_permission_at:
+        boost.photo_permission_at = datetime.now(timezone.utc)
+        _log(db, current_user, boost.id, "photo_permission", {})
+        db.commit()
+    return {"boost_id": boost.id, "granted": True,
+            "photo_permission_at": boost.photo_permission_at.isoformat()}
 
 
 @router.get("/boosts/{boost_id}/build-status")
@@ -266,7 +341,12 @@ def get_plan(boost_id: int, current_user: User = Depends(get_current_user), db: 
 
 @router.get("/boosts/{boost_id}/posts")
 def list_posts(boost_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """The campaign's posts with the engine's scheduling and publishing state."""
+    """The campaign's posts with the engine's scheduling and publishing state.
+
+    ``failure`` is what the calendar's red "Didn't post" is drawn from: the kind, Meta's own
+    reason, and the buttons that kind allows. None for a post that has not failed.
+    """
+    from app.services.post_retry import failure_payload
     boost = _owned_boost(boost_id, current_user, db)
     posts = db.query(Post).filter(Post.boost_id == boost.id).order_by(Post.day, Post.slot).all()
     return [{
@@ -277,6 +357,8 @@ def list_posts(boost_id: int, current_user: User = Depends(get_current_user), db
         "client_status": p.client_status, "publish_status": p.publish_status,
         "publish_at": p.publish_at, "publish_target": p.publish_target,
         "fb_post_id": p.fb_post_id, "ig_media_id": p.ig_media_id, "last_error": p.last_error,
+        "attempts": p.publish_attempts or 0, "next_attempt_at": p.next_attempt_at,
+        "failure": failure_payload(p),
     } for p in posts]
 
 
@@ -287,8 +369,23 @@ def approve_campaign(boost_id: int, body: dict = None,
     copy-approval half of the two-layer gate."""
     boost = _owned_boost(boost_id, current_user, db)
     body = body or {}
+    # "No go-live without review" (owner's item 20). The UI knows which posts were actually
+    # opened; if it says something on screen was never read, approval needs a second answer.
+    # Silently approving 14 unseen posts is exactly the failure this gate exists to stop.
+    unreviewed = int(body.get("unreviewed") or 0)
+    if unreviewed > 0 and not body.get("confirm"):
+        raise HTTPException(status_code=409, detail={
+            "error": "review_required",
+            "message": "You haven't reviewed everything — are you sure?",
+            "unreviewed": unreviewed,
+            "confirm_with": {"confirm": True},
+        })
     only_ids = set(body.get("post_ids") or [])
     posts = db.query(Post).filter(Post.boost_id == boost.id).all()
+    if not posts:
+        raise HTTPException(status_code=409, detail={
+            "error": "nothing_to_approve",
+            "message": "There is nothing to review yet - build the campaign first."})
     approved = 0
     for p in posts:
         if only_ids and p.id not in only_ids:
@@ -306,19 +403,23 @@ def approve_campaign(boost_id: int, body: dict = None,
 @router.post("/boosts/{boost_id}/launch")
 async def launch(boost_id: int, body: dict = None,
                  current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Launch this boost's Meta campaign for real (created PAUSED).
+    """Launch this boost's Meta campaign for real.
 
-    Gate: budget precheck (subscription + ad-account budget) AND copy approval (every post
-    approved, or an explicit auto_approve for a trusted operator).
+    Gate: budget precheck (subscription + ad-account budget) AND copy approval — every post
+    approved by a human. Objects are created ACTIVE against the ad set's go-live time, so an
+    approved campaign actually delivers (Ad Engine §4.4).
     """
     from app.services.launch import launch_boost
     boost = _owned_boost(boost_id, current_user, db)
     require_paid(boost, current_user, db)
     body = body or {}
+    # There is no auto-approve path any more, for a launch or a re-run: approval is a human
+    # reading the posts, and an API flag that skips it is the same "go live without review"
+    # choice the owner ruled out (item 20).
     result = await launch_boost(
         boost, current_user, db,
         budget_usd=body.get("budget_usd"),
-        auto_approve=bool(body.get("auto_approve")),
+        auto_approve=False,
         action=body.get("action") or CampaignAction.LAUNCH_NEW_CAMPAIGN,
         custom_configs=body.get("meta_custom_configs") or {},
     )

@@ -55,6 +55,15 @@ def main() -> int:
         token = login.json().get("access_token")
         h = {"Authorization": f"Bearer {token}"}
 
+        # + Campaign needs Meta connected (item 8); this test starts after that gate.
+        from datetime import datetime, timezone
+        from app.db.session import SessionLocal, User
+        _db = SessionLocal()
+        _u = _db.query(User).filter(User.email == reg.json()["email"]).first()
+        _u.meta_connected_at = datetime.now(timezone.utc)
+        _db.commit()
+        _db.close()
+
         made = client.post("/api/boosts", headers=h, json={
             "address": "706 Congress Ave, Austin TX", "tier": "standard",
             "campaign_days": 14, "ad_budget_usd": 250})

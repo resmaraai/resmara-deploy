@@ -16,6 +16,15 @@ ADDITIONS = {
         # Prepaid campaigns from a pack. An existing account keeps working with 0; the ALTER is
         # what stops every build on an established database failing on a missing column.
         ("campaign_credits", "INTEGER DEFAULT 0"),
+        # Onboarding answers the product is required to remember (owner item 8): Meta connected,
+        # setup session booked, tour shown. On an established database these arrive by ALTER.
+        ("meta_connected_at", "TIMESTAMP"),
+        ("setup_booked_at", "TIMESTAMP"),
+        ("tour_seen_at", "TIMESTAMP"),
+        # Email confirmation before first sign-in (item 8); added to existing databases by ALTER.
+        ("email_confirmed_at", "TIMESTAMP"),
+        ("confirm_token_hash", "VARCHAR"),
+        ("confirm_sent_at", "TIMESTAMP"),
     ],
     "ad_accounts": [
         ("refresh_token", "TEXT"),
@@ -43,6 +52,14 @@ ADDITIONS = {
         ("photo_room", "VARCHAR"),
         ("photo_file", "VARCHAR"),
         ("post_type", "VARCHAR DEFAULT 'photo'"),
+        # The failed-post ladder: an established database has none of these, and the publisher
+        # now reads them on every sweep, so each needs its own ALTER.
+        ("publish_attempts", "INTEGER DEFAULT 0"),
+        ("next_attempt_at", "VARCHAR"),
+        ("failure_kind", "VARCHAR"),
+        ("failure_note", "TEXT"),
+        ("failed_at", "DATETIME"),
+        ("failure_notified_at", "DATETIME"),
     ],
     "ads": [
         ("meta_adset_id", "VARCHAR"),
@@ -90,6 +107,8 @@ ADDITIONS = {
         ("paused_at", "TIMESTAMP"),
         ("paused_days", "INTEGER DEFAULT 0"),
         ("listing_status", "VARCHAR"),
+        ("photo_permission_at", "TIMESTAMP"),
+        ("video_found_at", "TIMESTAMP"),
         ("listing_checked_at", "TIMESTAMP"),
         ("reboost_offer_sent_at", "TIMESTAMP"),
     ],

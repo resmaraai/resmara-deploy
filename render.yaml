@@ -81,6 +81,19 @@ services:
       #   python scripts/make_token_key.py  → paste the output into RESMARA_TOKEN_KEY
       # - key: RESMARA_TOKEN_KEY
       #   sync: false
+      # Email: Resend first, Gmail SMTP as the fallback. Resend is HTTP, so it is the only one
+      # that works here — Render's free plan drops outbound SMTP silently. Free Resend is
+      # 100 messages/day; the fallback covers the cap and any Resend error.
+      # - key: RESEND_API_KEY
+      #   sync: false
+      # - key: MAIL_FROM
+      #   value: "Resmara <support@resmara.com>"
+      # - key: SMTP_HOST            # the Gmail/Workspace fallback, once that mailbox exists
+      #   value: smtp.gmail.com
+      # - key: SMTP_USER
+      #   value: support@resmara.com
+      # - key: SMTP_PASSWORD        # a Google App Password, not the account password
+      #   sync: false
 
   # The scheduler. Without this service nothing calls the publisher: a post can be approved
   # and scheduled and then sit there forever, because "scheduled" is a clock, and a clock

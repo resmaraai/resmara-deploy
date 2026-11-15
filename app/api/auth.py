@@ -18,6 +18,40 @@ from app.services.access import signup_block_reason, parse_allowlist
 router = APIRouter()
 
 RESET_TTL_MINUTES = 60
+CONFIRM_TTL_HOURS = 48
+
+
+def _public_base() -> str:
+    base = (getattr(settings, "PUBLIC_BASE_URL", "") or "").rstrip("/")
+    return base or "https://www.resmara.com"
+
+
+def _confirm_link(token: str) -> str:
+    return f"{_public_base()}/confirm?token={token}"
+
+
+def _send_confirmation(user: User, db: Session) -> str:
+    """Send the confirm link, or say honestly that there is no way to send it.
+
+    "Email confirmation before first sign-in" (item 8) is only enforceable if an email actually
+    went out; on a deploy with no mail provider the account is confirmed on the spot and the
+    response says so, rather than locking a beta tester out of an inbox that will never be written
+    to.
+    """
+    token = secrets.token_urlsafe(24)
+    user.confirm_token_hash = _hash(token)
+    user.confirm_sent_at = datetime.now(timezone.utc)
+    ok = mail.send_email(user.email, "Confirm your Resmara email",
+                         "Welcome to Resmara.\n\n"
+                         "Confirm this address to finish setting up your account:\n"
+                         f"{_confirm_link(token)}\n\n"
+                         f"The link works for {CONFIRM_TTL_HOURS} hours. If this was not you, ignore this "
+                         "message and nothing happens.\n\n- Resmara")
+    if not ok:
+        user.email_confirmed_at = datetime.now(timezone.utc)
+        user.confirm_token_hash = None
+    db.commit()
+    return "sent" if ok else "not_configured"
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
@@ -40,7 +74,11 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     db.flush()
     # The activity log is what the operator console charts; a new account is the first
     # thing it should be able to show.
-    db.add(Event(user_id=user.id, event_type="user_registered", payload={"source": "password"}))
+    # Email confirmation before first sign-in (item 8). When no provider is configured the
+    # account is usable immediately and the response says the email did not go out.
+    confirmation = _send_confirmation(user, db)
+    db.add(Event(user_id=user.id, event_type="user_registered",
+                 payload={"source": "password", "confirmation": confirmation}))
     db.commit()
     db.refresh(user)
     return user
@@ -54,6 +92,12 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     if not user.is_active:
         # Deactivating an account has to actually stop it signing in.
         raise HTTPException(status_code=403, detail="This account is disabled")
+    if user.confirm_token_hash and not user.email_confirmed_at:
+        # Only blocks accounts we actually emailed: an existing account with no pending token
+        # keeps working, which is what makes this safe to ship on a deploy with no mail provider.
+        raise HTTPException(status_code=403,
+                            detail="Confirm your email address first - check your inbox for the "
+                                   "Resmara link (it can be resent from the sign-in screen).")
     if not user.is_admin and user.email in parse_allowlist(settings.ADMIN_EMAILS):
         # Owners listed in RESMARA_ADMIN_EMAILS are operators from their first login, whether
         # the account predates the setting or not; no database edit needed to add a second one.
@@ -62,6 +106,39 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     db.commit()
     token = create_access_token(data={"sub": user.email})
     return {"access_token": token, "token_type": "bearer"}
+
+
+@router.get("/confirm")
+def confirm_email(token: str = "", db: Session = Depends(get_db)):
+    """The link in the confirmation email. Safe to call twice; the second says so."""
+    if not token:
+        raise HTTPException(status_code=400, detail="That link is missing its token")
+    user = db.query(User).filter(User.confirm_token_hash == _hash(token)).first()
+    if not user:
+        raise HTTPException(status_code=400,
+                            detail="That link has already been used or has expired - sign in and "
+                                   "ask for a new one.")
+    sent = user.confirm_sent_at
+    if sent is not None:
+        age = datetime.now(timezone.utc) - (sent if sent.tzinfo else sent.replace(tzinfo=timezone.utc))
+        if age > timedelta(hours=CONFIRM_TTL_HOURS):
+            raise HTTPException(status_code=400,
+                                detail="That link has expired - sign in and ask for a new one.")
+    user.email_confirmed_at = datetime.now(timezone.utc)
+    user.confirm_token_hash = None
+    db.add(Event(user_id=user.id, event_type="email_confirmed", payload={}))
+    db.commit()
+    return {"ok": True, "email": user.email}
+
+
+@router.post("/confirm/resend")
+def resend_confirmation(email: str, db: Session = Depends(get_db)):
+    """Ask for the link again. Says the same thing whether or not the address exists."""
+    user = db.query(User).filter(User.email == (email or "").strip().lower()).first()
+    if not user or user.email_confirmed_at:
+        return {"ok": True, "delivery": "sent"}
+    delivery = _send_confirmation(user, db)
+    return {"ok": True, "delivery": delivery}
 
 
 @router.get("/me", response_model=UserOut)
@@ -195,8 +272,12 @@ def request_reset(email: str, request: Request, db: Session = Depends(get_db)):
             db.add(Event(user_id=user.id, event_type="password_reset_sent",
                          payload={"delivery": "email"}))
         else:
+            # Say which provider refused and why. "no mail provider configured" was wrong as soon
+            # as Resend/SMTP existed but errored, and it sent the operator looking for a missing
+            # setting instead of an unverified domain.
             db.add(Event(user_id=user.id, event_type="password_reset_unmailed",
-                         payload={"reason": "no mail provider configured"}))
+                         payload={"reason": mail.last_attempt().get("reason")
+                                  or "no mail provider configured"}))
         db.commit()
     return {"status": "ok", "delivery": delivery, "expires_minutes": RESET_TTL_MINUTES,
             "detail": ("Check your email for the reset link." if delivery == "email"

@@ -36,7 +36,7 @@ To take real client work, additionally:
 
 - A Meta app with the host in **App domains**, the OAuth redirect registered, and privacy/terms URLs on the domain. The in-app Meta app (`META_CLIENT_ID` / `META_CLIENT_SECRET`) is currently the build machine's app — the partner should create **their own** app so a bad token or policy strike can't take down both.
 - Publishing permissions: `pages_manage_posts`, `instagram_basic`, `instagram_content_publish` (App Review / Advanced Access), plus Business Verification and a Marketing API access tier.
-- SMTP credentials for password-reset email (§8 — not configured, the reset flow returns the token instead of mailing it).
+- Email: a [Resend](https://resend.com) API key with `resmara.com` verified (free tier, 100/day) is the primary — it is HTTP, so it works on Render's free plan, which blocks outbound SMTP. Gmail/Workspace SMTP app password (`smtp.gmail.com`, 587) is the fallback. With neither, a reset request answers `delivery="not_configured"` and an operator mints the link in the console.
 - A billing provider (§8 — there is none in the code; customers cannot pay through the app yet).
 
 ---
@@ -204,8 +204,11 @@ In the partner's own Meta app:
 
 - **No billing.** Nothing in the code charges anyone; `subscription_status` exists on the user row
   but no provider is wired. Subscriptions are manual or out of scope for launch.
-- **No outbound email.** Password reset answers `delivery="not_configured"` and returns the token
-  to the caller until `SMTP_*` is set.
+- **Email depends on configuration that is not in this repo.** `RESEND_API_KEY` (primary) or the
+  `SMTP_*` pair (fallback) has to be set on the host; until then a password reset answers
+  `delivery="not_configured"`, records the reason, and an operator mints the link by hand.
+  `GET /api/admin/mail` says which provider a send would use, and `POST /api/admin/mail/test`
+  actually sends one — "email works" should be a delivery, not a config opinion.
 - **Media lives on local disk.** Fine on a VPS with a volume; needs an object store before running
   more than one app replica, because Instagram fetches media by URL from whichever box wrote it.
 - **Meta publishing permissions are pending** (§8). Ads and campaign creation work today; organic

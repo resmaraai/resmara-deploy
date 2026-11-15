@@ -129,6 +129,7 @@ class BoostOut(BaseModel):
     budget_confirmed_at: Optional[datetime] = None
     paused_at: Optional[datetime] = None
     paused_days: int = 0
+    photo_permission_at: Optional[datetime] = None
     class Config:
         from_attributes = True
 

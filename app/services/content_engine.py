@@ -725,6 +725,31 @@ def _asset_bytes(asset) -> bytes:
         return b""
 
 
+
+def _store_design(db, boost, post, raw: bytes):
+    """Write a designed post to uploads and the row, and return its public URL.
+
+    The bytes go in the Asset as well as the file: a free-tier container has no persistent disk,
+    so a design that lives only in uploads/ becomes a 404 at the next deploy - exactly when a
+    campaign is being published.
+    """
+    import uuid as _uuid
+
+    from app.db.session import Asset
+
+    name = f"post-{int(getattr(post, 'day', 0) or 0):02d}-{_uuid.uuid4().hex[:8]}.png"
+    folder = _uploads_dir()
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_bytes(raw)
+    except OSError:
+        pass
+    asset = Asset(user_id=boost.user_id, boost_id=boost.id, filename=name, url=f"/uploads/{name}",
+                  original_name=name, kind="design", data=raw, content_type="image/png")
+    db.add(asset)
+    db.commit()
+    return asset.url
+
 def _shrink_for_vision(raw: bytes, mime: str = "") -> str:
     """A data URL of the photo at 1280px: about 150 KB instead of five megabytes.
 
@@ -926,6 +951,39 @@ def _scrub_stale_video_notes(missing_info: list, plan: dict) -> list:
             continue
         keep.append(note)
     return keep
+
+
+def _apply_listing_video(plan: dict, boost, engine_notes: list) -> bool:
+    """Day 1 becomes the listing's own video, and the ad becomes a video ad (§6.6).
+
+    Only when the campaign actually has a video URL: ``video_url`` is set by the listing check
+    after a real probe, so an embed that Meta cannot pull never reaches this point.
+    """
+    url = (getattr(boost, "video_url", "") or "").strip()
+    if not url or not isinstance(plan, dict):
+        return False
+    posts = plan.get("posts")
+    if not isinstance(posts, list):
+        return False
+    day1 = [p for p in posts if isinstance(p, dict) and (_as_int(p.get("day")) or 1) == 1]
+    if not day1:
+        return False
+    target = sorted(day1, key=lambda p: _as_int(p.get("slot")) or 1)[0]
+    target["kind"] = "main_video"
+    target["video_url"] = url
+    target["label"] = "VIDEO: the listing tour"
+    ad = plan.get("ad")
+    if not isinstance(ad, dict):
+        ad = plan["ad"] = {}
+    ad["adType"] = "video"
+    # One video ad, not a carousel of cards (§4): the creativeDays list is what the launcher
+    # and the Ad row read, so day 1 is the only day in it.
+    ad["creativeDays"] = [1]
+    if isinstance(engine_notes, list):
+        engine_notes.append(
+            "Day 1 is the listing video and the ad is a single video ad, because the listing "
+            "link has a public MP4 - no designed photo post on day 1, and no carousel ad.")
+    return True
 
 
 def _calendar_slots(days: int, per_day: int) -> list:
@@ -1392,6 +1450,11 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
     else:
         missing_info_early = None
     plan, repairs = _repair_video_mix(plan, days, per_day)
+    # A listing video makes day 1 the tour and the ad a single video ad (Post Engine §6.6).
+    # Applied before the gallery assignment so the video post does not fight a photo for day 1,
+    # and recorded in the notes because the agent should know which of the two they are getting.
+    if _apply_listing_video(plan, boost, engine_notes):
+        repairs = list(repairs or []) + ["listing video on day 1"]
     # --- gallery assignment: one photo per post, and one post per space -----
     # The plan picks photos too, but a model reading the whole index will happily put two shots of
     # the primary suite on days 3 and 9. Assigning here makes "never the same room twice" a rule of
@@ -1585,6 +1648,54 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
             f"{rotated} post(s) were moved to a different photo so no space ran twice, and each "
             "caption was written for the photo it now carries.")
 
+    # --- the design step: the real photo + the brief -> OpenAI's image edit --------
+    # Post Engine section 7.7 / Appendix C: no Make, no BSP scenario - Resmara sends the photo and
+    # the brief itself, runs the checker, and files the result. Skipped (and said so) when there
+    # is no image model configured, or in a simulated build.
+    design_notes = {}
+    if db is not None:
+        try:
+            from app.services import design as design_step
+            if design_step.design_available():
+                rows = (db.query(Post).filter(Post.boost_id == boost.id)
+                        .order_by(Post.day, Post.slot).all())
+                by_name = {getattr(a, "filename", ""): a for a in intact}
+                fallback_asset = intact[0] if intact else None
+
+                def _photo_for(post):
+                    asset = by_name.get(getattr(post, "photo_file", "") or "") or fallback_asset
+                    if asset is None:
+                        return None
+                    raw = _asset_bytes(asset)
+                    return (raw, getattr(asset, "content_type", "") or "image/png") if raw else None
+
+                briefs = [{"overlay": getattr(post, "overlay_text", "") or getattr(post, "title", "") or "",
+                           "caption": getattr(post, "caption", "") or "",
+                           "room": getattr(post, "photo_room", "") or ""} for post in rows]
+                say("designing the posts", posts=len(rows))
+                made = await design_step.design_posts(briefs, boost, brand, _photo_for)
+                for item in made.get("designed") or []:
+                    post = rows[item["index"]]
+                    post.image_url = _store_design(db, boost, post, item["bytes"])
+                db.commit()
+                design_notes = {k: made.get(k) for k in
+                                ("calls", "checked", "regenerated", "fallbacks", "model")}
+                design_notes["designed"] = len(made.get("designed") or [])
+                engine_notes.extend([str(n) for n in (made.get("notes") or [])][:14])
+                engine_notes.append(
+                    f"{design_notes['designed']} of {len(rows)} posts were designed with "
+                    f"{made.get('model')}; each one cost an image call"
+                    + (" and was checked before it was kept" if made.get("checked") else ""))
+            else:
+                design_notes = {"designed": 0, "reason": "no image model configured"}
+                engine_notes.append(
+                    "the design step was skipped: no image model is configured, so the posts "
+                    "carry their listing photos unchanged")
+        except Exception as exc:  # noqa: BLE001 - the campaign is usable without the design pass
+            design_notes = {"designed": 0, "reason": f"{type(exc).__name__}: {exc}"[:200]}
+            engine_notes.append(f"the design step failed and the posts kept their photos: "
+                                f"{type(exc).__name__}: {exc}"[:300])
+
     return {
         "source": source,
         "engine": engine,
@@ -1596,6 +1707,7 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
         "repairs": repairs,
         "missing_info": missing_info,
         "posts_created": posts_created,
+        "design": design_notes,
         "photos_used": rotated,
         "ad_id": ad_id,
         "model": {

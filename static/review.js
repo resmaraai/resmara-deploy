@@ -51,6 +51,9 @@ function photosPanel(r){
  const seed=/^https?:\/\//i.test(listing)?esc(listing):'';
  return '<section class="panel campaign-photos"><h2 class="campaign-step-title"><span>1</span> Listing photos</h2>'
   +'<p data-photo-count>Checking this campaign’s photos…</p>'
+  // Item 9: the agent ticks this before Build, and the server stores the timestamp. It is
+  // their signature that they may use the photographs, so the box is not pre-ticked.
+  +'<label class="photo-permission"><input type="checkbox" id="photoPermission" onchange="photoPermissionChanged()"> I have permission to use these photos for this campaign’s posts and ads.</label>'
   +'<p class="fine">Paste the listing link and Resmara pulls the gallery. Movoto and Trulia links work directly; Zillow, Realtor, Redfin and Homes.com block server reads, so those are matched to the same property on Trulia by address. Or upload the photos yourself — without photos the calendar stays text-only.</p>'
   +'<label class="scope-field">Listing link<input id="photo-listing-url" type="url" inputmode="url" placeholder="https://www.trulia.com/home/… or https://www.movoto.com/…" value="'+seed+'"></label>'
   +'<div class="modal-actions">'
@@ -270,7 +273,9 @@ async function confirmCampaignApproval(){
  if(boostId!=null&&window.RM){
   const buttons=[...modal.querySelectorAll('button')];
   buttons.forEach(b=>b.disabled=true);
-  try{await RM.approveAll(boostId)}
+  // Send the count of items nobody opened: the server refuses an approval that claims all of
+  // them were read, and only takes it with an explicit confirm after the dialog (item 20).
+  try{await RM.approveAll(boostId,{unreviewed:r.items.filter(i=>!i.reviewed).length,confirm:true})}
   catch(e){
    buttons.forEach(b=>b.disabled=false);
    show(`<h2>Couldn’t approve the campaign</h2><p>${esc(e.message)}</p><p class="fine">Nothing was changed. Try again once the API is reachable.</p><div class="modal-actions"><button class="alt" onclick="modal.close()">Close</button></div>`);
@@ -353,16 +358,30 @@ function buildApprovedScope(){
 }
 
 // Build the calendar from the real content engine (POST /api/boosts/{id}/build + GET .../posts).
+function photoPermissionChanged(){
+ const box=document.querySelector('#photoPermission');
+ const build=document.querySelector('.campaign-scope .scope-form-actions .alt');
+ if(build&&/Build content/.test(build.textContent||''))build.disabled=!(box&&box.checked);
+ if(box&&box.checked)RM.setPhotoPermission(reviewCampaignBoostId(),true).catch(()=>{});
+}
 async function buildCampaignFromBackend(){
  const r=activeReview(),boostId=reviewCampaignBoostId();
  if(boostId==null||!window.RM){toast('This demo campaign isn’t linked to a backend boost yet.');return}
  if(!r.scopeFirst||!r.scopeConfirmed||r.approved||ReviewStudio.building.has(r))return;
+ // Build designs posts from the agent's photographs: without their permission on record the
+ // server refuses, so ask for it here rather than failing after the engine has started.
+ const permissionBox=document.querySelector('#photoPermission');
+ if(permissionBox&&!permissionBox.checked){
+  permissionBox.focus();
+  toast('Please confirm you have permission to use these photos first.');
+  return;
+ }
  ReviewStudio.building.add(r);
  show(`<span class="eyebrow">BUILDING YOUR CAMPAIGN</span><h2>Resmara is turning your scope into a campaign.</h2><div class="audit-track campaign-build-track"><span class="robot-avatar" aria-hidden="true"></span></div><p role="status">Running the content engine…</p>`);
  const progress=modal.querySelector('[role="status"]');
  let finalStatus=null;
  try{
-  const started=await RM.buildCampaign(boostId,{force:false});
+  const started=await RM.buildCampaign(boostId,{force:false,photo_permission:true});
   // The build is a background run (four model calls, minutes long) — a single request would be
   // cut by any hosted proxy. Poll the status, then read the posts it wrote.
   if(started&&started.status==='running'){
@@ -412,7 +431,7 @@ async function rebuildLiveCampaign(){
 async function launchCampaignViaApi(){
  const boostId=reviewCampaignBoostId();
  if(boostId==null||!window.RM){toast('This demo campaign isn’t linked to a backend boost yet.');return}
- show(`<span class="eyebrow">LAUNCHING</span><h2>Launching your campaign…</h2><p role="status">Checking the budget and approvals, then creating the Meta campaign paused…</p>`);
+ show(`<span class="eyebrow">LAUNCHING</span><h2>Launching your campaign…</h2><p role="status">Checking the budget and approvals, then creating the Meta campaign for your go-live date…</p>`);
  try{
   const result=await RM.launch(boostId,{auto_approve:false});
   if(result&&['approval_required','no_ad_account','nothing_to_launch'].includes(result.status)){
@@ -421,7 +440,7 @@ async function launchCampaignViaApi(){
    show(`<span class="eyebrow">LAUNCH HELD</span><h2>${heading}</h2><ul class="campaign-report-list">${reasons.map(reason=>`<li>${esc(reason)}</li>`).join('')}</ul><p class="fine">Nothing was published and no spend was authorised.</p><div class="modal-actions"><button class="alt" onclick="modal.close()">Close</button></div>`);
    return;
   }
-  show(`<h2>Campaign launched</h2><div class="check">Meta campaign ${esc(String((result&&result.meta_campaign_id)||'created'))} created paused.</div><p class="fine">${result&&result.simulated?'Simulated mode · no live Meta calls were made.':'Created paused; you activate it in Meta Ads Manager.'}</p><div class="modal-actions"><button onclick="modal.close()">Close</button></div>`);
+  show(`<h2>Campaign launched</h2><div class="check">Meta campaign ${esc(String((result&&result.meta_campaign_id)||'created'))} scheduled for your go-live date.</div><p class="fine">${result&&result.simulated?'Simulated mode · no live Meta calls were made.':'It starts on your go-live date. You can pause it from the campaign page at any time.'}</p><div class="modal-actions"><button onclick="modal.close()">Close</button></div>`);
  }catch(e){
   show(`<h2>Launch failed</h2><p>${esc(e.message)}</p><div class="modal-actions"><button class="alt" onclick="modal.close()">Close</button></div>`);
  }

@@ -33,9 +33,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import httpx
+from sqlalchemy import or_
 
 from app.core.config import settings
 from app.db.session import AdAccount, Boost, Event, Post
+from app.services import post_retry
 
 log = logging.getLogger("resmara.publisher")
 
@@ -68,6 +70,37 @@ def _is_simulated(ad_account: Any) -> bool:
 
 def _url(path: str) -> str:
     return settings.graph_base.rstrip("/") + "/" + path.lstrip("/")
+
+
+class GraphError(RuntimeError):
+    """A failed Graph call, carrying Meta's own error object.
+
+    ``raise_for_status`` used to throw Meta's body away, so every failure reached the calendar
+    as "Client error '400 Bad Request'" - which cannot be classified, and cannot tell an agent
+    that the caption was refused by policy rather than that our upload was missing.
+    """
+
+    def __init__(self, message: str, *, status_code: Optional[int] = None,
+                 error: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.error = error or {}
+
+
+def _check(resp: httpx.Response) -> httpx.Response:
+    """Raise GraphError with Meta's sentence when a Graph call comes back unhappy."""
+    if resp.status_code < 400:
+        return resp
+    error: Dict[str, Any] = {}
+    try:
+        body = resp.json()
+    except Exception:  # noqa: BLE001 - a non-JSON body is a failure with no detail
+        body = None
+    if isinstance(body, dict) and isinstance(body.get("error"), dict):
+        error = body["error"]
+    text = " - ".join(p for p in (error.get("message") or "", error.get("error_user_msg") or "") if p)
+    raise GraphError(text or f"Graph answered HTTP {resp.status_code}",
+                     status_code=resp.status_code, error=error)
 
 
 def _classify(post: Post) -> str:
@@ -141,7 +174,7 @@ async def _publish_facebook(client: httpx.AsyncClient, post: Post, kind: str,
     if kind == "text":
         resp = await client.post(_url(f"/{page_id}/feed"),
                                  data={"message": message, "access_token": token})
-        resp.raise_for_status()
+        _check(resp)
         return (resp.json() or {}).get("id")
 
     path = local_media_path(post.image_url)
@@ -158,7 +191,7 @@ async def _publish_facebook(client: httpx.AsyncClient, post: Post, kind: str,
         resp = await client.post(
             _url(f"/{page_id}/photos"),
             data={"message": message, "access_token": token}, files=files)
-    resp.raise_for_status()
+    _check(resp)
     return (resp.json() or {}).get("id")
 
 
@@ -175,14 +208,14 @@ async def _publish_instagram(client: httpx.AsyncClient, post: Post, ig_id: str,
     resp = await client.post(_url(f"/{ig_id}/media"),
                              params={"image_url": image_url, "caption": message,
                                      "access_token": token})
-    resp.raise_for_status()
+    _check(resp)
     creation_id = (resp.json() or {}).get("id")
     if not creation_id:
         raise RuntimeError("Instagram did not return a creation id")
 
     resp2 = await client.post(_url(f"/{ig_id}/media_publish"),
                               params={"creation_id": creation_id, "access_token": token})
-    resp2.raise_for_status()
+    _check(resp2)
     return (resp2.json() or {}).get("id")
 
 
@@ -237,6 +270,12 @@ async def publish_post(post: Post, boost: Boost, ad_account: Any, db) -> Dict[st
                 fb_post_id = await _publish_facebook(client, post, kind, page_id, message, token)
             if do_ig:
                 ig_media_id = await _publish_instagram(client, post, ig_id, message, token)
+    except GraphError as exc:
+        # Meta answered and refused: its own error object is what decides whether this is a
+        # connection problem or a rejected post, so it travels with the failure.
+        return {"status": "failed", "state": "failed", "error": str(exc),
+                "status_code": exc.status_code, "graph_error": exc.error,
+                "fb_post_id": fb_post_id, "ig_media_id": ig_media_id}
     except Exception as exc:  # noqa: BLE001
         return {"status": "failed", "state": "failed", "error": str(exc),
                 "fb_post_id": fb_post_id, "ig_media_id": ig_media_id}
@@ -253,6 +292,10 @@ def _due_posts(db, now: str, limit: int, boost_id: Optional[int] = None) -> List
 
     ``boost_id`` narrows it to one campaign (the operator's "publish now" button);
     the scheduler omits it and gets every due post.
+
+    ``next_attempt_at`` is the retry gate: a post that failed and is being retried keeps
+    ``publish_status='scheduled'`` so the calendar does not call it dead, and this bound is what
+    stops the next sweep (15 minutes later) from burning a retry early.
     """
     q = (
         db.query(Post)
@@ -262,6 +305,7 @@ def _due_posts(db, now: str, limit: int, boost_id: Optional[int] = None) -> List
         .filter(Post.publish_status == "scheduled")
         .filter(Post.publish_at.isnot(None))
         .filter(Post.publish_at <= now)
+        .filter(or_(Post.next_attempt_at.is_(None), Post.next_attempt_at <= now))
         .filter(AdAccount.is_active == True)  # noqa: E712
     )
     if boost_id is not None:
@@ -269,18 +313,21 @@ def _due_posts(db, now: str, limit: int, boost_id: Optional[int] = None) -> List
     return q.limit(limit).all()
 
 
-def claim_post(db, post_id: int) -> Optional[Post]:
+def claim_post(db, post_id: int, now: Optional[str] = None) -> Optional[Post]:
     """Atomically claim a post for publishing.
 
     Returns the post with ``publish_status='posting'`` committed, or None when
-    it is no longer approved + scheduled (withdrawn, edited, or already
-    claimed). This is the guard the spec requires before any network call.
+    it is no longer approved + scheduled (withdrawn, edited, or already claimed). This is
+    the guard the spec requires before any network call. A post still waiting on its retry is
+    also left alone: selection and claim must agree, or a run could post one early.
     """
     db.expire_all()  # read current committed state, not a stale identity-map copy
     fresh = db.query(Post).filter(Post.id == post_id).first()
     if (fresh is None
             or fresh.client_status != "approved"
             or fresh.publish_status != "scheduled"):
+        return None
+    if now is not None and fresh.next_attempt_at and fresh.next_attempt_at > now:
         return None
     fresh.publish_status = "posting"
     db.commit()
@@ -292,17 +339,21 @@ async def publish_due(db, now: Optional[str] = None, *, limit: int = 50,
     """Publish every approved, due post. Safe to run repeatedly.
 
     ``boost_id`` limits the run to one campaign.
+
+    A failure goes to ``post_retry.record_failure`` rather than straight to
+    ``publish_status='failed'``: that is where the retry ladder, the three-way classification,
+    the connection email and the banner text live. This sweep is the only place retries run.
     """
     now = now or datetime.utcnow().isoformat()
 
-    result: Dict[str, Any] = {"checked": 0, "posted": 0, "failed": 0, "skipped": 0,
-                              "details": []}
+    result: Dict[str, Any] = {"checked": 0, "posted": 0, "failed": 0, "retrying": 0,
+                              "skipped": 0, "details": []}
 
     for post in _due_posts(db, now, limit, boost_id=boost_id):
         result["checked"] += 1
 
         # CLAIM first: flip to 'posting' and commit before touching the network.
-        claimed = claim_post(db, post.id)
+        claimed = claim_post(db, post.id, now=now)
         if claimed is None:
             result["skipped"] += 1
             result["details"].append({"post_id": post.id, "status": "skipped",
@@ -326,6 +377,11 @@ async def publish_due(db, now: Optional[str] = None, *, limit: int = 50,
             if published.get("ig_media_id"):
                 claimed.ig_media_id = published["ig_media_id"]
             claimed.last_error = None
+            # A retry that worked must not leave the banner behind.
+            claimed.next_attempt_at = None
+            claimed.failure_kind = None
+            claimed.failure_note = None
+            claimed.failure_notified_at = None
             # One event per published post: this is what the operator's activity graph
             # counts, and it records whether a real network call happened or not.
             db.add(Event(boost_id=claimed.boost_id, event_type="post_published",
@@ -341,12 +397,15 @@ async def publish_due(db, now: Optional[str] = None, *, limit: int = 50,
                 "ig_media_id": claimed.ig_media_id,
             })
         else:
-            claimed.publish_status = published.get("state") or "failed"
-            claimed.last_error = published.get("error")
-            db.commit()
+            failure = post_retry.record_failure(db, claimed, boost, published, now=now)
             result["failed"] += 1
+            if failure["status"] == "retrying":
+                result["retrying"] += 1
             result["details"].append({"post_id": claimed.id,
-                                      "status": claimed.publish_status,
+                                      "status": failure["status"],
+                                      "kind": failure["kind"],
+                                      "attempts": failure["attempts"],
+                                      "next_attempt_at": failure["next_attempt_at"],
                                       "error": claimed.last_error})
 
     return result

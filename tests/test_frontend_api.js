@@ -154,9 +154,9 @@ async function one(name, run, expect) {
   // ---- engine: build / plan / posts / approval -------------------------------
   console.log('\nengine');
   await one('RM.buildCampaign', () => RM.buildCampaign(7, { force: true }),
-    { method: 'POST', path: '/api/boosts/7/build', contentType: 'application/json', jsonBody: { force: true } });
+    { method: 'POST', path: '/api/boosts/7/build', contentType: 'application/json', jsonBody: { force: true, photo_permission: false } });
   await one('RM.buildCampaign (default force=false)', () => RM.buildCampaign(7),
-    { method: 'POST', path: '/api/boosts/7/build', contentType: 'application/json', jsonBody: { force: false } });
+    { method: 'POST', path: '/api/boosts/7/build', contentType: 'application/json', jsonBody: { force: false, photo_permission: false } });
   await one('RM.plan', () => RM.plan(7), { method: 'GET', path: '/api/boosts/7/plan' });
   await one('RM.posts', () => RM.posts(7), { method: 'GET', path: '/api/boosts/7/posts' });
   await one('RM.approvePost', () => RM.approvePost(42), { method: 'PATCH', path: '/api/posts/42/approve' });
@@ -191,12 +191,14 @@ async function one(name, run, expect) {
       jsonBody: { boost_id: 7 } });
   await one('RM.orders', () => RM.orders(), { method: 'GET', path: '/api/billing/orders' });
   await one('RM.boostBilling', () => RM.boostBilling(7), { method: 'GET', path: '/api/billing/boost/7' });
-  await one('RM.launch', () => RM.launch(7, { auto_approve: true, meta_custom_configs: { campaign_name: 'Elm St' } }),
+  // No auto_approve on the wire any more: approval is always a human reading the posts
+  // (owner item 20), and the server ignores the flag, so sending it only pretends otherwise.
+  await one('RM.launch', () => RM.launch(7, { meta_custom_configs: { campaign_name: 'Elm St' } }),
     { method: 'POST', path: '/api/launch', contentType: 'application/json',
-      jsonBody: { platform: 'meta', boost_id: 7, auto_approve: true, meta_custom_configs: { campaign_name: 'Elm St' } } });
+      jsonBody: { platform: 'meta', boost_id: 7, meta_custom_configs: { campaign_name: 'Elm St' } } });
   await one('RM.launch (defaults)', () => RM.launch(7),
     { method: 'POST', path: '/api/launch', contentType: 'application/json',
-      jsonBody: { platform: 'meta', boost_id: 7, auto_approve: false, meta_custom_configs: {} } });
+      jsonBody: { platform: 'meta', boost_id: 7, meta_custom_configs: {} } });
 
   // ---- publishing ------------------------------------------------------------
   console.log('\npublishing');

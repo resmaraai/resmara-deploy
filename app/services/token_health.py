@@ -390,6 +390,15 @@ async def refresh_account(ad_account: AdAccount, db, *, base_url: Optional[str] 
     db.add(ad_account)
     db.commit()
 
+    # A connection that is usable again is the only moment the posts that died on it can be
+    # published. Requeue (never publish here - the publish sweep is the one caller of Graph for
+    # a post), so a broken token costs the agent the posts it was down for and nothing else.
+    if info["status"] in (STATUS_HEALTHY, STATUS_EXPIRING):
+        from app.services import post_retry
+        requeued = post_retry.requeue_connection_failures(db, ad_account)
+    else:
+        requeued = {"requeued": 0, "post_ids": []}
+
     return {
         "ok": bool(info["status"] != STATUS_NEEDS_RECONNECT and (ready is None or ready["ok"])),
         "simulated": False,
@@ -411,6 +420,8 @@ async def refresh_account(ad_account: AdAccount, db, *, base_url: Optional[str] 
         "spend_ok": bool((ready or {}).get("ok")),
         "spend_note": (ready or {}).get("note") or "",
         "account": ad_account.account_name or ad_account.advertiser_id,
+        # Posts the reconnect brought back into the queue (0 the rest of the time).
+        "posts_requeued": requeued.get("requeued", 0),
     }
 
 

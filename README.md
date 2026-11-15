@@ -154,8 +154,13 @@ Still not wired to a live account (each is a config step, not a code gap):
   "Ready for testing" on the use case's Permissions and features list.
   Credit card details are never entered in the app: ads go out PAUSED and the ad account's
   own budget row is the only thing that gates spend.
-- `SMTP_*` — password-reset emails. Until it is configured the reset request returns
-  `delivery: "not_configured"` and hands back the token so the flow still completes.
+- `RESEND_API_KEY` / `MAIL_FROM` — transactional email, the only route that works on a host
+  that blocks outbound SMTP (Render's free tier silently drops port 587). `app/services/mail.py`
+  tries Resend first and falls back to SMTP whenever Resend errors (unverified domain, the
+  100/day free cap, an outage). Mail leaves as `Resmara <support@resmara.com>`.
+- `SMTP_*` — the fallback: Gmail/Workspace with an app password (`smtp.gmail.com`, 587). With
+  neither provider set, a reset request answers `delivery: "not_configured"`, the event log
+  records the reason, and an operator mints the link by hand in the console.
 - `RESMARA_PUBLISH_TOKEN` — already generated in `.env`; the 15-minute publisher cron and
   the 6-hourly connection-health job use it as the shared system token for
   `POST /api/content/publish/run` and `POST /api/oauth/meta/check-all`.

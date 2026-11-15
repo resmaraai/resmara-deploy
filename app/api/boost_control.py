@@ -93,6 +93,15 @@ async def launch_details(boost_id: int, body: LaunchDetails, db: Session = Depen
                 raise HTTPException(status_code=422, detail={
                     "error": "listing_link_unusable", "message": result["detail"],
                     "field": "listing_url", **result})
+            # The same visit looks for the tour video (Post Engine §6.6): the link check tells
+            # the agent what it found in one answer, instead of a separate step they forget.
+            from app.services import listing_video
+            found = await listing_video.find(url)
+            out["checks"]["video"] = {"found": found["found"], "detail": found["detail"],
+                                      "url": found.get("video_url")}
+            if found["found"] and not boost.video_url:
+                boost.video_url = found["video_url"]
+                boost.video_found_at = datetime.now(timezone.utc)
         boost.listing_url = url or None
         boost.listing_checked_at = datetime.now(timezone.utc)
 
@@ -327,3 +336,76 @@ async def listings_sweep(x_resmara_token: str = Header(default=""),
     if x_resmara_token != _settings.PUBLISH_TOKEN:
         raise HTTPException(status_code=403, detail="Bad publish token")
     return await sweep(db)
+
+
+# --------------------------------------------------------------------------- the old test posts
+
+def _admin_only(user: User):
+    if not getattr(user, "is_admin", False):
+        raise HTTPException(status_code=403, detail={
+            "error": "admin_only", "message": "This is an operator action."})
+
+
+@router.get("/admin/posts/audit")
+def posts_audit(db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)):
+    """Every post on the site, grouped by campaign, with enough to recognise a test.
+
+    The publisher stays off until the 126 old test posts are gone (owner item 7), and the only
+    way to be sure it is safe to switch on is to look at what is actually stored. Read-only.
+    """
+    _admin_only(current_user)
+    rows = (db.query(Post, Boost).join(Boost, Post.boost_id == Boost.id)
+            .order_by(Post.boost_id, Post.day, Post.slot).all())
+    campaigns: dict = {}
+    for post, boost in rows:
+        entry = campaigns.setdefault(boost.id, {
+            "boost_id": boost.id, "address": boost.address, "stage": boost.stage,
+            "main_status": boost.main_status, "created_at": boost.created_at.isoformat()
+            if boost.created_at else None, "posts": 0, "published": 0, "sample": []})
+        entry["posts"] += 1
+        if (post.publish_status or "").lower() in ("posted", "published", "live"):
+            entry["published"] += 1
+        if len(entry["sample"]) < 3:
+            first_line = (post.caption or "").strip().split("\n")[0][:90]
+            entry["sample"].append({"id": post.id, "day": post.day, "kind": post.kind,
+                                    "status": post.publish_status, "caption": first_line})
+    ordered = sorted(campaigns.values(), key=lambda c: (c["created_at"] or "", c["boost_id"]))
+    return {"total_posts": sum(c["posts"] for c in ordered),
+            "total_campaigns": len(ordered),
+            "published_posts": sum(c["published"] for c in ordered),
+            "campaigns": ordered}
+
+
+@router.post("/admin/posts/purge")
+def posts_purge(body: Optional[dict] = None, db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)):
+    """Delete posts, but only when the operator has named what they are deleting.
+
+    The confirmation string carries the number: a request that says "purge" without saying how
+    many is exactly how the real campaign gets deleted by accident.
+    """
+    _admin_only(current_user)
+    body = body or {}
+    count = db.query(Post).count()
+    expected = body.get("expect_total")
+    confirm = str(body.get("confirm") or "").strip().upper()
+    if confirm != f"DELETE {count} POSTS":
+        raise HTTPException(status_code=428, detail={
+            "error": "confirmation_required",
+            "message": f"There are {count} posts. To delete them, confirm with "
+                       f"'DELETE {count} POSTS'.",
+            "expect_confirm": f"DELETE {count} POSTS", "total_posts": count})
+    if expected is not None and int(expected) != count:
+        raise HTTPException(status_code=409, detail={
+            "error": "count_changed", "message": "The number of posts changed since you looked.",
+            "total_posts": count})
+    keep = set(int(b) for b in (body.get("keep_boost_ids") or []))
+    q = db.query(Post)
+    if keep:
+        q = q.filter(~Post.boost_id.in_(keep))
+    deleted = q.delete(synchronize_session=False)
+    db.add(Event(user_id=current_user.id, event_type="posts_purged",
+                 payload={"deleted": int(deleted), "kept_boost_ids": sorted(keep)}))
+    db.commit()
+    return {"deleted": int(deleted), "kept_boost_ids": sorted(keep), "remaining": db.query(Post).count()}

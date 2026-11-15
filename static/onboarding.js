@@ -105,7 +105,10 @@ function obBook() {
 addEventListener('message', e => {
   if (!/calendly\.com$/.test(new URL(e.origin || 'https://x.invalid').hostname)) return;
   if (e.data && e.data.event === 'calendly.event_scheduled') {
+    // Stored on the account (item 8): booking a session is a fact about the agent, and it
+    // has to survive a new browser the same way the Meta connection does.
     state.setupSession = { booked: new Date().toISOString() }; persist();
+    if (window.RM && RM.isLoggedIn()) RM.bookSetupSession({ booked: true }).catch(() => {});
     show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">YOU’RE BOOKED IN</span><h2>See you soon.</h2><p>Calendly has emailed you the time and a video link. We’ll connect your Meta account together on the call. Until then you can look around and set up your brand, but campaigns can’t run until you’re connected.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Close</button><button class="campaign-primary" onclick="onboard(1)">Build my brand →</button></div>`);
   }
 });
@@ -177,7 +180,11 @@ function workspaceTour(step = 0) {
   };
   place();
 }
-function tourDone() { state.firstRun = false; state.tourDone = true; persist(); }
+function tourDone() {
+  state.firstRun = false; state.tourDone = true; persist();
+  // Once per account, not once per browser: signing in on a laptop should not replay it.
+  if (window.RM && RM.isLoggedIn()) RM.tourSeen().catch(() => {});
+}
 function finishWorkspaceTour() { workspaceTourCleanup?.(); tourDone(); if (modal.open) modal.close(); dashboard('campaigns'); }
 
 // Card on file: opens Stripe's secure card page (live). Resmara never sees the card number.
@@ -225,15 +232,31 @@ function obSignIn() {
 // Resmara can't post or run ads without the agent's Meta account, so step 1 can't be skipped.
 // Until it's connected (or a setup session is booked), sign-in lands on Accounts with the prompt.
 function metaBlocked() { return !!state.metaRequired && !state.connected; }
+// What the account has actually done, read from the server (item 8). localStorage alone let a
+// cleared browser skip the required Meta step, which is the one thing that must not be
+// skippable — so on every sign-in the stored answers win over the local ones.
+function hydrateOnboarding() {
+  if (!(window.RM && RM.isLoggedIn && RM.isLoggedIn())) return Promise.resolve(null);
+  return RM.onboardingState().then(st => {
+    state.connected = !!st.meta_connected;
+    state.metaRequired = !st.meta_connected;
+    state.setupSession = st.setup_booked ? (state.setupSession || { booked: st.setup_booked_at }) : null;
+    state.tourDone = !!st.tour_seen;
+    persist();
+    return st;
+  }).catch(() => null);
+}
 function metaNagging() { return metaBlocked() && !state.setupSession; }
 function metaRequiredPrompt() {
   dashboard('accounts');
   show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">META ACCOUNT NEEDED</span><h2>Please connect your Meta account.</h2><p>Resmara posts and runs ads through your Facebook Page, Instagram and ad account, so we can’t run campaigns for you until they’re connected.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="obBook()">Book a free setup session</button><button class="campaign-primary" onclick="onboard(0)">Connect your Meta account</button></div>`);
 }
 function metaGateOnLogin() {
-  if (metaNagging()) { dashboard('accounts'); setTimeout(() => onboard(0), 400); return; }
-  dashboard('campaigns');
-  if (state.firstRun && !state.tourDone) setTimeout(() => onboard(state.connected ? 1 : 0), 400);
+  hydrateOnboarding().then(() => {
+    if (metaNagging()) { dashboard('accounts'); setTimeout(() => onboard(0), 400); return; }
+    dashboard('campaigns');
+    if (state.firstRun && !state.tourDone) setTimeout(() => onboard(state.connected ? 1 : 0), 400);
+  });
 }
 // Closing step 1 without connecting goes to Accounts with the prompt.
 modal.addEventListener('close', () => {
@@ -359,3 +382,31 @@ function paintSupportBadge() {
     }, 8000);
   };
 })();
+
+
+// ---- the readiness audit (step 1, item 8) ---------------------------------------------------
+// Four things have to be true before Resmara can post and spend: a Page, admin rights on it, an
+// Instagram professional account linked to it, and a way to pay. Each line is Meta's answer,
+// and anything Meta does not answer says so instead of showing a tick.
+function runMetaAudit() {
+  const box = document.querySelector('#connDetail');
+  const btn = document.querySelector('#metaAuditBtn');
+  if (!(window.RM && RM.isLoggedIn())) { toast('Sign in first'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  RM.onboardingAudit().then(r => {
+    const rows = (r.checks || []).map(c => `<li class="audit-row ${c.ok ? 'ok' : 'bad'}"><b>${esc(c.label)}</b>` +
+      `<small>${esc(c.detail || '')}</small>` + (c.ok ? '' : `<small class="fix">${esc(c.fix || '')}</small>`) + '</li>').join('');
+    if (box) {
+      box.innerHTML = (r.connected ? '' : `<p class="notice">${esc(state.message || 'Please connect your Meta account so we can run campaigns for you.')}</p>`) +
+        `<ul class="audit-list">${rows}</ul>` +
+        `<p class="fine">Once you've done this, come back here and click Check again.</p>` +
+        (r.connected ? '' : `<div class="btn-pair"><button class="campaign-primary" onclick="connectMeta()">Connect Meta</button><button class="alt" onclick="obBook()">Book a free setup session</button></div>`);
+    }
+    state.metaAudit = { status: r.connected && (r.checks || []).every(c => c.ok) ? 'ready' : 'blocked', checkedAt: new Date().toISOString() };
+    state.connected = !!r.connected;
+    persist();
+    const bad = (r.checks || []).filter(c => !c.ok);
+    toast(r.connected ? (bad.length ? `${bad.length} thing(s) still to fix` : 'You\'re ready to run campaigns.') : 'Meta is not connected yet.');
+  }).catch(e => toast('Check failed: ' + e.message))
+    .then(() => { if (btn) { btn.disabled = false; btn.textContent = 'Check again'; } });
+}

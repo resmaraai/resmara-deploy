@@ -200,6 +200,9 @@ def sign_up(email):
     from app.db.session import User
     user = session.query(User).filter(User.email == email).first()
     user.subscription_status = "active"
+    # Meta is required before + Campaign (item 8); this test is about token health after it.
+    from datetime import datetime, timezone
+    user.meta_connected_at = datetime.now(timezone.utc)
     session.add(user)
     session.commit()
     session.close()

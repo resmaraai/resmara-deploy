@@ -48,6 +48,10 @@ print(f"Login: OK, token: {token[:20]}...")
 db = SessionLocal()
 user = db.query(User).filter(User.email == "agent@resmara.com").first()
 user.subscription_status = "active"
+# Meta is required before a campaign can be created (item 8); this test is about what
+# happens after that gate, so the account is marked connected.
+from datetime import datetime, timezone
+user.meta_connected_at = datetime.now(timezone.utc)
 db.commit()
 
 # --- 3. Connect Meta ad account ---

@@ -38,6 +38,18 @@ class User(Base):
     # makes this non-zero and building a campaign spends one (api/billing.require_paid). It is
     # a pre-paid balance, not credit we invented: every unit arrived as a Stripe payment.
     campaign_credits = Column(Integer, default=0, nullable=False)
+    # Onboarding facts that must survive a cleared browser (owner item 8): when Meta was
+    # connected, when a setup session was booked, and whether the first-visit tour was shown.
+    # Stored here rather than in localStorage because "every sign-in lands on Accounts until
+    # Meta is connected" cannot be enforced by a browser.
+    meta_connected_at = Column(DateTime(timezone=True), nullable=True)
+    setup_booked_at = Column(DateTime(timezone=True), nullable=True)
+    tour_seen_at = Column(DateTime(timezone=True), nullable=True)
+    # Email confirmation before the first sign-in (item 8). The token is stored hashed: a dumped
+    # database must not be a pile of working confirmation links.
+    email_confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    confirm_token_hash = Column(String, nullable=True)
+    confirm_sent_at = Column(DateTime(timezone=True), nullable=True)
 
 # --- Ad Account (OAuth) ---
 class AdAccount(Base):
@@ -154,6 +166,13 @@ class Boost(Base):
     paused_days = Column(Integer, default=0)
     # active | pending | sold | contingent | unknown — written by the daily watcher.
     listing_status = Column(String, nullable=True)
+    # When the agent ticked "I have permission to use these photos" (item 9). Meta and the
+    # agent's broker both expect that answer to exist, and a timestamp is the only version of
+    # it that can be shown to them later.
+    photo_permission_at = Column(DateTime, nullable=True)
+    # When the listing video was found (Post Engine §6.6). The footage stays at its public URL;
+    # Meta pulls it from there and Resmara never stores the file.
+    video_found_at = Column(DateTime, nullable=True)
     listing_checked_at = Column(DateTime(timezone=True), nullable=True)
     reboost_offer_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -187,6 +206,15 @@ class Post(Base):
     fb_post_id = Column(String, nullable=True)
     ig_media_id = Column(String, nullable=True)
     last_error = Column(Text, nullable=True)
+    # The failed-post ladder (post_retry): how many tries this post has had, when the next one
+    # is due, and whose fault the failure was - the three kinds drive the message, the red
+    # banner and whether anything is retried at all.
+    publish_attempts = Column(Integer, default=0)
+    next_attempt_at = Column(String, nullable=True)
+    failure_kind = Column(String, nullable=True)          # our_fault | connection | meta_rejected
+    failure_note = Column(Text, nullable=True)            # the sentence the agent reads
+    failed_at = Column(DateTime, nullable=True)           # when it ran out of tries
+    failure_notified_at = Column(DateTime, nullable=True)  # the one email a connection sent
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # --- Ad ---
