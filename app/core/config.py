@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     RENDER_API_KEY: str = os.getenv("RESMARA_RENDER_API_KEY", "")
     RENDER_SERVICE_ID: str = os.getenv("RESMARA_RENDER_SERVICE_ID", "")
     RENDER_API_BASE: str = os.getenv("RESMARA_RENDER_API_BASE", "https://api.render.com/v1")
+    # A free PageSpeed Insights key: anonymous calls are rate-limited to the point of a 429.
+    PAGESPEED_KEY: str = os.getenv("RESMARA_PAGESPEED_KEY", "")
     GITHUB_API_BASE: str = os.getenv("RESMARA_GITHUB_API_BASE", "https://api.github.com")
 
     # Models that must not be used for this workload, whatever the env says. glm-5.3 spent its

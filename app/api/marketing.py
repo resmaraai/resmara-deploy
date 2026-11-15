@@ -117,26 +117,36 @@ def marketing(days: int = Query(30, ge=1, le=180),
     }
 
 
-def _pagespeed(url: str, strategy: str) -> Optional[int]:
-    """PageSpeed Insights needs no key at low volume, and returns the real Lighthouse score."""
+def _pagespeed(url: str, strategy: str) -> tuple[Optional[int], str]:
+    """The real Lighthouse score, or the sentence that says why there isn't one.
+
+    Anonymous calls are heavily rate-limited (Google answers 429), so a free key is used when
+    RESMARA_PAGESPEED_KEY is set. Either way the page is told the reason rather than shown a blank.
+    """
+    params = {"url": url, "strategy": strategy, "category": "performance"}
+    key = (getattr(settings, "PAGESPEED_KEY", "") or "").strip()
+    if key:
+        params["key"] = key
     try:
-        with httpx.Client(timeout=20.0) as client:
-            response = client.get(
-                "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
-                params={"url": url, "strategy": strategy, "category": "performance"},
-            )
+        with httpx.Client(timeout=25.0) as client:
+            response = client.get("https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+                                  params=params)
         if response.status_code >= 400:
             log.info("pagespeed %s -> %s", strategy, response.status_code)
-            return None
+            if response.status_code == 429:
+                return None, ("PageSpeed Insights is rate-limiting this service - a free "
+                              "RESMARA_PAGESPEED_KEY fixes it" if not key
+                              else "PageSpeed Insights is rate-limiting this service")
+            return None, f"PageSpeed Insights said {response.status_code}"
         data = response.json()
         score = (((data.get("lighthouseResult") or {}).get("categories") or {})
                  .get("performance") or {}).get("score")
-        return int(round(float(score) * 100)) if score is not None else None
+        if score is None:
+            return None, "PageSpeed Insights answered without a score"
+        return int(round(float(score) * 100)), ""
     except Exception as exc:                                    # noqa: BLE001 - a check, not a crash
         log.info("pagespeed failed: %s", exc)
-        return None
-
-
+        return None, f"PageSpeed Insights could not be reached ({type(exc).__name__})"
 def _tag_checks(base: str) -> List[Dict[str, Any]]:
     checks = []
     try:
@@ -163,16 +173,14 @@ def website(days: int = Query(30, ge=1, le=180),
     """Visitors need Google Analytics; speed and the tags are measured here, for real."""
     base = settings.PUBLIC_BASE_URL.rstrip("/")
     checks = _tag_checks(base)
-    mobile = _pagespeed(base + "/", "mobile")
-    desktop = _pagespeed(base + "/", "desktop")
+    mobile, why_mobile = _pagespeed(base + "/", "mobile")
+    desktop, why_desktop = _pagespeed(base + "/", "desktop")
     checks.append({"name": "Page speed (phones)", "status":
                    "ok" if (mobile or 0) >= 90 else ("fail" if mobile is not None and mobile < 50 else "warn"),
-                   "detail": f"Lighthouse performance {mobile}/100" if mobile is not None
-                             else "PageSpeed Insights did not answer"})
+                   "detail": f"Lighthouse performance {mobile}/100" if mobile is not None else why_mobile})
     checks.append({"name": "Page speed (desktop)", "status":
                    "ok" if (desktop or 0) >= 90 else ("warn" if desktop is not None else "warn"),
-                   "detail": f"Lighthouse performance {desktop}/100" if desktop is not None
-                             else "PageSpeed Insights did not answer"})
+                   "detail": f"Lighthouse performance {desktop}/100" if desktop is not None else why_desktop})
 
     return {
         "connected": False,
