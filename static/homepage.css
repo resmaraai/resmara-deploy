@@ -911,3 +911,6 @@ dialog:has(.ei-split){max-width:900px;width:min(900px,calc(100vw - 24px))}
 /* Photo permission checkbox on New campaign */
 .nc-rights{display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;font-size:14px;color:#12354d;cursor:pointer;line-height:1.45}
 .nc-rights input{width:18px;height:18px;margin:2px 0 0;flex:none;accent-color:#d94c0d}
+
+/* Homepage scroll boxes scroll by touch on phones (the brand kit's content is inert, not the box itself) */
+#home-brand .mb-preview,#home-report-preview{touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
