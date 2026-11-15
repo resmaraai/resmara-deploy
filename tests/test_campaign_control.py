@@ -336,6 +336,27 @@ kept = next((c for c in after["campaigns"] if c["boost_id"] == boost["id"]), {})
 check("  ...and the campaign that was kept still has its posts", kept.get("posts") == 3,
       str(kept)[:200])
 
+print("\n=== 8. the same job from a machine token, not a browser ===")
+import os as _os
+pub = "test-publish-token-123"
+_os.environ["RESMARA_PUBLISH_TOKEN"] = pub
+from app.core.config import settings as _settings
+_settings.PUBLISH_TOKEN = pub
+r = client.get("/api/admin/posts/audit", headers={"X-Resmara-Token": pub})
+check("the audit answers a token", r.status_code == 200, r.text[:160])
+r_bad = client.get("/api/admin/posts/audit", headers={"X-Resmara-Token": "wrong"})
+check("  ...but not a wrong one", r_bad.status_code in (401, 403), str(r_bad.status_code))
+guard = client.post("/api/admin/posts/purge", json={"expect_total": 0, "confirm": "DELETE 0 POSTS"},
+                    headers={"X-Resmara-Token": pub})
+check("the count guard still bites with a token", guard.status_code == 428, str(guard.status_code))
+now = client.get("/api/admin/posts/audit", headers={"X-Resmara-Token": pub}).json()["total_posts"]
+done = client.post("/api/admin/posts/purge",
+                   json={"expect_total": now, "confirm": f"DELETE {now} POSTS"},
+                   headers={"X-Resmara-Token": pub})
+check("  ...and a token purge works", done.status_code == 200 and done.json()["deleted"] == now,
+      done.text[:200])
+check("  ...leaving nothing behind", done.json()["remaining"] == 0, done.text[:200])
+
 print()
 if FAILS:
     print(f"{len(FAILS)} FAILED: " + "; ".join(FAILS))

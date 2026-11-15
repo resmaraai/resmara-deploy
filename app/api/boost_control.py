@@ -448,7 +448,10 @@ def posts_purge(body: Optional[dict] = None, db: Session = Depends(get_db),
     if keep:
         q = q.filter(~Post.boost_id.in_(keep))
     deleted = q.delete(synchronize_session=False)
-    db.add(Event(user_id=current_user.id, event_type="posts_purged",
-                 payload={"deleted": int(deleted), "kept_boost_ids": sorted(keep)}))
+    # A machine-token purge has no user row to hang the event off; the event still gets written so
+    # the dashboard's history shows who did what and when.
+    db.add(Event(user_id=(current_user.id if current_user else None), event_type="posts_purged",
+                 payload={"deleted": int(deleted), "kept_boost_ids": sorted(keep),
+                          "via": "token" if current_user is None else "dashboard"}))
     db.commit()
     return {"deleted": int(deleted), "kept_boost_ids": sorted(keep), "remaining": db.query(Post).count()}
