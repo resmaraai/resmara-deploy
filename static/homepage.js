@@ -70,7 +70,7 @@ function siteNav(active){
  return `<header class="home-nav shared-nav">${logo}<nav aria-label="Main navigation">${links.map(([id,label,fn])=>`<a href="#${id==='home'?'':id}" ${active===id?'aria-current="page"':''} onclick="${fn}();return false">${label}</a>`).join('')}</nav><button class="alt" onclick="clientAccess()">${state.clientSignedIn?'My Dashboard':'Client Login'} ↗</button></header>`;
 }
 function footerLinks(){
- return `<span style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;font-size:12px"><a href="privacy.html">Privacy</a><a href="data-deletion.html">Data deletion</a><a href="terms.html">Terms</a><a href="mailto:resmaraai@gmail.com" target="_blank" rel="noopener">Contact</a></span>`;
+ return `<span style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;font-size:12px"><a href="privacy.html">Privacy</a><a href="data-deletion.html">Data deletion</a><a href="terms.html">Terms</a><a href="mailto:resmaraai@gmail.com" target="_blank" rel="noopener">Contact</a><a href="admin.html">Team room</a></span>`;
 }
 function signOutDemo(){state.clientSignedIn=false;persist();home();window.scrollTo(0,0)}
 function clientAccess(mode='signin'){
@@ -103,9 +103,10 @@ async function requestResetLink(form){
  }
 }
 function resetPasswordPage(token){
- location.hash='';document.title='Choose a new password — Resmara';
- app.innerHTML=`<div class="marketing-home">${siteNav('')}<main><section class="home-section package-page"><div><span class="home-kicker">PASSWORD RESET</span><h2>Choose a new password.</h2>${token?'<p>Type it twice. This link works once, so choose something you will remember.</p>':'<p>This link is missing its reset code. Ask for a new one from the sign-in page.</p>'}<form onsubmit="event.preventDefault();submitNewPassword(this)" data-token="${esc(token)}"><label class="field">New password<input name="password" type="password" required minlength="8" autocomplete="new-password"></label><label class="field">Type it again<input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label><p class="fine" role="status"></p><div class="modal-actions"><button${token?'':' disabled'}>Save new password →</button><button type="button" class="alt" onclick="clientAccess()">Back to sign in</button></div></form></div></section></main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
- window.scrollTo(0,0);
+ // Same pop-up card as Client Login, over the homepage, so a reset looks like the rest of the client area.
+ document.title='Choose a new password — Resmara';
+ if(typeof home==='function')home();
+ show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>Choose a new password</h2>${token?'<p>Type it twice. This link works once.</p>':'<p>This link is missing its reset code. Ask for a new one from Client Login.</p>'}<form onsubmit="event.preventDefault();submitNewPassword(this)" data-token="${esc(token)}"><label class="field">New password<input name="password" type="password" required minlength="8" autocomplete="new-password"></label><label class="field">Type it again<input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label><p class="fine" role="status"></p><div class="modal-actions"><button${token?'':' disabled'}>Save new password →</button><button type="button" class="alt" onclick="clientAccess()">Back to sign in</button></div></form>`);
 }
 async function submitNewPassword(form){
  const status=form.querySelector('[role="status"]');
@@ -116,7 +117,7 @@ async function submitNewPassword(form){
  status.textContent='Saving…';
  try{
   await RM.confirmPasswordReset(form.dataset.token,password);
-  show(`<span class="eyebrow">PASSWORD CHANGED</span><h2>You're set</h2><p>Sign in with your new password.</p><div class="modal-actions"><button onclick="clientAccess()">Sign in →</button></div>`);
+  show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>Password changed</h2><p>You're set. Sign in with your new password.</p><div class="modal-actions"><button onclick="clientAccess()">Sign in →</button></div>`);
  }catch(err){
   status.textContent=(err&&err.message)||'This reset link is invalid or has expired.';
  }
@@ -403,3 +404,7 @@ function scrollHint(text){return `<div class="scroll-hint" aria-hidden="true"><s
 function armScrollHint(el){if(!el||el.dataset.hintArmed)return;el.dataset.hintArmed='1';el.classList.add('has-hint');el.addEventListener('scroll',()=>el.classList.toggle('scrolled',el.scrollTop>30),{passive:true})}
 document.addEventListener('DOMContentLoaded',()=>{});
 new MutationObserver(()=>{document.querySelectorAll('#home-brand .mb-preview,#home-report-preview').forEach(armScrollHint)}).observe(document.documentElement,{childList:true,subtree:true});
+
+// Light / dark for the agent dashboard. Each person's choice is remembered on their device.
+function themeToggle(){const dark=document.documentElement.classList.contains('dark');return `<button class="theme-toggle" role="switch" aria-checked="${dark}" onclick="toggleTheme()"><span>Dark mode</span><i></i></button>`}
+function toggleTheme(){const dark=!document.documentElement.classList.contains('dark');document.documentElement.classList.toggle('dark',dark);try{localStorage.setItem('resmara_theme',dark?'dark':'light')}catch{}const b=document.querySelector('.theme-toggle');if(b){b.setAttribute('aria-checked',String(dark));0}}

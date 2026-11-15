@@ -184,13 +184,68 @@ if (window.RM && RM.isLoggedIn && RM.isLoggedIn() && window.fetch) {
 }
 
 function helpNorm(s) { return String(s || '').toLowerCase().replace(/[’']/g, '’').replace(/[^a-z0-9’$.\s-]/g, ' ').replace(/\s+/g, ' ').trim(); }
+// Everyday words agents use, mapped onto the words the library is written in, so
+// "how do I add a house" finds "How do I start my first campaign?".
+const HELP_SYNONYMS = [
+  [/\b(house|home|homes|houses|property|properties|listing|listings|address|place)\b/g, 'campaign'],
+  [/\b(add|create|make|launch|post|set up|setup|upload|put up|list)\b(?= (a |an |my |new |another )?(campaign|campaigns))/g, 'start'],
+  [/\b(price|pricing|charge|charged|pay|paying|bill|billed|fee)\b/g, 'cost'],
+  [/\b(ig|insta|fb)\b/g, 'instagram'],
+  [/\b(stats|numbers|analytics|insights|results)\b/g, 'report'],
+  [/\b(didnt|didn t|did not|never|wont|won t)\b (go live|post|publish|show|show up|appear)/g, 'didn’t post'],
+  [/\b(quit|stop using|leave|unsubscribe)\b/g, 'close account'],
+];
+
+HELP_KB.push(
+  { id: 'add-house', q: 'How do I add a house?', keys: ['add a house', 'add a home', 'add a listing', 'new listing', 'another listing', 'list a house', 'add property'],
+    a: 'Each house is its own campaign. Click the orange + Campaign button on My campaigns, paste the listing link (or upload your photos), tick that you have permission to use the photos, then click Build my campaign. It’s $49 for that house, charged when you build it.' },
+  { id: 'after-14', q: 'What happens after the 14 days?', keys: ['after 14 days', 'after the 14', 'when it ends', 'campaign ends', 'finished campaign', 'campaign is over', 'after two weeks'],
+    a: 'The posts stop and the ad switches off on its own. The campaign moves to Completed, where your final seller report stays. If the house is still for sale, you can run it again from there.' },
+  { id: 'cancel', q: 'Can I cancel?', keys: ['cancel', 'cancel my', 'stop paying', 'subscription', 'monthly fee'],
+    a: 'There’s no subscription to cancel. You only pay $49 when you build a campaign. To stop a running campaign, use Pause on its card. To close your account completely, go to Billing and click Close my account at the bottom.' },
+  { id: 'how-many', q: 'Can I run more than one house at once?', keys: ['more than one', 'multiple', 'several houses', 'two listings', 'at the same time', 'at once'],
+    a: 'Yes. Each house is its own campaign, and you can have as many running at the same time as you like. They all show on My campaigns.' },
+  { id: 'what-posts', q: 'What gets posted?', keys: ['what gets posted', 'what posts', 'how many posts', 'what will it post', 'post every day', 'daily posts'],
+    a: 'Fourteen days of posts on your Facebook Page and Instagram, one a day, written in your voice from the listing. Day 1 is the listing video if there is one. Alongside them runs one ad for the house. You can read and change every post before it goes live.' },
+  { id: 'where-posts', q: 'Where do the posts go?', keys: ['where do posts go', 'which page', 'my page', 'post to', 'where will it post'],
+    a: 'To the Facebook Page and Instagram account you connected under Accounts. Nothing posts anywhere else.' }
+);
+
+const HELP_GO = { start: 'new-campaign', 'add-house': 'new-campaign', 'how-many': 'new-campaign', connect: 'accounts', required: 'accounts',
+  'ig-personal': 'accounts', 'not-admin': 'accounts', 'no-page': 'accounts', 'no-ad-account': 'accounts', disconnect: 'accounts',
+  card: 'add-card', receipts: 'billing', price: 'billing', 'when-pay': 'billing', cancel: 'close-account', close: 'close-account', refund: 'support',
+  brand: 'brand', 'brand-wrong': 'brand', support: 'support', 'failed-post': 'support', reports: 'reports', leads: 'campaigns',
+  pause: 'campaigns', rerun: 'campaigns', 'after-14': 'campaigns', 'edit-post': 'campaigns', 'move-post': 'campaigns', approve: 'campaigns', password: 'password' };
+HELP_KB.forEach(e => { if (!e.go && HELP_GO[e.id]) e.go = HELP_GO[e.id]; });
+const HELP_GO_LABEL = { campaigns: 'Open My campaigns', 'new-campaign': 'Start a campaign', brand: 'Open My Brand', billing: 'Open Billing',
+  'add-card': 'Add a card', 'close-account': 'Go to Close my account', accounts: 'Open Accounts', support: 'Open Support', reports: 'Open my campaigns', password: 'Reset my password' };
+function helpGo(where){
+  const signed = typeof state !== 'undefined' && state.clientSignedIn;
+  if (where === 'password' || !signed) { if (typeof clientAccess === 'function') clientAccess(); return; }
+  if (where === 'new-campaign') { if (typeof newCampaign === 'function') newCampaign(); return; }
+  const v = { campaigns: 'campaigns', reports: 'campaigns', brand: 'brand', billing: 'credits', 'add-card': 'credits', 'close-account': 'credits', accounts: 'accounts', support: 'support' }[where];
+  if (v && typeof dashboard === 'function') dashboard(v);
+  if (where === 'add-card' && typeof addPaymentCard === 'function') setTimeout(addPaymentCard, 300);
+  if (where === 'close-account') setTimeout(() => { const b = document.querySelector('.billing-close'); if (b) { b.scrollIntoView({behavior: 'smooth', block: 'center'}); b.classList.add('pulse'); } }, 400);
+}
+function helpGoButton(where){
+  const panel = document.querySelector('#pip-messages'); if (!panel || !where || !HELP_GO_LABEL[where]) return;
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'pip-go'; b.textContent = HELP_GO_LABEL[where] + ' →';
+  b.addEventListener('click', () => helpGo(where)); panel.append(b); panel.scrollTop = panel.scrollHeight;
+}
+function helpCanon(q){ let s = ' ' + helpNorm(q) + ' '; HELP_SYNONYMS.forEach(([re, to]) => { s = s.replace(re, to); }); return s; }
+function helpScore(q, e){
+  const words = q.trim().split(' ').filter(w => w.length > 3);
+  let s = 0;
+  e.keys.forEach(k => { if (q.includes(helpNorm(k))) s += 3 + helpNorm(k).split(' ').length; });
+  words.forEach(w => { if (helpNorm(e.q).includes(w)) s += 1; });
+  return s;
+}
 function helpMatch(question) {
-  const q = ' ' + helpNorm(question) + ' ', words = q.trim().split(' ').filter(w => w.length > 3);
+  const q1 = ' ' + helpNorm(question) + ' ', q2 = helpCanon(question);
   let best = null, bestScore = 0;
   HELP_KB.forEach(e => {
-    let s = 0;
-    e.keys.forEach(k => { if (q.includes(helpNorm(k))) s += 3 + helpNorm(k).split(' ').length; });
-    words.forEach(w => { if (helpNorm(e.q).includes(w)) s += 1; });
+    const s = Math.max(helpScore(q1, e), helpScore(q2, e));
     if (s > bestScore) { bestScore = s; best = e; }
   });
   return bestScore >= 3 ? best : null;
@@ -207,19 +262,43 @@ function helpLogMiss(question) {
 const HELP_QUICK = ['start', 'connect', 'price', 'reports'];
 pipAnswer = function (n) {
   const e = HELP_KB.find(x => x.id === HELP_QUICK[n]) || HELP_KB[0];
-  pipMessage(e.q, true); pipMessage(e.a);
+  pipMessage(e.q, true); pipMessage(e.a); helpGoButton(e.go);
 };
 pipFreeText = function (q) {
   if (!String(q || '').trim()) return;
   pipMessage(q, true);
+  helpAskAI(q);
+};
+// Needs POST /api/help/ask from the back end: it sends the question and this library to the
+// model and returns {answer, sure}. The model may only use what the library says; when it is not
+// sure it says so, and the question goes to the team as before.
+async function helpAskAI(q){
+  const panel = document.querySelector('#pip-messages');
+  const wait = document.createElement('div'); wait.className = 'pip-reply pip-typing'; wait.textContent = 'Thinking…';
+  if (panel) { panel.append(wait); panel.scrollTop = panel.scrollHeight; }
+  let r = null;
+  try {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 9000);
+    const headers = { 'Content-Type': 'application/json' };
+    try { const tok = localStorage.getItem('resmara_token'); if (tok) headers.Authorization = 'Bearer ' + tok; } catch (x) {}
+    const res = await fetch('/api/help/ask', { method: 'POST', credentials: 'include', headers, signal: ctl.signal,
+      body: JSON.stringify({ question: String(q).slice(0, 500), page: typeof view !== 'undefined' ? view : '', history: helpHistory.slice(-6) }) });
+    clearTimeout(t);
+    if (res.ok) r = await res.json();
+  } catch (err) {}
+  wait.remove();
+  if (r && r.answer && r.sure !== false) { pipMessage(r.answer); helpGoButton(r.go); helpHistory.push({q: q, a: r.answer}); return; }
+  // No AI (or it was not sure): the built-in library, then a person.
   const e = helpMatch(q);
-  if (e) { pipMessage(e.a); if (e.ticket) pipOfferTicket(q); return; }
+  if (e) { pipMessage(e.a); helpGoButton(e.go); helpHistory.push({q: q, a: e.a}); if (e.ticket) pipOfferTicket(q); return; }
   helpLogMiss(q);
   pipOfferTicket(q);
-};
+}
+const helpHistory = [];
 (function () {
   const box = document.querySelector('.pip-questions');
-  if (box) box.innerHTML = HELP_QUICK.map((id, n) => `<button onclick="pipAnswer(${n})">${esc(HELP_KB.find(x => x.id === id).q)}</button>`).join('');
+  // No suggested questions: the agent just asks.
+  if (box) box.remove();
   const note = document.querySelector('.pip-demo-note');
   if (note) note.textContent = 'Ask me anything about Resmara. If I don’t know, I’ll pass it to the team.';
 })();
