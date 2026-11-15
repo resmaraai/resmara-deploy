@@ -14,12 +14,13 @@ from urllib.parse import urlsplit
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.billing import require_paid
 from app.core.config import settings
-from app.core.security import get_current_user, oauth2_scheme
+from app.core.security import get_current_user
 from app.db.session import Ad, AdAccount, Boost, Event, Post, SessionLocal, User, get_db
 
 router = APIRouter()
@@ -347,7 +348,12 @@ def _admin_only(user: User):
             "error": "admin_only", "message": "This is an operator action."})
 
 
-async def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme),
+# auto_error=False is the whole point: an operator calling with X-Resmara-Token has no bearer
+# token, and the default scheme would reject the request before the token was ever looked at.
+_optional_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+
+async def get_current_user_optional(token: Optional[str] = Depends(_optional_scheme),
                                     db: Session = Depends(get_db)) -> Optional[User]:
     """The signed-in operator, or None. Used where a machine token is also acceptable."""
     if not token:
