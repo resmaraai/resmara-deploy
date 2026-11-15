@@ -261,8 +261,38 @@ function myBrand(){
  const k=brandKitData();
  $('#content').innerHTML=`<div class="welcome mb-page-head"><h1>My Brand</h1></div><div class="notice page-intro">This is the brand kit Resmara built from your website, socials and brokerage. Every post and ad follows it, so check it over, fix anything that’s off and save.</div>
  <form class="mb" onsubmit="saveBrandProfile(event,this,false)">${brandKitSections(k)}<p class="fine" data-brand-error role="alert"></p>
-  <div class="mb-foot"><div class="mb-status"><button class="mb-research" type="button" onclick="toast('Resmara is researching your brand again. This takes a minute.')">Research again</button><span>✓ Researched ${esc(k.researched||'from your website')}</span></div><button class="campaign-primary">Save my brand</button></div>
+  <div class="mb-foot"><div class="mb-status"><button class="mb-research" type="button" onclick="toast('Resmara is researching your brand again. This takes a minute.')">Research again</button><button class="mb-research" type="button" onclick="brandFromPage(this)">Build from my Facebook Page</button><span>✓ Researched ${esc(k.researched||'from your website')}</span></div><button class="campaign-primary">Save my brand</button></div>
  </form>`;
+}
+// Brand Engine section 4: the kit is built from the Page the agent connected. Meta's facts fill
+// only the fields that are empty - the agent's own words are never overwritten - and the model's
+// suggestions are shown for a yes/no, not applied silently.
+async function brandFromPage(btn){
+ if(!window.RM||!RM.brandFromMeta){toast('Sign in first.');return}
+ if(!state.metaConnected&&!(state.connected&&state.connected.meta)){toast('Connect Facebook first - Resmara reads your Page from that connection.');return}
+ if(btn){btn.disabled=true;btn.textContent='Reading your Page…'}
+ try{
+  const kit=await RM.brandFromMeta();
+  const f=kit.facts||{},p=kit.proposed||{};
+  state.brand={...(state.brand||{})};
+  const fill=(k,v)=>{if(v&&!state.brand[k])state.brand[k]=v};
+  fill('company',f.name);fill('website',f.website);fill('phone',f.phone);
+  if(f.address)fill('market',f.address);
+  if(f.logo_url&&!state.brandMedia)state.brandMedia={...(state.brandMedia||{}),logo:f.logo_url};
+  const suggested=[];
+  if(p.colors&&p.colors.length){suggested.push('Colours: '+p.colors.join(', '));fill('colours',p.colors.join(', '))}
+  if(p.voice){suggested.push('Voice: '+p.voice);fill('voice',p.voice)}
+  if(p.font)suggested.push('Type: '+p.font);
+  if(p.tagline)suggested.push('Tagline: '+p.tagline);
+  persist();myBrand();
+  show(`<span class="eyebrow">FROM YOUR FACEBOOK PAGE</span><h2>Resmara read your Page.</h2>
+   <p>These are Meta's own facts, now filled in below. Anything you had already typed was left alone.</p>
+   <p class="fine">${esc(f.name||'Your Page')}${f.phone?' · '+esc(f.phone):''}${f.website?' · '+esc(f.website):''}</p>
+   ${suggested.length?`<p class="notice">Suggestions to look over, not applied: ${esc(suggested.join(' · '))}</p>`:''}
+   <p class="fine">Nothing is saved as your brand until you press Save my brand.</p>
+   <div class="modal-actions"><button onclick="modal.close();document.querySelector('.mb')?.scrollIntoView({block:'start'})">Review and save</button></div>`);
+ }catch(e){toast((e&&e.message)||'Could not read your Page. Connect Facebook and try again.')}
+ finally{if(btn){btn.disabled=false;btn.textContent='Build from my Facebook Page'}}
 }
 function brandColoursSync(form){const v=[...form.querySelectorAll('.mb-sw input')].map(i=>i.value.toUpperCase()).join(', ');form.elements.colours.value=v}
 function brandProfileForm(onboarding){

@@ -464,6 +464,13 @@
     }).then(function (r) { return (r && r.brand) || {}; });
   }
 
+  // Build the brand kit from the Facebook Page the agent connected (Brand Engine §4). The answer
+  // separates facts (from Meta) from proposals (from the model) - the caller must not merge them
+  // silently, so it returns the whole kit.
+  function brandFromMeta() {
+    return request('/api/auth/me/brand/from-meta', { method: 'POST' });
+  }
+
   function adAccounts() {
     return request('/api/ad-accounts');
   }
@@ -595,6 +602,7 @@
     metaConnect: metaConnect,
     brandProfile: brandProfile,
     saveBrandProfile: saveBrandProfile,
+    brandFromMeta: brandFromMeta,
     adAccounts: adAccounts,
     checkConnections: checkConnections,
     onboardingState: onboardingState,

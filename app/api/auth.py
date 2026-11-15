@@ -226,6 +226,39 @@ def put_my_brand(payload: dict, current_user: User = Depends(get_current_user),
     return {"brand": current_user.brand or {}}
 
 
+@router.post("/me/brand/from-meta")
+async def build_brand_from_meta(current_user: User = Depends(get_current_user),
+                                db: Session = Depends(get_db)):
+    """Build the brand kit from the agent's own Facebook Page (Brand Engine v1.0 §4).
+
+    Meta is the source of the facts - name, category, about, phone, website, logo. Voice, palette
+    and typeface are proposals from the model and come back marked ``confirmed: false``: the engine
+    never overwrites what the agent typed. Nothing is saved here; the client shows the proposal and
+    the agent presses save, so a wrong palette cannot silently become the brand.
+    """
+    from app.services import brand_engine
+
+    token = ""
+    try:
+        from app.db.session import AdAccount
+        acct = (db.query(AdAccount).filter(AdAccount.user_id == current_user.id)
+                .order_by(AdAccount.id.desc()).first())
+        token = (acct.access_token or "") if acct is not None else ""
+    except Exception:  # noqa: BLE001
+        token = ""
+    if not token:
+        raise HTTPException(status_code=400,
+                            detail="Resmara is not connected to your Facebook account yet, so there "
+                                   "is no Page to read. Connect in Connections and try again.")
+    page = await brand_engine.read_page(token)
+    if not page.get("ok"):
+        raise HTTPException(status_code=502,
+                            detail="Facebook did not return your Page: "
+                                   + str(page.get("reason") or "unknown error"))
+    kit = await brand_engine.brand_from_meta(page.get("page") or {}, page.get("business"))
+    return kit
+
+
 def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
