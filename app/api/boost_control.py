@@ -18,7 +18,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.billing import require_paid
-from app.core.security import get_current_user
+from app.core.config import settings
+from app.core.security import get_current_user, oauth2_scheme
 from app.db.session import Ad, AdAccount, Boost, Event, Post, SessionLocal, User, get_db
 
 router = APIRouter()
@@ -346,15 +347,49 @@ def _admin_only(user: User):
             "error": "admin_only", "message": "This is an operator action."})
 
 
+async def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme),
+                                    db: Session = Depends(get_db)) -> Optional[User]:
+    """The signed-in operator, or None. Used where a machine token is also acceptable."""
+    if not token:
+        return None
+    try:
+        return await get_current_user(token=token, db=db)
+    except HTTPException:
+        return None
+
+
+def _operator_or_token(user_ok: bool, token: str) -> None:
+    """Admin session, or the machine token the sweep already uses.
+
+    The old test posts have to be cleared before the publisher is switched on (item 7). Doing that
+    from the dashboard is fine when someone is sitting in front of it; the deploy that clears them
+    is not always a browser, so the same token that drives the listing sweep can drive this.
+    """
+    expected = (getattr(settings, "PUBLISH_TOKEN", "") or "").strip()
+    if not expected:
+        if user_ok:
+            return
+        raise HTTPException(status_code=503, detail={"error": "not_configured",
+                                                    "message": "No publish token is configured."})
+    if token and token == expected:
+        return
+    if user_ok:
+        return
+    raise HTTPException(status_code=403, detail={"error": "admin_only",
+                                                "message": "This is an operator action."})
+
+
 @router.get("/admin/posts/audit")
 def posts_audit(db: Session = Depends(get_db),
-                current_user: User = Depends(get_current_user)):
+                current_user: Optional[User] = Depends(get_current_user_optional),
+                x_resmara_token: str = Header(default="")):
     """Every post on the site, grouped by campaign, with enough to recognise a test.
 
     The publisher stays off until the 126 old test posts are gone (owner item 7), and the only
     way to be sure it is safe to switch on is to look at what is actually stored. Read-only.
     """
-    _admin_only(current_user)
+    _operator_or_token(bool(current_user and getattr(current_user, "is_admin", False)),
+                       x_resmara_token)
     rows = (db.query(Post, Boost).join(Boost, Post.boost_id == Boost.id)
             .order_by(Post.boost_id, Post.day, Post.slot).all())
     campaigns: dict = {}
@@ -379,13 +414,15 @@ def posts_audit(db: Session = Depends(get_db),
 
 @router.post("/admin/posts/purge")
 def posts_purge(body: Optional[dict] = None, db: Session = Depends(get_db),
-                current_user: User = Depends(get_current_user)):
+                current_user: Optional[User] = Depends(get_current_user_optional),
+                x_resmara_token: str = Header(default="")):
     """Delete posts, but only when the operator has named what they are deleting.
 
     The confirmation string carries the number: a request that says "purge" without saying how
     many is exactly how the real campaign gets deleted by accident.
     """
-    _admin_only(current_user)
+    _operator_or_token(bool(current_user and getattr(current_user, "is_admin", False)),
+                       x_resmara_token)
     body = body or {}
     count = db.query(Post).count()
     expected = body.get("expect_total")
