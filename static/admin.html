@@ -1236,8 +1236,9 @@ function renderBuildroom(){
   const tb = $('brTable').querySelector('tbody');
   if (!rows.length) {
     tb.innerHTML = '<tr><td colspan="7"><span class="hint">' +
-      (brFilter === 'all' ? 'Nothing on the board yet. Add the first task above — the one you are on right now is a good start.'
-                          : 'Nothing in this view.') + '</span></td></tr>';
+      (!brRows.length
+        ? 'Nothing on the board yet. Add the first task above — the thing you are on right now is a good start.'
+        : 'Nothing in this view.') + '</span></td></tr>';
   } else {
     const me = brMe().toLowerCase();
     tb.innerHTML = rows.map(t => {
