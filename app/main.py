@@ -69,8 +69,8 @@ app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads"
 app.include_router(api_router, prefix="/api")
 
 
-@app.get("/api/version", include_in_schema=False)
 def _migrate_failures():
+    """Columns the last startup could not add; [] is the healthy answer."""
     try:
         from app.db.migrate import failed_additions
         return failed_additions()
@@ -78,6 +78,7 @@ def _migrate_failures():
         return []
 
 
+@app.get("/api/version", include_in_schema=False)
 def version():
     """Which commit is actually running here.
 
