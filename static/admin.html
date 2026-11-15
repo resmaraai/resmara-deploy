@@ -1907,6 +1907,12 @@ function paintReleases(){
     ['relOpen', 'relDone'].forEach(id => { $(id).className = 'hint'; $(id).textContent = 'Appears once the back end reads the pull requests from GitHub.'; });
     navBadge('releases', 0); return;
   }
+  if relData && relData.connected === false {
+    h.innerHTML = hero({eyebrow: 'Releases', big: 'Not connected', small: (relData.problems || [])[0] || 'the service has no GitHub or Render credential'});
+    ['relOpen', 'relDone'].forEach(id => { const el = $(id); if (!el) return; el.className = 'hint';
+      el.textContent = (relData.problems || [])[0] || 'Connect GitHub to see what is waiting to go live.'; });
+    navBadge('releases', 0); return;
+  }
   const openR = (relData.open || []), doneR = (relData.recent || []);
   const lastLive = doneR.find(r => r.deploy === 'live');
   h.innerHTML = hero({eyebrow: 'Releases', big: openR.length ? esc(openR.length) + ' waiting to go live' : 'Everything is live',
@@ -2342,16 +2348,19 @@ async function boot(){
   $('index').classList.remove('hidden');
   $('logout').classList.remove('hidden');
   $('tools').classList.remove('hidden');
-  $('who').textContent = me.email + (me.is_admin ? ' · admin' : ' · NOT admin');
+  // A team member is not an operator, but the console is theirs: say which of the two it is so
+  // nobody reads "NOT admin" as "this is broken" when it is a granted account.
+  const inConsole = !!(me.is_admin || me.team_super_admin || (Array.isArray(me.team_access) && me.team_access.length));
+  $('who').textContent = me.email + (me.is_admin || me.team_super_admin ? ' · admin' : inConsole ? ' · team' : ' · NOT admin');
   // The build room records who claimed a task; "who" is this signed-in operator.
   window.resmaraMe = me;
   applyAccess(me);
-  if (!me.is_admin) {
-    // A logged-in non-admin used to see four empty sections and a 403 buried in one of them.
-    // Say it at the top: this is refused, not empty.
+  if (!inConsole) {
+    // A logged-in account with no team access used to see four empty sections and a 403 buried
+    // in one of them. Say it at the top: this is refused, not empty.
     $('triage').innerHTML = '<div class="msg bad" style="grid-column:1/-1">' +
-      'Signed in as ' + esc(me.email) + ', which is not an admin account, so every figure here is refused by the server. ' +
-      'This is not an empty product — sign out and use an account marked admin in the Accounts table.</div>';
+      'Signed in as ' + esc(me.email) + ', which has no access to the Team room, so every figure here is refused by the server. ' +
+      'This is not an empty product — ask an owner to add this address on the Team page.</div>';
   }
   refreshAll();
 }

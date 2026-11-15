@@ -49,6 +49,19 @@ if [ $((10#$hour % 6)) -eq 0 ]; then
   say "listings sweep: $code $body"
 fi
 
+# Every third tick (so every 15 minutes) the console's System page runs its checks for real.
+# The page reads that freshness, which is why it can say "runs every 15 minutes" and mean it.
+if [ $((10#$(date -u +%M) % 15)) -lt 5 ]; then
+  code=$(curl -sS -m 120 -H "X-Resmara-Token: $TOKEN" -o /tmp/resmara-sched-check.$$ \
+              -w "%{http_code}" "$BASE/api/admin/system-check?refresh=1")
+  body=$(head -c 200 /tmp/resmara-sched-check.$$ 2>/dev/null)
+  rm -f /tmp/resmara-sched-check.$$
+  case "$code" in
+    200) case "$body" in *'"fail"'*) say "system check found a failure: $body" ;; esac ;;
+    *) say "system-check returned $code: $body" ;;
+  esac
+fi
+
 if [ "$(date -u +%H%M)" -ge 1400 ] && [ "$(date -u +%H%M)" -lt 1410 ]; then
   code=$(post "/api/oauth/meta/check-all" 180)
   body=$(head -c 300 /tmp/resmara-sched-body.$$ 2>/dev/null)

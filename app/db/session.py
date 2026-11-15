@@ -50,6 +50,13 @@ class User(Base):
     email_confirmed_at = Column(DateTime(timezone=True), nullable=True)
     confirm_token_hash = Column(String, nullable=True)
     confirm_sent_at = Column(DateTime(timezone=True), nullable=True)
+    # Team room access. A team member is a normal account with a list of the console's sections
+    # they may read; someone with no list and no flag is a customer and gets nothing. Access is
+    # checked on the server for every console endpoint, so the page's hiding is a courtesy and
+    # not the fence.
+    team_access = Column(JSON, nullable=True)
+    team_super_admin = Column(Boolean, default=False)
+    team_invited_at = Column(DateTime(timezone=True), nullable=True)
 
 # --- Ad Account (OAuth) ---
 class AdAccount(Base):
@@ -215,6 +222,9 @@ class Post(Base):
     failure_note = Column(Text, nullable=True)            # the sentence the agent reads
     failed_at = Column(DateTime, nullable=True)           # when it ran out of tries
     failure_notified_at = Column(DateTime, nullable=True)  # the one email a connection sent
+    # Every failure, oldest first: [{at, error}]. The console's fail log reads this, so a retry
+    # shows what happened last time instead of only the newest sentence in last_error.
+    fail_log = Column(JSON, default=list)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # --- Ad ---

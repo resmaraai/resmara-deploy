@@ -16,7 +16,8 @@ stored, counted and shown to operators, never executed and never matched by `key
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,12 +25,30 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.security import get_admin_user, get_current_user
-from app.db.session import HelpAnswer, HelpMiss, User, get_db
+from app.core.config import settings
+from app.db.session import Event, HelpAnswer, HelpMiss, User, get_db
+from app.services import llm, team_access
 
 router = APIRouter()
+log = logging.getLogger("resmara.help")
 
 MAX_QUESTION = 400
 MAX_ANSWER = 4000
+
+# How many questions the chat may put to the model per account per hour. The chat falls back to
+# the built-in library on a refusal, so a limit costs the agent nothing but a plainer answer.
+ASK_LIMIT_PER_HOUR = 40
+
+# The places the chat may tell an agent to go. Anything else is dropped rather than rendered as
+# a button that leads nowhere.
+GO_VIEWS = {"home", "dashboard", "campaigns", "campaign", "accounts", "support", "billing",
+            "settings", "setup", "growth", "photos"}
+
+
+class AskIn(BaseModel):
+    question: str
+    page: Optional[str] = None
+    history: Optional[list[dict]] = None
 
 
 class MissIn(BaseModel):
@@ -120,11 +139,90 @@ def approved_answers(db: Session = Depends(get_db)):
     return [_shape(r) for r in rows]
 
 
+# --- the chat itself ------------------------------------------------------------------
+
+ASK_SYSTEM = """You answer questions from real estate agents using Resmara, inside the app.
+
+You may use ONLY the answer library given to you. Do not invent features, prices, dates or
+policies. If the library does not answer the question, say so by returning sure=false.
+
+Reply with ONE JSON object, nothing else:
+{"answer": "1-3 short sentences, plain English, no markdown", "sure": true|false, "go": "view-or-null"}
+
+"go" may be one of: home, dashboard, campaigns, campaign, accounts, support, billing, settings,
+setup, growth, photos - only when sending the agent to that page genuinely helps, otherwise null.
+If sure is false, answer must be an empty string."""
+
+
+@router.post("/help/ask")
+async def ask(payload: AskIn, current_user: User = Depends(get_current_user),
+              db: Session = Depends(get_db)):
+    """The question the built-in library could not answer, put to the model over that library.
+
+    The model is not allowed to invent: it is handed the approved answers and told to return
+    ``sure: false`` when they do not cover the question. A false goes straight back to the
+    library-then-a-person path the chat already had, so a bad model answer can never reach an
+    agent - only a confident one built from text the team approved.
+    """
+    question = (payload.question or "").strip()[:500]
+    if len(question) < 3:
+        raise HTTPException(status_code=400, detail="A question is required")
+    unavailable = {"answer": None, "sure": False, "go": None, "reason": "no_model"}
+    if not llm.llm_available():
+        return unavailable
+
+    since = datetime.utcnow() - timedelta(hours=1)
+    used = (db.query(Event)
+            .filter(Event.user_id == current_user.id)
+            .filter(Event.event_type == "help_ask")
+            .filter(Event.created_at >= since)
+            .count())
+    if used >= ASK_LIMIT_PER_HOUR:
+        return {"answer": None, "sure": False, "go": None, "reason": "rate_limited"}
+
+    rows = (db.query(HelpAnswer)
+            .filter(HelpAnswer.active.is_(True))
+            .order_by(HelpAnswer.created_at.desc())
+            .limit(80).all())
+    library = "\n\n".join(f"Q: {r.question}\nA: {r.answer}" for r in rows)[:12000]
+    if not library:
+        return {"answer": None, "sure": False, "go": None, "reason": "empty_library"}
+
+    history = ""
+    for turn in (payload.history or [])[-4:]:
+        if isinstance(turn, dict) and turn.get("q"):
+            history += f"\nEarlier question: {str(turn.get('q'))[:200]}"
+
+    prompt = (f"Page the agent is on: {payload.page or 'unknown'}{history}\n\n"
+              f"Question: {question}\n\nAnswer library:\n{library}")
+    try:
+        data = await llm.chat_json(ASK_SYSTEM, prompt, model=settings.OPENAI_MODEL,
+                                   max_completion_tokens=500, timeout=8.0)
+    except Exception as exc:                                     # noqa: BLE001 - the chat falls back
+        log.info("help ask failed: %s", exc)
+        return {**unavailable, "reason": "model_error"}
+
+    usage = llm.take_usage()
+    answer = str(data.get("answer") or "").strip()[:1200]
+    sure = bool(data.get("sure")) and bool(answer)
+    go = data.get("go")
+    go = go if isinstance(go, str) and go.strip().lower() in GO_VIEWS else None
+
+    db.add(Event(user_id=current_user.id, event_type="help_ask",
+                 payload={"question": question[:300], "sure": sure, "page": payload.page,
+                          "usage": usage}))
+    db.commit()
+
+    if not sure:
+        return {"answer": None, "sure": False, "go": None, "reason": "not_sure"}
+    return {"answer": answer, "sure": True, "go": go}
+
+
 # --- the operator's side ---------------------------------------------------------------
 
 @router.get("/admin/help/misses")
 def admin_misses(open_only: bool = True, limit: int = 100,
-                 current_user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+                 current_user: User = Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
     q = db.query(HelpMiss)
     if open_only:
         q = q.filter(HelpMiss.answer_id.is_(None))
@@ -147,7 +245,7 @@ def admin_misses(open_only: bool = True, limit: int = 100,
 
 
 @router.get("/admin/help/answers")
-def admin_answers(current_user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+def admin_answers(current_user: User = Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
     rows = db.query(HelpAnswer).order_by(HelpAnswer.created_at.desc()).all()
     return [dict(_shape(r), active=bool(r.active), created_by=r.created_by,
                  source_ticket_id=r.source_ticket_id,
@@ -155,7 +253,7 @@ def admin_answers(current_user: User = Depends(get_admin_user), db: Session = De
 
 
 @router.post("/admin/help/answers", status_code=201)
-def add_answer(payload: AnswerIn, current_user: User = Depends(get_admin_user),
+def add_answer(payload: AnswerIn, current_user: User = Depends(team_access.needs("agents")),
                db: Session = Depends(get_db)):
     """Approve an answer for the chat.
 
@@ -185,7 +283,7 @@ def add_answer(payload: AnswerIn, current_user: User = Depends(get_admin_user),
 
 @router.patch("/admin/help/answers/{answer_id}")
 def edit_answer(answer_id: int, payload: AnswerPatch,
-                current_user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+                current_user: User = Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
     row = db.query(HelpAnswer).filter(HelpAnswer.id == answer_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Answer not found")

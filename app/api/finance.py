@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from app.core.security import get_admin_user
 from app.db.session import (Asset, Boost, Cost, CreditPurchase, FinanceSetting, Order, User,
                             get_db)
-from app.services import billing, storage
+from app.services import billing, storage, team_access
 
 router = APIRouter()
 
@@ -135,7 +135,7 @@ class AssumptionsIn(BaseModel):
 
 
 @router.get("/admin/finance")
-def finance(db: Session = Depends(get_db), current_user: User = Depends(get_admin_user)):
+def finance(db: Session = Depends(get_db), current_user: User = Depends(team_access.needs("money"))):
     """Everything the Finance tab shows, computed once, server-side, so there is one version
     of each number instead of a different one in every panel."""
     a = assumptions(db)
@@ -330,7 +330,7 @@ def finance(db: Session = Depends(get_db), current_user: User = Depends(get_admi
 
 @router.put("/admin/finance/assumptions")
 def save_assumptions(body: AssumptionsIn, db: Session = Depends(get_db),
-                     current_user: User = Depends(get_admin_user)):
+                     current_user: User = Depends(team_access.needs("money"))):
     """Store the operator's numbers. Unknown keys and out-of-range values are refused, because
     a silently ignored typo is how a model starts lying."""
     payload = dict(_row(db).payload or {})
@@ -352,3 +352,69 @@ def save_assumptions(body: AssumptionsIn, db: Session = Depends(get_db),
     row.payload = payload
     db.commit()
     return {"saved": saved, "assumptions": assumptions(db)}
+
+
+@router.get("/admin/finance/daily")
+def finance_daily(days: int = 30, db: Session = Depends(get_db),
+                  current_user: User = Depends(team_access.needs("money"))):
+    """One row per day, with the orders behind it - the bar chart on the Finance page.
+
+    Days are calendar days in UTC (Stripe reports in UTC and so does the database), the window
+    is contiguous so a quiet day is a zero bar rather than a missing one, and a checkout that
+    was started and never finished shows up as ``unfinished`` on the day it was started.
+    """
+    days = max(1, min(int(days or 30), 180))
+    end = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    start = end - timedelta(days=days)
+
+    paid = (
+        db.query(Order, User, Boost)
+        .outerjoin(User, Order.user_id == User.id)
+        .outerjoin(Boost, Order.boost_id == Boost.id)
+        .filter(Order.paid_at.isnot(None))
+        .filter(Order.paid_at >= start)
+        .order_by(Order.paid_at)
+        .all()
+    )
+    started = (
+        db.query(Order)
+        .filter(Order.status == "pending")
+        .filter(Order.created_at >= start)
+        .all()
+    )
+
+    buckets: dict[str, dict] = {}
+    cursor = start
+    while cursor < end:
+        buckets[cursor.date().isoformat()] = {"date": cursor.date().isoformat(), "orders": 0,
+                                              "revenue_usd": 0.0, "unfinished": 0, "items": []}
+        cursor += timedelta(days=1)
+
+    for order, owner, boost in paid:
+        paid_at = order.paid_at.replace(tzinfo=None) if isinstance(order.paid_at, datetime) else None
+        if paid_at is None:
+            continue
+        day = buckets.get(paid_at.date().isoformat())
+        if day is None:
+            continue
+        amount = round(float(order.amount_cents or 0) / 100.0, 2)
+        day["orders"] += 1
+        day["revenue_usd"] = round(day["revenue_usd"] + amount, 2)
+        day["items"].append({
+            "at": paid_at.isoformat(),
+            "agent": (owner.name or owner.email) if owner else None,
+            "agent_email": owner.email if owner else None,
+            "address": boost.address if boost else None,
+            "amount_usd": amount,
+        })
+
+    for order in started:
+        created = order.created_at.replace(tzinfo=None) if isinstance(order.created_at, datetime) else None
+        if created is None:
+            continue
+        day = buckets.get(created.date().isoformat())
+        if day is not None:
+            day["unfinished"] += 1
+
+    return {"days": list(buckets.values()), "window_days": days,
+            "total_usd": round(sum(d["revenue_usd"] for d in buckets.values()), 2)}

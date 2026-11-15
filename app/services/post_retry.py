@@ -280,6 +280,61 @@ def _email_connection_failure(db, post: Post, boost: Optional[Boost], reason: st
     return outcome
 
 
+def _open_agent_ticket(db, post: Post, boost: Optional[Boost], reason: str, kind: str,
+                       now: datetime) -> Dict[str, Any]:
+    """One support ticket per failed post, opened in the agent's own Support tab.
+
+    The agent's copy of this is otherwise a red banner with no next step and no human attached.
+    The ticket carries the plain reason (not Meta's JSON) and a note that the team will retry, so
+    the reply the agent gets is written by a person. Reassigning the JSON list, not appending in
+    place, for the same reason as above.
+    """
+    try:
+        owner_id = getattr(boost, "user_id", None)
+        if not owner_id:
+            return {}
+        from app.db.session import SupportTicket
+
+        where = getattr(boost, "address", "") or "your campaign"
+        subject = f"A post to {where} did not go out"
+        existing = None
+        for row in (db.query(SupportTicket)
+                      .filter(SupportTicket.user_id == owner_id)
+                      .filter(SupportTicket.status != "closed")
+                      .filter(SupportTicket.subject == subject).all()):
+            for message in (row.messages or []):
+                if isinstance(message, dict) and message.get("post_id") == post.id:
+                    existing = row
+                    break
+            if existing:
+                break
+
+        text = (f"Day {post.day} did not go out: {reason[:300] or 'Meta gave no reason'}. "
+                "The team has this on the list and will retry it.")
+        message = {"role": "team", "text": text, "at": now.isoformat(), "unread": True,
+                   "post_id": post.id, "kind": kind, "auto": True}
+        if existing:
+            messages = list(existing.messages or []) + [message]
+            existing.messages = messages
+            existing.status = "open"
+            existing.updated_at = now
+            db.add(existing)
+            ticket_id, created = existing.id, False
+        else:
+            ticket = SupportTicket(user_id=owner_id, subject=subject, status="open",
+                                   messages=[message])
+            db.add(ticket)
+            db.flush()
+            ticket_id, created = ticket.id, True
+
+        db.add(Event(boost_id=post.boost_id, event_type="ticket_created" if created else "ticket_updated",
+                     payload={"ticket_id": ticket_id, "post_id": post.id, "auto": True}))
+        return {"ticket_id": ticket_id, "created": created}
+    except Exception as exc:                                    # noqa: BLE001 - never break a sweep
+        log.warning("could not open a ticket for post %s: %s", getattr(post, "id", "?"), exc)
+        return {}
+
+
 def record_failure(db, post: Post, boost: Optional[Boost], outcome: Dict[str, Any],
                    now: Any = None) -> Dict[str, Any]:
     """Classify one failure and take its action. Called from the publish sweep.
@@ -305,8 +360,16 @@ def record_failure(db, post: Post, boost: Optional[Boost], outcome: Dict[str, An
     post.failure_kind = kind
     post.last_error = reason[:2000] or None
     post.failure_note = message_for(kind, retrying=retrying, attempts=attempts, reason=reason)
+    # Every attempt is kept, not just the last: the console's fail log shows what happened on
+    # try 1 when try 3 is the one that ran out. Reassigned rather than appended in place because
+    # SQLAlchemy's plain JSON column does not notice a mutation inside the value.
+    history = list(post.fail_log or [])
+    history.append({"at": now_dt.isoformat(), "error": (reason or "no message from Meta")[:600],
+                    "attempt": attempts, "kind": kind})
+    post.fail_log = history[-20:]
 
     email: Dict[str, Any] = {}
+    ticket: Dict[str, Any] = {}
     if retrying:
         post.publish_status = "scheduled"   # still ours to publish; next_attempt_at gates it
         post.next_attempt_at = next_attempt_at(attempts, now_dt)
@@ -317,13 +380,15 @@ def record_failure(db, post: Post, boost: Optional[Boost], outcome: Dict[str, An
         post.failed_at = now_dt
         if kind == KIND_CONNECTION:
             email = _email_connection_failure(db, post, boost, reason, now_dt)
+        ticket = _open_agent_ticket(db, post, boost, reason, kind, now_dt)
 
     db.add(Event(boost_id=post.boost_id, event_type="post_retrying" if retrying else "post_failed",
                  payload={"post_id": post.id, "day": post.day, "slot": post.slot,
                           "kind": kind, "attempts": attempts,
                           "next_attempt_at": post.next_attempt_at,
                           "error": (reason or "")[:400],
-                          **({"email": email} if email else {})}))
+                          **(({"email": email} if email else {})),
+                          **(({"ticket": ticket} if ticket else {}))}))
     db.commit()
     log.info("post %s %s (%s, attempt %s/%s)%s", post.id,
              "retrying" if retrying else "failed", kind, attempts, MAX_ATTEMPTS,

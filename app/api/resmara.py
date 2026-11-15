@@ -27,6 +27,7 @@ import secrets
 from app.core.config import settings
 from app.api.auth import reset_link, RESET_TTL_MINUTES
 from app.services import mail
+from app.services import team_access
 
 router = APIRouter()
 
@@ -475,7 +476,7 @@ def notify_operators(ticket: SupportTicket, author: User, db: Session) -> dict:
 
 
 @router.post("/admin/users/{user_id}/reset-link")
-def admin_reset_link(user_id: int, request: Request, current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def admin_reset_link(user_id: int, request: Request, current_user=Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
     """Mint a password-reset link for one account and hand it to the operator.
 
     This exists because email is not connected yet: a customer who cannot sign in is not
@@ -549,7 +550,7 @@ def mark_support_read(current_user=Depends(get_current_user), db: Session = Depe
 
 # --- Admin ---
 @router.get("/admin/users", response_model=list[AdminUserOut])
-def admin_users(current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def admin_users(current_user=Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
     users = db.query(User).all()
     result = []
     for u in users:
@@ -558,7 +559,7 @@ def admin_users(current_user=Depends(get_admin_user), db: Session = Depends(get_
     return result
 
 @router.get("/admin/support", response_model=list[SupportTicketOut])
-def admin_support(current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def admin_support(current_user=Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
     """Every ticket, newest first, with the client's email so a reply has a name on it."""
     tickets = db.query(SupportTicket).order_by(SupportTicket.created_at.desc()).all()
     emails = {u.id: u.email for u in db.query(User).all()}
@@ -571,7 +572,7 @@ def admin_support(current_user=Depends(get_admin_user), db: Session = Depends(ge
     return out
 
 @router.patch("/admin/support/{ticket_id}")
-def admin_update_ticket(ticket_id: int, status: str = None, reply: str = None, current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def admin_update_ticket(ticket_id: int, status: str = None, reply: str = None, current_user=Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
     ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -614,25 +615,25 @@ def admin_update_ticket(ticket_id: int, status: str = None, reply: str = None, c
             "messages": ticket.messages or []}
 
 @router.get("/admin/health", response_model=SystemHealth)
-def admin_health(current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def admin_health(current_user=Depends(team_access.needs("system")), db: Session = Depends(get_db)):
     """Is the service itself well? No product counts here - see /admin/metrics."""
     return SystemHealth(**metrics_service.system_health(db))
 
 @router.get("/admin/metrics", response_model=MetricsOut)
-def admin_metrics(current_user=Depends(get_admin_user), db: Session = Depends(get_db)):
+def admin_metrics(current_user=Depends(team_access.console_user), db: Session = Depends(get_db)):
     """What the product is doing, grouped by area and counted from real rows."""
     return MetricsOut(**metrics_service.activity(db))
 
 
 @router.get("/admin/mail")
-def admin_mail_state(current_user=Depends(get_admin_user)):
+def admin_mail_state(current_user=Depends(team_access.needs("system"))):
     """Which email provider is wired, without exposing the credential itself."""
     from app.services import mail
     return mail.delivery_state()
 
 
 @router.post("/admin/mail/test")
-def admin_mail_test(to: str = None, current_user=Depends(get_admin_user)):
+def admin_mail_test(to: str = None, current_user=Depends(team_access.needs("system"))):
     """Actually send one email, so "email works" is a delivery and not a config opinion.
 
     Defaults to the operator's own address. Returns the provider, whether the send was
