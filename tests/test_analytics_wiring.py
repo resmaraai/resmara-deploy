@@ -10,9 +10,17 @@ Run:  cd /Users/dan/resmara && venv/bin/python tests/test_analytics_wiring.py
 
 import os
 import sys
+import tempfile
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# --- environment BEFORE the app is imported: a throwaway database, never the real one ---
+_tmp = tempfile.NamedTemporaryFile(prefix="resmara-analytics-", suffix=".db", delete=False)
+_tmp.close()
+os.environ["DATABASE_URL"] = f"sqlite:///{_tmp.name}"
+os.environ.pop("RESMARA_SIMULATE", None)
+os.environ["RESMARA_ADMIN_EMAILS"] = "owner@resmara.com"
 
 from app.services import analytics                                        # noqa: E402
 
@@ -61,7 +69,7 @@ class FakeClient:
     def __exit__(self, *exc):
         return False
 
-    def _answer(self, method, url, params=None, json=None, data=None, headers=None):
+    def _answer(self, method, url, params=None, json=None, data=None, headers=None, content=None):
         FakeClient.calls.append({"method": method, "url": url, "params": params,
                                  "json": json, "data": data, "headers": headers})
         return FakeClient.queue.pop(0) if FakeClient.queue else FakeResponse(200, {})
@@ -69,10 +77,13 @@ class FakeClient:
     def get(self, url, params=None, headers=None, follow_redirects=False):
         return self._answer("GET", url, params=params, headers=headers)
 
-    def post(self, url, json=None, data=None, headers=None):
-        return self._answer("POST", url, json=json, data=data, headers=headers)
+    def post(self, url, json=None, data=None, headers=None, content=None):
+        return self._answer("POST", url, json=json, data=data, headers=headers, content=content)
 
 
+# Patching analytics.httpx.Client patches the httpx module itself, which starlette's TestClient
+# also uses, so the real class is kept and put back before the endpoint checks below.
+_real_httpx_client = analytics.httpx.Client
 analytics.httpx.Client = FakeClient
 start = datetime.utcnow() - timedelta(days=30)
 end = datetime.utcnow()
@@ -191,6 +202,40 @@ FakeClient.queue = [FakeResponse(429, {"error": "rate limited"})]
 result = analytics.clarity_sessions()
 ok("a 429 is not connected", result["connected"] is False)
 ok("and quotes the status", "429" in result["why"], result["why"])
+
+# --------------------------------------------------------------------- the two pages, for real
+print("\n[both pages answer as pages, with no key at all]")
+analytics.httpx.Client = _real_httpx_client
+# A property that decrypts (AdAccount.access_token) cannot be filtered in SQL, and a naive
+# datetime compared to Postgres' timestamptz is exactly the kind of thing that passes on sqlite
+# and 500s in production. These two calls catch both, because they go through the endpoints.
+from fastapi.testclient import TestClient                             # noqa: E402
+
+from app.core.security import get_password_hash                        # noqa: E402
+from app.db.session import Base, SessionLocal, User, engine            # noqa: E402
+from app.main import app                                               # noqa: E402
+
+Base.metadata.create_all(bind=engine)
+session = SessionLocal()
+session.add(User(email="owner@resmara.com", name="Owner", is_admin=True, team_super_admin=True,
+                 hashed_password=get_password_hash("pw-123456")))
+session.commit()
+session.close()
+
+client = TestClient(app)
+token = client.post("/api/auth/login",
+                    data={"username": "owner@resmara.com", "password": "pw-123456"}).json().get("access_token")
+ok("the operator signs in", bool(token))
+for path in ("/api/admin/marketing", "/api/admin/website"):
+    response = client.get(path, headers={"Authorization": f"Bearer {token}"})
+    ok(f"{path} answers 200 with nothing connected", response.status_code == 200,
+       str(response.status_code) + " " + response.text[:200])
+    body = response.json() if response.status_code == 200 else {}
+    ok(f"{path} says it is not connected", body.get("connected") is False, body.get("connected"))
+    ok(f"{path} lists what is missing", bool(body.get("unavailable")), body.get("unavailable"))
+    ok(f"{path} never invents a figure",
+       all(body.get(k) is None for k in ("visitors", "spend_usd", "impressions", "clicks")),
+       {k: body.get(k) for k in ("visitors", "spend_usd", "impressions", "clicks")})
 
 clear_env()
 print()

@@ -48,12 +48,17 @@ def _resmara_ad_account(db: Session) -> Optional[AdAccount]:
     """Resmara's own ad account is an account owned by an operator."""
     owners = db.query(User).filter(User.email.in_(_operator_emails() or {"-"})).all()
     for owner in owners:
-        account = (db.query(AdAccount)
-                   .filter(AdAccount.user_id == owner.id)
-                   .filter(AdAccount.access_token.isnot(None))
-                   .order_by(AdAccount.id.desc()).first())
-        if account:
-            return account
+        # access_token is a decrypting property, not a column: it cannot be filtered in SQL, so
+        # the newest rows are checked here. An account whose token will not decrypt is skipped.
+        for account in (db.query(AdAccount)
+                        .filter(AdAccount.user_id == owner.id)
+                        .filter(AdAccount.platform == "meta")
+                        .order_by(AdAccount.id.desc()).all()):
+            try:
+                if (account.access_token or "").strip():
+                    return account
+            except Exception:                                # noqa: BLE001 - an unreadable token
+                continue
     return None
 
 
@@ -207,10 +212,19 @@ def website(days: int = Query(30, ge=1, le=180),
     traffic = analytics.ga4_visitors(start, end)
     clarity = analytics.clarity_sessions()
     # "Sign-ups started" is ours to count: an account created in the window started signing up.
-    signups_started = (db.query(func.count(User.id))
-                       .filter(User.created_at.isnot(None))
-                       .filter(User.created_at >= start.strftime("%Y-%m-%d %H:%M:%S"))
-                       .scalar() or 0)
+    # Counted in Python on purpose - created_at is a timestamptz on Postgres and a naive datetime
+    # here, and a SQL comparison between the two dialects is exactly the kind of thing that works
+    # on sqlite and 500s in production.
+    operators = _operator_emails()
+    signups_started = 0
+    for person in db.query(User).all():
+        if (person.email or "").lower() in operators:
+            continue
+        created = person.created_at
+        if isinstance(created, datetime):
+            created = created.replace(tzinfo=None)
+            if created >= start:
+                signups_started += 1
 
     unavailable = []
     if traffic.get("connected"):
