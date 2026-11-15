@@ -1249,7 +1249,7 @@ function renderBuildroom(){
       const testedCell = t.tested_at
         ? esc(t.tested_by || 'yes') + '<div class="tiny">' + esc(String(t.tested_at).slice(0, 10)) + '</div>'
         : '<span class="tiny">not tested</span>';
-      const statusSel = '<select class="tiny" data-brstatus="' + t.id + '">' +
+      const statusSel = '<select data-brstatus="' + t.id + '" style="min-width:88px;font-size:12px;padding:4px 6px">' +
         ['todo', 'doing', 'review', 'done', 'blocked'].map(v =>
           '<option value="' + v + '"' + (t.status === v ? ' selected' : '') + '>' + v + '</option>').join('') +
         '</select>';
@@ -1267,20 +1267,21 @@ function renderBuildroom(){
         ' <button class="ghost tiny" data-brtest="' + t.id + '">tested</button>' +
         ' <button class="ghost tiny" data-brdel="' + t.id + '">delete</button>';
       return '<tr>' +
-        '<td><b>' + esc(t.title) + '</b>' +
-          (t.notes ? '<div class="tiny" title="' + esc(t.notes) + '">' + esc(t.notes.split('\n').slice(-1)[0].slice(0, 90)) + '</div>' : '') +
+        '<td style="max-width:300px"><b>' + esc(t.title) + '</b>' +
+          (t.notes ? '<div class="tiny" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px" title="' + esc(t.notes) + '">' + esc(t.notes.split('\n').slice(-1)[0].slice(0, 90)) + '</div>' : '') +
           '</td>' +
         '<td class="nw">' + esc(t.area === 'front_end' ? 'front end' : (t.area === 'back_end' ? 'back end' : 'both')) + '</td>' +
         '<td>' + statusSel + '</td>' +
         '<td>' + claimCell + '</td>' +
         '<td class="nw">' + esc(t.due_on || '—') + (t.overdue ? '<div class="tiny bad">overdue</div>' : '') + '</td>' +
         '<td>' + testedCell + '</td>' +
-        '<td class="tiny">' + actions + '</td>' +
+        '<td class="tiny nw">' + actions + '</td>' +
         '</tr>';
     }).join('');
   }
   const cnt = $('brCount');
-  if (cnt) cnt.textContent = rows.length + ' of ' + brRows.length + ' task(s) shown · ' + brFilter.replace('_', ' ');
+  if (cnt) cnt.textContent = rows.length + ' of ' + brRows.length +
+    (brRows.length === 1 ? ' task' : ' tasks') + ' shown · ' + brFilter.replace('_', ' ');
   const sum = $('sum-buildroom');
   if (sum) sum.textContent = (s.open || 0) + ' open · ' + (s.claimed || 0) + ' claimed · ' +
     (s.unclaimed || 0) + ' nobody has' + (s.overdue ? ' · ' + s.overdue + ' overdue' : '');
