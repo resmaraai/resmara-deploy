@@ -152,6 +152,10 @@ class _BaseAdsClient:
     def simulated(self) -> bool:
         return is_simulated_account(self.ad_account)
 
+    async def get_ad_preview(self, ad_id: str, ad_format: str = "MOBILE_FEED_STANDARD") -> dict:
+        """Only Meta can render one; other platforms say so instead of guessing."""
+        return {"unsupported": True, "ad_id": ad_id}
+
 
 # ---------------------------------------------------------------------------
 # Meta
@@ -230,6 +234,18 @@ class MetaAdsClient(_BaseAdsClient):
         return resp.json()
 
     # -- public API --------------------------------------------------------
+
+    async def get_ad_preview(self, ad_id: str, ad_format: str = "MOBILE_FEED_STANDARD") -> dict:
+        """Render an ad the way Meta will show it, without spending a cent.
+
+        ``/{ad_id}/previews`` returns an iframe we can drop straight into the console,
+        which is the only honest proof that a paused build is real and looks right.
+        """
+        body = await self._get(f"/{ad_id}/previews", {"ad_format": ad_format})
+        data = body.get("data") or []
+        return {"ad_id": ad_id, "format": ad_format,
+                "iframe": (data[0] or {}).get("body", "") if data else "",
+                "raw": data}
 
     async def create_campaign(self, configs: dict) -> dict:
         """Create campaign -> adset -> adcreative -> ad, in that order.

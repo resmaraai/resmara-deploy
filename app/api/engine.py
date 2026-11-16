@@ -422,6 +422,7 @@ async def launch(boost_id: int, body: dict = None,
         auto_approve=False,
         action=body.get("action") or CampaignAction.LAUNCH_NEW_CAMPAIGN,
         custom_configs=body.get("meta_custom_configs") or {},
+        no_delivery=bool(body.get("no_delivery") or body.get("build_paused")),
     )
     if result.get("status") == "failed":
         raise HTTPException(status_code=502, detail=result.get("detail"))

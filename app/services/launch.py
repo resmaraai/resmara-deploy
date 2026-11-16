@@ -126,8 +126,13 @@ def _merge_custom(configs: dict, custom: dict) -> list:
 
 async def launch_boost(boost: Boost, current_user: User, db: Session, *, budget_usd=None,
                        auto_approve: bool = False, action: str = None,
-                       custom_configs: dict = None) -> dict:
-    """Run the gate and, if it passes, create the campaign. Returns a JSON-safe dict."""
+                       custom_configs: dict = None, no_delivery: bool = False) -> dict:
+    """Run the gate and, if it passes, create the campaign. Returns a JSON-safe dict.
+
+    ``no_delivery`` builds the whole chain PAUSED (campaign, ad set and ad) and returns a
+    Meta-rendered preview instead of treating it as a launch: real objects Meta accepted,
+    zero spend, and nothing to un-do. This is the free proof the ad path works.
+    """
     from app.services.ad_platforms import get_platform_client, build_boost_configs
 
     action = action or CampaignAction.LAUNCH_NEW_CAMPAIGN
@@ -235,6 +240,7 @@ async def launch_boost(boost: Boost, current_user: User, db: Session, *, budget_
         go_live=boost.go_live_date,
         geo=geo_service.for_boost(boost, db),
         campaign_no=(boost.repeat_round or 0) + 1,
+        status="PAUSED" if no_delivery else "ACTIVE",
     )
     configs.setdefault("notes", []).extend(media_notes)
     if configs.get("format") == "none":
@@ -271,6 +277,38 @@ async def launch_boost(boost: Boost, current_user: User, db: Session, *, budget_
     adset_id = (result.get("adset") or {}).get("id")
     creative_id = (result.get("creative") or {}).get("id")
     ad_id = (result.get("ad") or {}).get("id")
+
+    if no_delivery:
+        # Everything Meta returned is PAUSED, so this build cannot deliver or spend.
+        # Hand back the ids plus Meta's own rendering of the ad as the proof.
+        preview = {"skipped": True}
+        if ad_id and not getattr(client, "simulated", False):
+            try:
+                preview = await client.get_ad_preview(ad_id)
+            except Exception as exc:  # noqa: BLE001 - a missing preview must not hide the build
+                preview = {"error": str(exc)[:300]}
+        db.add(Event(user_id=current_user.id, boost_id=boost.id,
+                     event_type="campaign_built_paused",
+                     payload={"campaign_id": campaign_id, "adset_id": adset_id,
+                              "creative_id": creative_id, "ad_id": ad_id,
+                              "simulated": bool(result.get("simulated"))}))
+        db.commit()
+        return {
+            "status": "built_paused",
+            "boost_id": boost.id,
+            "no_delivery": True,
+            "simulated": bool(result.get("simulated")),
+            "meta_campaign_id": campaign_id,
+            "meta_adset_id": adset_id,
+            "meta_creative_id": creative_id,
+            "meta_ad_id": ad_id,
+            "preview": preview,
+            "all_paused": True,
+            "budget_approved": precheck["budget_approved"],
+            "copy_approved": copy_approved,
+            "config_notes": configs.get("notes", []),
+        }
+
 
     boost.meta_campaign_id = campaign_id
     boost.stage = CampaignStage.DEPLOYED     # campaign exists and is PAUSED

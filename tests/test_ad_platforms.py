@@ -95,7 +95,9 @@ class MockGraphHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         entry = self._record()
-        if entry["path"].startswith("/act_"):
+        if entry["path"].endswith("/previews"):
+            self._send(200, {"data": [{"body": "<iframe src=\"https://mock/preview/1\"></iframe>"}]})
+        elif entry["path"].startswith("/act_"):
             self._send(200, {"id": entry["path"].lstrip("/"), "account_id": "123456789",
                              "name": "Mock Account", "currency": "USD", "account_status": 1})
         else:
@@ -331,6 +333,33 @@ def main():
     check("get_ad_account GETs act_<id>",
           REQUESTS[0]["path"].lstrip("/") == "act_123456789" and "fields" in REQUESTS[0]["query"], REQUESTS)
     check("get_ad_account returned currency", acct_info.get("currency") == "USD")
+
+    # --- build paused (no delivery, no spend) + Meta's own preview --------
+    # A launch creates everything ACTIVE and relies on the go-live start_time. The free way
+    # to prove the ad path works is to build the same tree PAUSED and ask Meta to render it:
+    # real objects, zero delivery, and nothing to un-do afterwards.
+    print("\n[build paused — all three objects PAUSED, preview rendered]")
+    paused_configs = build_boost_configs(boost, page_id="111222333", budget_usd=50.0,
+                                         status="PAUSED")
+    REQUESTS.clear()
+    paused_result = asyncio.run(client.create_campaign(paused_configs))
+    check("campaign body status PAUSED",
+          REQUESTS[0]["body"].get("status") == "PAUSED", REQUESTS[0]["body"].get("status"))
+    check("adset body status PAUSED",
+          REQUESTS[1]["body"].get("status") == "PAUSED", REQUESTS[1]["body"].get("status"))
+    check("ad body status PAUSED",
+          REQUESTS[3]["body"].get("status") == "PAUSED", REQUESTS[3]["body"].get("status"))
+    check("paused build still returns ids",
+          paused_result["ad"]["id"] == "120210000004", paused_result.get("ad"))
+
+    REQUESTS.clear()
+    preview = asyncio.run(client.get_ad_preview(paused_result["ad"]["id"]))
+    check("preview GETs <ad_id>/previews",
+          len(REQUESTS) == 1 and REQUESTS[0]["path"].endswith("/previews"), REQUESTS)
+    check("preview asks for MOBILE_FEED_STANDARD",
+          REQUESTS[0]["query"].get("ad_format") == "MOBILE_FEED_STANDARD", REQUESTS[0]["query"])
+    check("preview returns Meta's iframe",
+          preview["iframe"].startswith("<iframe"), preview.get("iframe"))
 
     # --- error path: 400 -> PlatformError, no fake ids --------------------
     print("\n[error path — 400 from mock]")
