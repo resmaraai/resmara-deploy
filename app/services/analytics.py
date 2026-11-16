@@ -31,7 +31,7 @@ import httpx
 
 log = logging.getLogger("resmara.analytics")
 
-GRAPH_BASE = "https://graph.facebook.com/v19.0"
+GRAPH_BASE = f"https://graph.facebook.com/{os.getenv('META_API_VERSION', 'v26.0')}"
 GA4_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GA4_DATA_BASE = "https://analyticsdata.googleapis.com/v1beta"
 GA4_SCOPE = "https://www.googleapis.com/auth/analytics.readonly"

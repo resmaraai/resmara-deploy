@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     ).rstrip("/")
 
     # Graph API. Base is overridable so tests can point at a local mock server.
-    META_API_VERSION: str = os.getenv("META_API_VERSION", "v19.0")
+    META_API_VERSION: str = os.getenv("META_API_VERSION", "v26.0")
     GRAPH_API_BASE: str = os.getenv("GRAPH_API_BASE", "")
     # Page + IG account the Boost posts to when the ad account row doesn't carry them.
     META_PAGE_ID: str = os.getenv("META_PAGE_ID", "")

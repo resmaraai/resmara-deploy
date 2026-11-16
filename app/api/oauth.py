@@ -76,7 +76,7 @@ async def meta_connect(current_user: User = Depends(get_current_user)):
         "state": state,
         "response_type": "code",
     }
-    redirect_url = f"https://www.facebook.com/v19.0/dialog/oauth?{urllib.parse.urlencode(params)}"
+    redirect_url = f"https://www.facebook.com/{settings.META_API_VERSION}/dialog/oauth?{urllib.parse.urlencode(params)}"
     return {"redirect_url": redirect_url, "state": state}
 
 @router.get("/meta/callback")

@@ -75,6 +75,7 @@ os.environ["GRAPH_API_BASE"] = f"http://127.0.0.1:{port}"
 
 from fastapi.testclient import TestClient          # noqa: E402
 from app.main import app                            # noqa: E402
+from app.core.config import settings                # noqa: E402
 from app.db.session import Base, engine, SessionLocal, User, AdAccount  # noqa: E402
 
 Base.metadata.create_all(bind=engine)
@@ -107,7 +108,7 @@ user = db.query(User).filter(User.email == email).first()
 r = client.get("/api/oauth/meta/connect", headers=H)
 connect = r.json()
 ok("connect issues a Meta consent URL", r.status_code == 200 and connect.get("redirect_url", "").startswith(
-    "https://www.facebook.com/v19.0/dialog/oauth?"), str(connect)[:120])
+    f"https://www.facebook.com/{settings.META_API_VERSION}/dialog/oauth?"), str(connect)[:120])
 ok("the state names the signed-in user", connect.get("state", "").startswith(f"{user.id}:"), connect.get("state", "")[:24])
 consent_url = urllib.parse.unquote(connect.get("redirect_url", ""))   # Meta gets it percent-encoded
 ok("the consent URL carries the mount-correct redirect_uri",
