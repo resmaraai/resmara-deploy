@@ -1,7 +1,7 @@
 /* Tracking tags, loaded from the server so the id lives in exactly one place.
  *
  * Why this file exists: the homepage had no Google tag and no Clarity, so nothing could ever
- * measure a visitor - the Website and Marketing pages would have stayed empty even with every
+ * measure a visitor (the Meta pixel joined them for ad tracking) - the Website and Marketing pages would have stayed empty even with every
  * key in the world. Pasting a snippet into index.html would work until somebody edits it and the
  * id goes stale in two places, so the ids come from /api/public/tags (neither is a secret) and the
  * System page reads the same endpoint to tell you whether tracking is on.
@@ -33,6 +33,21 @@
     })(window, document, 'clarity', 'script', id);
   }
 
+  function metaPixel(id) {
+    if (!/^[0-9]{10,20}$/.test(id)) return;            // a pixel id is digits only
+    /* Meta's standard base code, unchanged apart from the id */
+    !function (f, b, e, v, n, t, s) {
+      if (f.fbq) return; n = f.fbq = function () {
+        n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+      };
+      if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = [];
+      t = b.createElement(e); t.async = !0; t.src = v;
+      s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s);
+    }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+    window.fbq('init', id);
+    window.fbq('track', 'PageView');
+  }
+
   try {
     fetch('/api/public/tags', { headers: { Accept: 'application/json' } })
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -40,6 +55,7 @@
         if (!t) return;
         if (t.ga4) ga4(t.ga4);
         if (t.clarity) clarity(t.clarity);
+        if (t.meta_pixel) metaPixel(t.meta_pixel);
       })
       .catch(function () { /* measuring is never worth breaking the page for */ });
   } catch (e) { /* no fetch, no tracking, still a working site */ }

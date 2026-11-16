@@ -40,7 +40,7 @@ def ok(name, cond, extra: object = ""):
 
 def clear_env():
     for name in ("META_AD_ACCOUNT_ID", "META_SYSTEM_TOKEN", "GA4_PROPERTY_ID", "GA4_TOKEN",
-                 "GA4_SA_JSON", "CLARITY_PROJECT_ID", "CLARITY_TOKEN", "GA4_MEASUREMENT_ID"):
+                 "GA4_SA_JSON", "CLARITY_PROJECT_ID", "CLARITY_TOKEN", "GA4_MEASUREMENT_ID", "META_PIXEL_ID"):
         os.environ.pop(name, None)
         os.environ.pop("RESMARA_" + name, None)
 
@@ -243,17 +243,19 @@ print("\n[tracking tags: the ids come from the server, and unset means nothing i
 clear_env()
 response = client.get("/api/public/tags")
 ok("the tag endpoint is public", response.status_code == 200, str(response.status_code))
-ok("with nothing set it returns two empty ids",
-   response.json() == {"ga4": "", "clarity": ""}, response.json())
+ok("with nothing set it returns three empty ids",
+   response.json() == {"ga4": "", "clarity": "", "meta_pixel": ""}, response.json())
 home = client.get("/").text
 ok("the homepage loads the injector", "tags.js" in home, home[:120])
 ok("the homepage does not carry a pasted tag", "googletagmanager.com/gtag/js" not in home)
 
 os.environ["GA4_MEASUREMENT_ID"] = "G-TEST123456"
 os.environ["RESMARA_CLARITY_PROJECT_ID"] = "abcdefghij"
+os.environ["META_PIXEL_ID"] = "1109032311944744"
 response = client.get("/api/public/tags")
-ok("both ids come back when set",
-   response.json() == {"ga4": "G-TEST123456", "clarity": "abcdefghij"}, response.json())
+ok("all three ids come back when set",
+   response.json() == {"ga4": "G-TEST123456", "clarity": "abcdefghij", "meta_pixel": "1109032311944744"},
+   response.json())
 clear_env()
 
 clear_env()
