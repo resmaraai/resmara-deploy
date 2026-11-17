@@ -96,7 +96,7 @@ var HELP_KB = [
     a: 'Billing › Purchases lists every campaign you’ve paid for.' },
   { id: 'until-sold', topic: 'Pricing and billing', q: 'Can Resmara keep running my listing until it sells?',
     keys: ['until it sells', 'until sold', 'autopilot', 'keep running', 'every 2 weeks', 'every two weeks', 'auto renew', 'automatic'],
-    a: 'Yes. Turn on Run it until it sells in Launch details, or click Until it sells on the campaign card. Every 2 weeks Resmara builds a brand-new campaign, 14 new posts and a new ad, tuned from how the last ad did. Each round is ready to look over 3 days before it starts. $39 a round, and your ad budget runs again each round, billed by Meta. It stops by itself when the listing shows pending or sold.' },
+    a: 'Yes. Turn on Run it until it sells in Launch details, or click Until it sells on the campaign card. Every 2 weeks Resmara builds a brand-new campaign, 14 new posts and a new ad, tuned from how the last ad did. Each round is ready to look over 3 days before it starts. $39 per renewal, and your ad budget runs again each round, billed by Meta. It stops by itself when the listing shows pending or sold.' },
   { id: 'rerun', topic: 'Pricing and billing', q: 'Can I run a campaign again?',
     keys: ['again', 'rerun', 're-run', 'second campaign', 'another campaign', 'still for sale', 'renew'],
     a: 'Yes. Open a completed campaign and click Run it again ($39). Resmara builds 14 brand-new posts and a new ad with fresh angles on the same home.' },

@@ -969,3 +969,4 @@ button.until-sold-how,button.until-sold-off{background:#e2f0f8!important;color:#
 @media(max-width:900px){.campaign-scope .until-sold{grid-template-columns:1fr}}
 html.dark .until-sold-title,html.dark .until-sold-list b{color:#d6e6f1}
 html.dark .campaign-scope .until-sold{border-color:#23425a}
+.until-sold-price{color:#c7e2f2;font-weight:600;font-size:14px}
