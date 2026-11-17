@@ -100,7 +100,7 @@ Otherwise the ad is a photo carousel and Day 1 is a photo post.
 
 After 14 days the posts stop and the ad switches off on its own. The campaign moves to
 **Completed campaigns**, where the final seller report stays. If the house is still for sale,
-the agent can run it again from there (a new $49 campaign).
+the agent can run it again from there ($39 for another 2 weeks).
 
 ## If a post didn't go live — go: support
 
