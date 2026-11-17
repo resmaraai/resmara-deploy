@@ -26,4 +26,5 @@ def tags() -> dict:
     return {
         "ga4": _setting("GA4_MEASUREMENT_ID"),
         "clarity": _setting("CLARITY_PROJECT_ID"),
+        "meta_pixel": _setting("META_PIXEL_ID"),
     }
