@@ -947,3 +947,25 @@ html.dark .shell .camp-tabs button span{color:inherit}
 @keyframes bc-pulse{50%{transform:scale(1.04)}}
 
 .pip-questions{display:none!important}
+
+/* Run it until it sells */
+.card-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.card-pause.until-sold-on{background:#d94c0d!important}
+.campaign-scope .until-sold{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;margin-top:22px;padding-top:22px;border-top:1px solid #d8e8f3;align-items:stretch}
+.until-sold-title{display:block;font-size:14px;font-weight:700;color:#12354d}
+.until-sold .budget-note{margin:8px 0 16px!important;font-size:12.5px}
+button.until-sold-how,button.until-sold-off{background:#e2f0f8!important;color:#12354d!important;border:0!important;width:auto}
+.until-sold-seller{background:#143a50;color:#fff;border-radius:10px;padding:18px 20px}
+.until-sold-seller .eyebrow,.until-sold-quote .eyebrow{color:#a2c9de}
+.until-sold-seller p{color:#fff;font-size:16px;line-height:1.5;margin:8px 0 16px;font-weight:600}
+.until-sold-seller .campaign-primary{margin:0;width:auto}
+.until-sold-state{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.until-sold-state strong{color:#fff}
+.until-sold-list{padding-left:18px;margin:14px 0;color:#506b80;line-height:1.6;font-size:14px}
+.until-sold-list li{margin-bottom:8px}
+.until-sold-list b{color:#12354d}
+.until-sold-quote{background:#143a50;border-radius:10px;padding:14px 18px}
+.until-sold-quote p{color:#fff;margin:6px 0 0;font-weight:600;line-height:1.5}
+@media(max-width:900px){.campaign-scope .until-sold{grid-template-columns:1fr}}
+html.dark .until-sold-title,html.dark .until-sold-list b{color:#d6e6f1}
+html.dark .campaign-scope .until-sold{border-color:#23425a}

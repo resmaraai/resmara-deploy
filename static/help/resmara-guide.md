@@ -82,6 +82,14 @@ Otherwise the ad is a photo carousel and Day 1 is a photo post.
 - Each campaign card shows **Day x of 14**, the platforms, and an orange badge for new leads.
 - **Pause** (on the card) stops posts and the ad, for example when the house goes under contract.
   **Resume** restarts it.
+- **Until it sells** (on the card, and in **Launch details** when setting up) runs the listing on
+  autopilot: every 2 weeks Resmara builds a brand-new round (14 new posts and a new ad, never a
+  repeat), tuned from how the last ad did. The next round is ready to look over 3 days before it
+  starts; if the agent changes nothing it goes live on its own. $39 a round, charged to the card on
+  file when the round is built; the ad budget runs again each round and Meta bills it. It stops
+  by itself when the listing shows pending or sold, and can be turned off any time. The line for
+  sellers: "We'll market your home with fresh content and ads every 2 weeks until it's under
+  contract."
 - **Leads**: people who commented or messaged with interest. Open the campaign to see them, mark
   them, add notes, or add a lead by hand.
 - **Reports** — go: reports. Inside the campaign. Shows reach, views, clicks and leads, and makes a

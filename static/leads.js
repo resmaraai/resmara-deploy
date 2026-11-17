@@ -97,6 +97,43 @@ function pauseCampaign(i) {
   show(`<span class="eyebrow">PAUSE CAMPAIGN</span><h2>Pause ${esc(c.address)}?</h2><p>Your scheduled posts stop and your listing ad pauses, so Meta stops spending your ad budget. Nothing is deleted.</p><p>Resume any time and it picks up where it left off.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Keep running</button><button class="campaign-primary" onclick="setCampaignPaused(${i},true)">Pause campaign</button></div>`);
 }
 function resumeCampaign(i) { setCampaignPaused(i, false); }
+
+// ---- Run it until it sells (autopilot) -------------------------------------------------------
+// When on, Resmara builds a brand-new 14-day round (new posts + a new ad, never a repeat) every
+// 2 weeks, tuned from how the last round's ad did, until the listing goes pending or sells.
+// Set in Launch details while setting up, or from the campaign card once it's running.
+const UNTIL_SOLD_LINE = 'We’ll market your home with fresh content and ads every 2 weeks until it’s under contract.';
+function untilSoldOn(c) { return (state.untilSoldCampaigns || []).includes(c && c.address); }
+function untilSoldButton(c) {
+  if (!campaignIsLive(c) || campaignPhase(c) === 'completed') return '';
+  const i = [...state.campaigns, ...examples].indexOf(c);
+  return untilSoldOn(c)
+    ? `<button type="button" class="card-pause until-sold-on" onclick="untilSoldInfo(${i},'card')">↻ Until it sells · On</button>`
+    : `<button type="button" class="card-pause" onclick="untilSoldInfo(${i},'card')">↻ Until it sells</button>`;
+}
+function untilSoldPanel(i) {
+  const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);
+  return `<div class="until-sold"><div class="until-sold-copy"><b class="until-sold-title">Run it until it sells</b><p class="budget-note">Every 2 weeks, Resmara builds a brand-new campaign for this home: 14 new posts and a new ad, never a repeat. Each round learns from how the last ad did. It stops on its own when the listing goes pending or sells.</p><button type="button" class="until-sold-how" onclick="untilSoldInfo(${i},'scope')">How it works</button></div><div class="until-sold-seller"><span class="eyebrow">TELL YOUR SELLERS</span><p>“${UNTIL_SOLD_LINE}”</p>${on
+    ? `<div class="until-sold-state"><strong>✓ Running until it sells</strong><button type="button" class="until-sold-off" onclick="setUntilSold(${i},false,'scope')">Turn off</button></div>`
+    : `<button type="button" class="campaign-primary" onclick="setUntilSold(${i},true,'scope')">Run it until it sells →</button>`}</div></div>`;
+}
+function untilSoldInfo(i, from) {
+  const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);
+  const r = state.reviews && state.reviews['review-' + (c.reviewId || i)];
+  const budget = r && Number(r.scope && r.scope.budget) > 0 ? Number(r.scope.budget) : 50;
+  show(`<span class="eyebrow">RUN IT UNTIL IT SELLS</span><h2>Fresh marketing every 2 weeks, until it’s under contract.</h2><ul class="until-sold-list"><li><b>A brand-new campaign every 2 weeks.</b> 14 new posts and a new ad each round. Nothing is repeated.</li><li><b>Every round gets smarter.</b> Resmara looks at which posts and ad reached the most people and got the most clicks, and builds the next round around what worked.</li><li><b>You stay in control.</b> The next round is ready to look over 3 days before it starts. Change anything you like, or leave it and it goes live on its own.</li><li><b>$39 a round</b>, charged to your card on file when the new round is built. Your $${budget} ad budget runs again each round and is billed by Meta, as always.</li><li><b>It stops by itself</b> when your listing shows pending or sold. You can turn it off any time.</li></ul><div class="until-sold-quote"><span class="eyebrow">TELL YOUR SELLERS</span><p>“${UNTIL_SOLD_LINE}”</p></div><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">${on ? 'Keep it on' : 'Not now'}</button>${on
+    ? `<button class="campaign-primary" onclick="setUntilSold(${i},false,'${from}')">Turn off</button>`
+    : `<button class="campaign-primary" onclick="setUntilSold(${i},true,'${from}')">Run it until it sells →</button>`}</div>`);
+}
+function setUntilSold(i, on, from) {
+  const c = [...state.campaigns, ...examples][i];
+  const list = (state.untilSoldCampaigns || []).filter(a => a !== c.address);
+  if (on) list.push(c.address);
+  state.untilSoldCampaigns = list; persist();
+  if (modal.open) modal.close();
+  if (from === 'scope') details(i); else dashboard('campaigns');
+  toast(on ? 'On. Resmara will run a fresh campaign every 2 weeks until this home sells.' : 'Turned off. This campaign ends after its 14 days.');
+}
 function setCampaignPaused(i, on) {
   const c = [...state.campaigns, ...examples][i];
   const list = (state.pausedCampaigns || []).filter(a => a !== c.address);
