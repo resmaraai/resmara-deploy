@@ -2986,6 +2986,29 @@ if ($('finSave')) $('finSave').addEventListener('click', saveFinance);
 
 $('loginBtn').addEventListener('click', login);
 
+// Enter does the same as clicking the box's button: sign in, add a task, add a cost, send an
+// invite, fetch a campaign. These boxes are not <form>s, so the browser would not do it on its own.
+const ENTER_SUBMITS = {
+  loginBtn: ['email', 'password'],
+  brAdd: ['brTitle', 'brDue'],
+  cAdd: ['cDate', 'cPayer', 'cVendor', 'cWhat', 'cAmount'],
+  tmAdd: ['tmName', 'tmEmail'],
+  checkBoost: ['boostId'],
+};
+Object.keys(ENTER_SUBMITS).forEach(function (btnId) {
+  ENTER_SUBMITS[btnId].forEach(function (inputId) {
+    const input = $(inputId);
+    if (!input) return;
+    input.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' || ev.isComposing) return;
+      const btn = $(btnId);
+      if (!btn || btn.disabled) return;
+      ev.preventDefault();
+      btn.click();
+    });
+  });
+});
+
 // Password help while email is not connected: mint the one-time link here and send it to the
 // customer by hand. It works once and expires in an hour; nothing is exposed publicly.
 document.addEventListener('click', async (e) => {
