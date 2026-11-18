@@ -38,6 +38,13 @@ GA4_SCOPE = "https://www.googleapis.com/auth/analytics.readonly"
 CLARITY_BASE = "https://www.clarity.ms/export-data/api/v1/project-live-insights"
 
 _GA4_CACHE: Dict[str, Any] = {"token": "", "expires": 0.0}
+# Clarity's data-export API allows about ten calls per project per DAY, and the Team room used to
+# ask on every page load - so the panel went blank by mid-morning with a 429 that looked like a
+# broken token. Read at most four times a day and serve the last good answer in between; a 429 with
+# a stored answer is then a stale number, not an outage.
+_CLARITY_CACHE: Dict[str, Any] = {"at": 0.0, "payload": None}
+CLARITY_CACHE_SECONDS = int(os.getenv("RESMARA_CLARITY_CACHE_SECONDS", str(6 * 3600)) or (6 * 3600))
+
 
 
 def _env(name: str) -> str:
@@ -266,13 +273,31 @@ def ga4_visitors(start: datetime, end: datetime) -> Dict[str, Any]:
 
 # --------------------------------------------------------------------------- Microsoft Clarity
 def clarity_sessions() -> Dict[str, Any]:
-    """Sessions and people from Clarity's last three days - the only window its API exposes."""
+    """Sessions and people from Clarity's last three days - the only window its API exposes.
+
+    Cached for ``CLARITY_CACHE_SECONDS`` (6 hours by default): the export endpoint allows roughly
+    ten calls per project per day, so a read per page load exhausts it in minutes. When a refresh
+    fails but an earlier answer is still held, that answer is served and labelled ``stale`` rather
+    than reported as "not connected" - a number from this morning is worth more than a blank panel.
+    """
     project_id = _env("CLARITY_PROJECT_ID")
     token = _env("CLARITY_TOKEN")
     if not project_id or not token:
         missing = [n for n, v in (("CLARITY_PROJECT_ID", project_id), ("CLARITY_TOKEN", token)) if not v]
         return {"connected": False, "sessions": None, "why":
                 "Microsoft Clarity is not connected (needs " + " + ".join(missing) + ")"}
+
+    fresh = _CLARITY_CACHE["payload"] and (time.time() - float(_CLARITY_CACHE["at"] or 0)) < CLARITY_CACHE_SECONDS
+    if fresh:
+        return {**_CLARITY_CACHE["payload"], "cached": True}
+
+    def _held(reason: str) -> Dict[str, Any]:
+        payload = _CLARITY_CACHE["payload"]
+        if payload:
+            return {**payload, "cached": True, "stale": True,
+                    "why": "", "note": reason}
+        return {"connected": False, "sessions": None, "why": reason}
+
     try:
         with httpx.Client(timeout=25.0) as client:
             response = client.get(CLARITY_BASE, params={"numOfDays": 3},
@@ -280,13 +305,14 @@ def clarity_sessions() -> Dict[str, Any]:
                                            "Content-Type": "application/json"})
         if response.status_code >= 400:
             log.info("clarity -> %s", response.status_code)
-            return {"connected": False, "sessions": None,
-                    "why": f"Clarity answered {response.status_code}"}
+            if response.status_code == 429:
+                return _held("Clarity's export API is rate-limited (about ten calls per project per "
+                             "day); showing the last reading it gave us.")
+            return _held(f"Clarity answered {response.status_code}")
         data = response.json() or []
     except Exception as exc:                                 # noqa: BLE001
         log.info("clarity failed: %s", exc)
-        return {"connected": False, "sessions": None,
-                "why": f"Clarity could not be reached ({type(exc).__name__})"}
+        return _held(f"Clarity could not be reached ({type(exc).__name__})")
 
     sessions = 0
     people = 0
@@ -299,7 +325,7 @@ def clarity_sessions() -> Dict[str, Any]:
                 people += int(float(point.get("distantUserCount") or 0))
             except Exception:                                # noqa: BLE001
                 continue
-    return {
+    payload = {
         "connected": True,
         "sessions": sessions,
         "people": people,
@@ -307,3 +333,5 @@ def clarity_sessions() -> Dict[str, Any]:
         "why": "",
         "url": f"https://clarity.microsoft.com/projects/view/{project_id}/dashboard",
     }
+    _CLARITY_CACHE.update({"at": time.time(), "payload": payload})
+    return {**payload, "cached": False}

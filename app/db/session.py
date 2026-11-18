@@ -155,6 +155,12 @@ class Boost(Base):
     # Which campaign this is for the listing: 0 for the first, 1 for the next one started from
     # it, and so on. The build rotates the gallery and asks for new copy when it is above 0.
     repeat_round = Column(Integer, default=0)
+    # "Run it until it sells": the agent has asked for a fresh 14-day round (and a $39 renewal)
+    # every two weeks until the listing is pending or sold. False on every existing campaign, and
+    # the front end used to keep this in the browser by address - which meant nothing on the server
+    # could build the next round or stop it. This is the record it needed.
+    until_sold = Column(Boolean, default=False)
+    until_sold_at = Column(DateTime(timezone=True), nullable=True)
     # A campaign is bought, not credited: $49 at checkout sets these, and the build/launch
     # gates read them. Both null = nobody has paid for this campaign yet.
     paid_at = Column(DateTime(timezone=True), nullable=True)

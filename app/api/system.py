@@ -254,6 +254,28 @@ def _render(path: str, params: Optional[Dict[str, Any]] = None) -> Any:
     return response.json()
 
 
+def _contains(commit: str, live: str) -> bool:
+    """True when ``commit`` is already inside ``live`` (the same commit or an ancestor).
+
+    The Releases page used to compare the two short SHAs by prefix, which only answers "live" for
+    the one PR whose merge commit *is* the build being served. The moment anything else lands on
+    top, every earlier PR reads "waiting" and the page looks like nothing ever shipped. GitHub's
+    compare endpoint answers the real question: is the build ahead of this commit (or identical to
+    it)? One call per merged PR, and a failure is a "not proven" rather than an exception.
+    """
+    a, b = (commit or "").strip(), (live or "").strip()
+    if not a or not b:
+        return False
+    if b.startswith(a[:7]) or b.startswith(a):
+        return True
+    try:
+        data = _gh(f"/compare/{a}...{b}")
+    except Exception as exc:                                     # noqa: BLE001 - a check, not a crash
+        log.info("compare %s...%s unavailable: %s", a[:7], b[:7], exc)
+        return False
+    return (data.get("status") or "") in ("ahead", "identical")
+
+
 def _deploys(service_id: str, limit: int = 10) -> List[Dict[str, Any]]:
     data = _render(f"/services/{service_id}/deploys", {"limit": limit})
     out = []
@@ -345,12 +367,17 @@ def releases(limit: int = 8, user=Depends(team_access.needs("build"))):
             log.info("files for PR %s unavailable: %s", pull.get("number"), exc)
 
         sha = (pull.get("merge_commit_sha") or "")[:7]
+        full_sha = pull.get("merge_commit_sha") or ""
         state = "open" if pull.get("state") == "open" else "merged"
         deploy = None
         live_at = None
         if state == "merged" and sha:
             if live_commit.startswith(sha):
                 deploy, live_at = "live", (live or {}).get("finished_at")
+            elif _contains(full_sha, live_commit):
+                # This PR is already in the build being served; it just isn't the tip any more.
+                # No timestamp of its own, so the card falls back to its merge date.
+                deploy = "live"
             elif newest and newest["commit"].startswith(sha):
                 deploy = "deploying"
             elif newest and newest["status"] in ("build_failed", "update_failed", "canceled", "pre_deploy_failed"):

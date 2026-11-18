@@ -106,6 +106,10 @@ ADDITIONS = {
         # Which campaign this is for the listing (0 = the first). The build rotates the gallery
         # and asks for new copy when a repeat campaign runs on the same house.
         ("repeat_round", "INTEGER DEFAULT 0"),
+        # "Run it until it sells" is a fact about the campaign, not a browser preference: the
+        # scheduler reads it to build and charge the next round, and the listing check clears it.
+        ("until_sold", "BOOLEAN DEFAULT FALSE"),
+        ("until_sold_at", "TIMESTAMP"),
         # --- Digital Ad Engine v1.3 (§8): the launch details, the pause state, the listing
         # watcher and the $39 re-run all live on the boost. Every one of these is NULL/absent
         # on an established database, so each needs its own ALTER here.

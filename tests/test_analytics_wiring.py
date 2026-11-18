@@ -198,11 +198,26 @@ ok("the window is stated as three days", result["window_days"] == 3)
 ok("a dashboard link is offered", result["url"].startswith("https://clarity.microsoft.com/"), result["url"])
 ok("only Traffic was counted", FakeClient.calls[0]["params"] == {"numOfDays": 3}, FakeClient.calls[0]["params"])
 
-print("\n[heat maps: Clarity refusing is a warn]")
+print("\n[heat maps: Clarity refusing, with a reading already held]")
+# Expire the six-hour window so the next call really goes to Clarity and is refused; the reading
+# stays in the cache, which is what a mid-morning 429 meets in production.
+analytics._CLARITY_CACHE["at"] = 0.0
 FakeClient.queue = [FakeResponse(429, {"error": "rate limited"})]
 result = analytics.clarity_sessions()
-ok("a 429 is not connected", result["connected"] is False)
-ok("and quotes the status", "429" in result["why"], result["why"])
+# The export endpoint allows ~10 calls per project per day; a refresh that is refused must not blank
+# a panel that has a real reading from this morning. The held number is served and labelled stale.
+ok("a 429 with a held reading stays connected", result["connected"] is True, str(result)[:160])
+ok("...and is labelled stale", result.get("stale") is True, str(result)[:160])
+ok("...with the last real reading, not a zero", result["sessions"] == 47, result.get("sessions"))
+ok("...and a note naming the daily limit", "rate-limited" in (result.get("note") or "").lower(),
+   result.get("note"))
+
+print("\n[heat maps: Clarity refusing with nothing held is still a warn]")
+analytics._CLARITY_CACHE.update({"at": 0.0, "payload": None})
+FakeClient.queue = [FakeResponse(429, {"error": "rate limited"})]
+result = analytics.clarity_sessions()
+ok("a cold 429 is not connected", result["connected"] is False)
+ok("and explains the daily limit", "rate-limited" in result["why"], result["why"])
 
 # --------------------------------------------------------------------- the two pages, for real
 print("\n[both pages answer as pages, with no key at all]")

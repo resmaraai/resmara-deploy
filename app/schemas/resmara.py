@@ -122,6 +122,11 @@ class BoostOut(BaseModel):
     # Which campaign this is for the listing, and the one it continues (§4.6). A repeat is
     # $39 and its copy is regenerated, so the UI needs both numbers on the campaign itself.
     repeat_round: int = 0
+    # "Run it until it sells" (§ Adam's Nov 18 PR): the agent's choice to keep building and
+    # charging a fresh round every two weeks until the listing is pending or sold. The card reads
+    # this instead of browser state, and `until_sold_at` is when they turned it on.
+    until_sold: bool = False
+    until_sold_at: Optional[datetime] = None
     parent_boost_id: Optional[int] = None
     # The links the campaign runs on (§3), the pause state (§4.5) and what the listing watcher
     # last saw (§5). All optional: a campaign that has not reached launch has none of them.

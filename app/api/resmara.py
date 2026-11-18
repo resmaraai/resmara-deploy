@@ -17,7 +17,7 @@ from app.services import metrics as metrics_service
 # The launch gate (budget precheck + copy approval + state machine) and the Graph
 # client live in app/services/launch.py and app/services/ad_platforms.py, so both launch
 # entrypoints share one implementation.
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 import httpx
 import json
@@ -273,6 +273,31 @@ def hide_boost(boost_id: int, hidden: bool = True,
     if not b:
         raise HTTPException(status_code=404, detail="Boost not found")
     b.hidden = bool(hidden)
+    db.commit()
+    db.refresh(b)
+    return b
+
+
+@router.post("/boosts/{boost_id}/until-sold", response_model=BoostOut)
+def set_until_sold(boost_id: int, until_sold: bool = True,
+                   current_user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Turn "run it until it sells" on or off for this campaign.
+
+    The switch is stored on the campaign, not in the browser: the scheduler that builds the next
+    14-day round and charges the $39 has to be able to read it, and a browser that is closed must
+    not be the reason a paid-for renewal never happens. Turning it on is refused once the listing
+    is pending or sold, because the whole point is that it stops by itself at that moment.
+    """
+    b = db.query(Boost).filter(Boost.id == boost_id, Boost.user_id == current_user.id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Boost not found")
+    status = (getattr(b, "listing_status", "") or "").strip().lower()
+    if until_sold and status in ("pending", "sold"):
+        raise HTTPException(
+            status_code=409,
+            detail="This listing is already %s, so there is nothing left to run until." % status)
+    b.until_sold = bool(until_sold)
+    b.until_sold_at = datetime.now(timezone.utc) if until_sold else None
     db.commit()
     db.refresh(b)
     return b
