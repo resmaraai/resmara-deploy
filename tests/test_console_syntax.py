@@ -107,6 +107,24 @@ ok("nothing assigns the raw response to sysRows", "sysRows = await api(" not in 
 ok("a syntax error would not be caught by a string test alone",
    "__check__" not in console)
 
+# A square that only shows a number leaves the reader guessing, and the operator's actual question
+# of the Finance tab is "what is inside that figure?". The answer is a hover card, and the two
+# squares built out of parts must quote the parts: a run-rate whose lines cannot be read is not
+# checkable. A native title= is the trap here - it is a second of waiting and one clipped line.
+print("\n[every square explains itself, and the compound ones show their working]")
+ok("the explanation rides in data-tip, not a native title",
+   "title=\"' + esc(WHY[l])" not in console and "data-tip=" in console)
+ok("a square can quote its own breakdown instead of the dictionary",
+   "function tipFor(l, explain)" in console)
+ok("the hosting square lists what the monthly bill pays for",
+   all(bit in console for bit in ("hostingTip", "Web service · ", "Database · ",
+                                  "Publisher cron · ", "Domain · ", "Total ")))
+ok("the cost-per-sale square lists its parts with live figures",
+   all(bit in console for bit in ("costTip", "Stripe · ", "Model and photo tagging · ",
+                                  "Photo storage · ", "Hosting share · ", "Refund buffer · ")))
+ok("one card, fixed, so a section's overflow cannot clip it",
+   "#tipCard{position:fixed" in console and "function showTip(" in console)
+
 print()
 if failures:
     print(f"{failures} of {checks} FAILED")

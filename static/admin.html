@@ -1099,6 +1099,13 @@ function media(u){
   if(s.charAt(0) !== '/' || s.charAt(1) === '/') return s;
   return base() + s;
 }
+// A listing photo is an original (2-7 MB); a campaign page draws up to 122 of them, so every
+// <img> asks the server for a preview and stays a link to the full-size file.
+function thumb(u, w){
+  const m = media(u);
+  if(!m) return m;
+  return m + (m.indexOf('?') >= 0 ? '&' : '?') + 'w=' + (w || 360);
+}
 async function api(path, opts = {}) {
   const t = localStorage.getItem(TOKEN_KEY);
   const headers = Object.assign({}, opts.headers || {});
@@ -1553,7 +1560,7 @@ function postRow(p){
     '<div class="post-line"><b>Day ' + esc(p.day) + '</b><span>' + esc(p.kind || 'post') + ' · ' + esc(p.target || '') + '</span>' +
       '<span class="post-when">' + esc(when(p.scheduled_at)) + '</span>' + postPill(p.publish_status) + '<i class="chev-s">›</i></div>' +
     '<div class="post-open hidden">' +
-      '<div class="post-media">' + (p.image_url ? '<img src="' + esc(media(p.image_url)) + '" alt="">' : '<div class="post-noimg">' + esc(p.kind === 'video' ? 'Video' : 'Photo') + '</div>') + '</div>' +
+      '<div class="post-media">' + (p.image_url ? '<img src="' + esc(thumb(p.image_url, 480)) + '" alt="">' : '<div class="post-noimg">' + esc(p.kind === 'video' ? 'Video' : 'Photo') + '</div>') + '</div>' +
       '<div class="post-copy"><span class="eyebrow-s">Caption</span><p>' + esc(p.caption || 'No caption saved.') + '</p>' +
         (failed ? '<div class="fail-log"><b>Why it failed</b><p>' + esc(p.reason || p.last_error || 'Meta gave no reason.') + '</p>' +
           ((p.fail_log || []).length ? '<ul>' + p.fail_log.map(f => '<li><span>' + esc(when(f.at)) + '</span>' + esc(f.error) + '</li>').join('') + '</ul>' : '') +
@@ -2927,7 +2934,7 @@ if ($('cAdd')) {
 }
 
 
-function refreshAll(){ loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); loadFinance(); loadBuildroom(); loadFilings(); }
+function refreshAll(){ hideTip(); loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); loadFinance(); loadBuildroom(); loadFilings(); }
 
 // ── build room ────────────────────────────────────────────────────────────────────
 // Who is working on what, and who has it claimed. The server owns the lock: a claimed task
@@ -3280,14 +3287,14 @@ function renderFinance(){
     '</div>';
   const res = $('finResults');
   if (res) res.innerHTML = '<span class="calc-eyebrow">Results</span>' +
-    calcRow('Price per campaign', d.price.label) +
-    calcRow('Our cost per sale', usd(u.costs_usd)) +
-    calcRow('We keep per campaign', usd(u.contribution_usd) + ' <small>' + esc(u.margin_pct) + '%</small>', true) +
-    calcRow('Hosting per month', usd(f.total_monthly_usd)) +
-    calcRow('Sales a month to cover hosting', b.campaigns_per_month === null ? '—' : esc(b.campaigns_per_month)) +
-    calcRow('Lowest price for ' + esc(d.price_floor.target_margin_pct) + '% margin', d.price_floor.at_current_volume_usd === null ? '—' : usd(d.price_floor.at_current_volume_usd)) +
-    calcRow('One agent is worth', usd(d.repeat.lifetime_contribution_usd)) +
-    calcRow('Most we may pay to win one', usd(d.acquisition.max_cac_usd[3]), true);
+    calcRow('Price per campaign', d.price.label, false, priceTip) +
+    calcRow('Our cost per sale', usd(u.costs_usd), false, costTip) +
+    calcRow('We keep per campaign', usd(u.contribution_usd) + ' <small>' + esc(u.margin_pct) + '%</small>', true, keepTip) +
+    calcRow('Hosting per month', usd(f.total_monthly_usd), false, hostingTip) +
+    calcRow('Sales a month to cover hosting', b.campaigns_per_month === null ? '—' : esc(b.campaigns_per_month), false, WHY['sales to cover hosting']) +
+    calcRow('Lowest price for ' + esc(d.price_floor.target_margin_pct) + '% margin', d.price_floor.at_current_volume_usd === null ? '—' : usd(d.price_floor.at_current_volume_usd), false, WHY['price for target margin']) +
+    calcRow('One agent is worth', usd(d.repeat.lifetime_contribution_usd), false, WHY['one agent, all years']) +
+    calcRow('Most we may pay to win one', usd(d.acquisition.max_cac_usd[3]), true, WHY['most we may pay per customer']);
 
   const rep = $('finRepeat');
   if (rep) rep.innerHTML = '<div class="grid g4">' +
