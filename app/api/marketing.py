@@ -172,21 +172,54 @@ def _pagespeed(url: str, strategy: str) -> tuple[Optional[int], str]:
     except Exception as exc:                                    # noqa: BLE001 - a check, not a crash
         log.info("pagespeed failed: %s", exc)
         return None, f"PageSpeed Insights could not be reached ({type(exc).__name__})"
+def _tag_rows(body: str) -> List[Dict[str, Any]]:
+    """One row per tag, decided by the ids the service actually holds.
+
+    ``static/tags.js`` installs the GA4, Meta pixel and Clarity snippets from ``/api/public/tags``
+    at run time, so grepping the homepage HTML for a vendor snippet reports "not found" about a
+    tag that is running on every page. The ids are the truth; the HTML only has to load ``tags.js``.
+    """
+    from app.api import public as public_tags                       # same process, same settings
+
+    try:
+        ids = public_tags.tags()
+    except Exception:                                               # noqa: BLE001 - a check, not a crash
+        ids = {}
+    loads = "tags.js" in (body or "")
+
+    # Google Ads is the one tag that is still pasted into a page rather than injected by id.
+    ads = "googleads.g.doubleclick.net" in (body or "")
+    ads_row: Dict[str, Any] = {
+        "name": "Google Ads tag", "status": "ok" if ads else "warn",
+        "detail": "Found on the homepage" if ads
+                  else "No Ads conversion tag on the homepage (optional: ad spend is read from Meta)",
+    }
+    rows: List[Dict[str, Any]] = []
+    for name, key, env in (("Google tag", "ga4", "GA4_MEASUREMENT_ID"),
+                           ("Meta pixel", "meta_pixel", "META_PIXEL_ID"),
+                           ("Clarity", "clarity", "CLARITY_PROJECT_ID")):
+        ident = (ids.get(key) or "").strip()
+        if ident and loads:
+            rows.append({"name": name, "status": "ok",
+                         "detail": f"{ident} installed on every page by tags.js"})
+        elif ident:
+            rows.append({"name": name, "status": "warn",
+                         "detail": f"{ident} is set, but the homepage does not load tags.js"})
+        else:
+            rows.append({"name": name, "status": "warn",
+                         "detail": f"No id on the service ({env})"})
+    rows.insert(1, ads_row)          # the console has always listed Ads right under Google tag
+    return rows
+
+
 def _tag_checks(base: str) -> List[Dict[str, Any]]:
     checks = []
     try:
         with httpx.Client(timeout=10.0, follow_redirects=True) as client:
             response = client.get(base + "/")
-        body = response.text
         checks.append({"name": "Site answers", "status": "ok" if response.status_code < 400 else "fail",
                        "detail": f"HTTP {response.status_code}"})
-        for name, needle in (("Google tag", "googletagmanager.com/gtag/js"),
-                             ("Google Ads tag", "googleads.g.doubleclick.net"),
-                             ("Meta pixel", "connect.facebook.net"),
-                             ("Clarity", "clarity.ms/tag")):
-            checks.append({"name": name, "status": "ok" if needle in body else "warn",
-                           "detail": "Found on the homepage" if needle in body
-                                     else "Not found on the homepage HTML"})
+        checks.extend(_tag_rows(response.text))
     except Exception as exc:                                    # noqa: BLE001
         checks.append({"name": "Site answers", "status": "fail", "detail": str(exc)[:200]})
     return checks
