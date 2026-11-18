@@ -1282,6 +1282,36 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
     # calendar is not campaign one's calendar again.
     round_ = _as_int(getattr(boost, "repeat_round", None)) or 0
     rotation = gallery_offset(round_, len(intact))
+    # A repeat round learns from the last one: its real Meta numbers decide which photos, rooms and
+    # formats lead this time (app/services/round_learning.py). With real numbers the gallery is not
+    # rotated, so the proven photos stay at the top of the PHOTO INDEX; without them the round
+    # behaves exactly as before (new angles, a different opening photo).
+    learning = {"ok": False, "note": ""}
+    if round_ > 0:
+        from app.services import round_learning  # noqa: PLC0415
+        learning = await round_learning.previous_round_results(boost, db)
+        if learning.get("ok"):
+            rotation = 0
+            engine_notes.append("Round %d is built from what worked last round: %s." % (
+                round_ + 1, "; ".join(
+                    "day %s (%s)" % (r.get("day"), r.get("photo_room") or r.get("photo_file") or "post")
+                    for r in learning["ranked"][:3])))
+        else:
+            engine_notes.append("Round %d could not learn from last round: %s." % (
+                round_ + 1, learning.get("reason") or "no numbers"))
+        if db is not None:
+            try:
+                from app.db.session import Event  # noqa: PLC0415
+                db.add(Event(user_id=getattr(boost, "user_id", None), boost_id=getattr(boost, "id", None),
+                             event_type="round_learning",
+                             payload={"used": bool(learning.get("ok")),
+                                      "reason": learning.get("reason"),
+                                      "previous_boost_id": learning.get("previous_boost_id"),
+                                      "top": [{k: r.get(k) for k in ("day", "photo_file", "photo_room",
+                                                                    "title", "kind", "score")}
+                                              for r in (learning.get("ranked") or [])[:5]]}))
+            except Exception:  # noqa: BLE001 - the record is a nicety, never a blocker
+                pass
     photo_index = build_photo_index(intact, offset=rotation)
     no_photos = len(intact) == 0
 
@@ -1401,6 +1431,8 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
     # instruction is appended after it rather than edited into it.
     if round_ > 0:
         r4_user += "\nCAMPAIGN ROUND: " + repeat_note(boost, db)
+        if learning.get("note"):
+            r4_user += "\n" + learning["note"]
     try:
         plan = await llm.chat_json(
             prompts.R4_PLAN_SYSTEM,
