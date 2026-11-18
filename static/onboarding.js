@@ -72,7 +72,7 @@ function obCheck(scenario) {
   obWalk(document.querySelector('#ob-box'), labels, results, '', () => {
     state.metaAudit = { status: ok ? 'ready' : 'blocked', checkedAt: new Date().toISOString() };
     state.connected = ok; persist();
-    if (ok) { show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>You’re connected.</h2><div class="nc-msg ok"><span class="robot-avatar"></span><div><b>Green light.</b> Your Page, Instagram and ad account are all set. Next, Resmara builds your brand.</div></div><div class="modal-actions"><span></span><button class="campaign-primary" onclick="onboard(1)">Build my brand →</button></div>`); return; }
+    if (ok) { show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>You’re connected.</h2><div class="nc-msg ok"><span class="robot-avatar"></span><div><b>Green light.</b> Your Page, Instagram and ad account are all set. Next, Resmara builds your brand.</div></div><div class="modal-actions"><span></span><button class="campaign-primary" onclick="onboard(1)">Build my brand</button></div>`); return; }
     obNeedsSetup(results.map((r, i) => r ? null : i).filter(i => i !== null));
   });
 }
@@ -109,7 +109,7 @@ addEventListener('message', e => {
     // has to survive a new browser the same way the Meta connection does.
     state.setupSession = { booked: new Date().toISOString() }; persist();
     if (window.RM && RM.isLoggedIn()) RM.bookSetupSession({ booked: true }).catch(() => {});
-    show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">YOU’RE BOOKED IN</span><h2>See you soon.</h2><p>Calendly has emailed you the time and a video link. We’ll connect your Meta account together on the call. Until then you can look around and set up your brand, but campaigns can’t run until you’re connected.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Close</button><button class="campaign-primary" onclick="onboard(1)">Build my brand →</button></div>`);
+    show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">YOU’RE BOOKED IN</span><h2>See you soon.</h2><p>Calendly has emailed you the time and a video link. We’ll connect your Meta account together on the call. Until then you can look around and set up your brand, but campaigns can’t run until you’re connected.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Close</button><button class="campaign-primary" onclick="onboard(1)">Build my brand</button></div>`);
   }
 });
 
@@ -125,13 +125,13 @@ function obBrand() {
   ];
   obWalk(document.querySelector('#ob-box'), labels, [true, true, true, true], '', () => {
     state.brandBuilt = true; persist();
-    show(`${obSteps(1)}<span class="eyebrow">STEP 2 OF 3</span><h2>Your brand kit is ready.</h2><div class="nc-msg ok"><span class="robot-avatar"></span><div><b>Done.</b> Your colours, fonts, logo, voice and brokerage details are all in your brand kit. You can check it any time in My Brand.</div></div><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close();dashboard('brand')">Review my brand</button><button class="campaign-primary" onclick="onboard(2)">Next →</button></div>`);
+    show(`${obSteps(1)}<span class="eyebrow">STEP 2 OF 3</span><h2>Your brand kit is ready.</h2><div class="nc-msg ok"><span class="robot-avatar"></span><div><b>Done.</b> Your colours, fonts, logo, voice and brokerage details are all in your brand kit. You can check it any time in My Brand.</div></div><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close();dashboard('brand')">Review my brand</button><button class="campaign-primary" onclick="onboard(2)">Next</button></div>`);
   });
 }
 
 // Step 3: a quick guided tour of the dashboard (first visit only), ending on the Campaign button.
 function obFirstCampaign() {
-  show(`${obSteps(2)}<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">STEP 3 OF 3</span><h2>A quick look around.</h2><p>Let me show you where everything is. It takes about a minute.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="finishWorkspaceTour()">Skip the tour</button><button class="campaign-primary" onclick="modal.close();workspaceTour(0)">Show me around →</button></div>`);
+  show(`${obSteps(2)}<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">STEP 3 OF 3</span><h2>A quick look around.</h2><p>Let me show you where everything is. It takes about a minute.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="finishWorkspaceTour()">Skip the tour</button><button class="campaign-primary" onclick="modal.close();workspaceTour(0)">Show me around</button></div>`);
 }
 
 
@@ -157,7 +157,7 @@ function workspaceTour(step = 0) {
   const tip = document.createElement('section');
   tip.className = 'workspace-tour-tip' + (s.final ? ' final' : '');
   tip.setAttribute('aria-label', 'Dashboard tour');
-  tip.innerHTML = `<div class="tour-head"><span class="robot-avatar tour-bot" aria-hidden="true"></span><span class="eyebrow">QUICK TOUR · ${step + 1} OF ${TOUR.length}</span></div><h2>${s.title}</h2><p>${s.text}</p>${s.extra || ''}<div class="modal-actions">${s.final ? '<button class="nc-cancel tour-skip" onclick="finishWorkspaceTour()">Maybe later</button><span></span>' : `<button class="nc-cancel" onclick="${step ? 'workspaceTour(' + (step - 1) + ')' : 'finishWorkspaceTour()'}">${step ? 'Back' : 'Skip tour'}</button><button class="campaign-primary" onclick="workspaceTour(${step + 1})">Next →</button>`}</div>`;
+  tip.innerHTML = `<div class="tour-head"><span class="robot-avatar tour-bot" aria-hidden="true"></span><span class="eyebrow">QUICK TOUR · ${step + 1} OF ${TOUR.length}</span></div><h2>${s.title}</h2><p>${s.text}</p>${s.extra || ''}<div class="modal-actions">${s.final ? '<button class="nc-cancel tour-skip" onclick="finishWorkspaceTour()">Maybe later</button><span></span>' : `<button class="nc-cancel" onclick="${step ? 'workspaceTour(' + (step - 1) + ')' : 'finishWorkspaceTour()'}">${step ? 'Back' : 'Skip tour'}</button><button class="campaign-primary" onclick="workspaceTour(${step + 1})">Next</button>`}</div>`;
   document.body.append(tip);
   target.scrollIntoView({ block: 'center' });
   function place() {
@@ -192,7 +192,7 @@ function addPaymentCard() {
   const live = window.RM && RM.isLoggedIn && RM.isLoggedIn() && RM.addCard;
   if (live) { RM.addCard().then(r => { if (r && r.url) location.href = r.url; }).catch(e => toast(e.message)); return; }
   workspaceTourCleanup?.();
-  show(`<span class="eyebrow">PAYMENT METHOD</span><h2>Add a card.</h2><p>You’ll be taken to Stripe’s secure page to add your card. Resmara never sees or stores your card number.</p><p class="fine">Preview only: no card page opens from this review copy.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close();if(state.firstRun&&!state.tourDone)workspaceTour(3)">Back</button><button class="campaign-primary" onclick="state.cardOnFile=true;persist();modal.close();toast('Card saved (preview).');if(state.firstRun&&!state.tourDone)workspaceTour(4)">Continue to Stripe →</button></div>`);
+  show(`<span class="eyebrow">PAYMENT METHOD</span><h2>Add a card.</h2><p>You’ll be taken to Stripe’s secure page to add your card. Resmara never sees or stores your card number.</p><p class="fine">Preview only: no card page opens from this review copy.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close();if(state.firstRun&&!state.tourDone)workspaceTour(3)">Back</button><button class="campaign-primary" onclick="state.cardOnFile=true;persist();modal.close();toast('Card saved (preview).');if(state.firstRun&&!state.tourDone)workspaceTour(4)">Continue to Stripe</button></div>`);
 }
 
 // ===== Review copy: start over as a brand-new client =====
@@ -208,13 +208,13 @@ function obPickScenario(back) {
   const cur = state.mockScenario || 'ready';
   show(`<span class="eyebrow">MOCK CLIENT WALKTHROUGH</span><h2>What should we test?</h2><p>You’ll go through every step a new client sees. The Meta connection is simulated, so pick how their Meta setup should look.</p>
   <form onsubmit="event.preventDefault();state.mockScenario=this.sc.value;persist();${back ? 'onboard(0)' : 'obSignup()'}"><div class="ob-scenarios">${Object.entries(OB_SCENARIOS).map(([k, v]) => `<label><input type="radio" name="sc" value="${k}" ${k === cur ? 'checked' : ''}><span><b>${v.label}</b>${k === 'ready' ? '<small>Passes every check</small>' : '<small>Shows what happens when it fails</small>'}</span></label>`).join('')}</div>
-  <div class="modal-actions"><span></span><button class="campaign-primary">${back ? 'Use this' : 'Start the walkthrough →'}</button></div></form>`);
+  <div class="modal-actions"><span></span><button class="campaign-primary">${back ? 'Use this' : 'Start the walkthrough'}</button></div></form>`);
 }
 function obSignup() {
   show(`<span class="eyebrow">WELCOME TO RESMARA</span><h2>Create your account.</h2><p>Just the basics. Resmara learns the rest when you connect your Meta account.</p>
   <form onsubmit="event.preventDefault();obSignupDone(this)"><div class="nc-row name-row"><label class="field">First name<input name="first" required autocomplete="given-name" value="Jamie"></label><label class="field">Last name<input name="last" required autocomplete="family-name" value="Carter"></label></div>
   <label class="field">Email address<input name="email" type="email" required autocomplete="email"></label><label class="field">Password<input name="pw" type="password" required minlength="8" autocomplete="new-password" value="mockclient"></label>
-  <p class="fine">Use one of your own emails if you like. The review copy can’t send email, so nothing actually arrives.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Cancel</button><button class="campaign-primary">Create account →</button></div></form>`);
+  <p class="fine">Use one of your own emails if you like. The review copy can’t send email, so nothing actually arrives.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Cancel</button><button class="campaign-primary">Create account</button></div></form>`);
 }
 function obSignupDone(form) {
   state = { ...state, name: form.first.value.trim() + ' ' + form.last.value.trim(), email: form.email.value.trim(), firstRun: true, metaRequired: true };
@@ -222,10 +222,10 @@ function obSignupDone(form) {
 }
 // Email confirmation: the account opens only after the agent clicks the link we email them.
 function obCheckEmail() {
-  show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">CHECK YOUR EMAIL</span><h2>Confirm your email address.</h2><p>We sent a confirmation link to <b>${esc(state.email || 'your email')}</b>. Click it to confirm it’s you, then sign in with your new password.</p><p class="fine">Can’t find it? Check your spam folder, or <a href="#" onclick="toast('Confirmation email sent again.');return false">send it again</a>.</p><div class="modal-actions"><span></span><button class="campaign-primary" onclick="obSignIn()">Preview: I clicked the link →</button></div>`);
+  show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">CHECK YOUR EMAIL</span><h2>Confirm your email address.</h2><p>We sent a confirmation link to <b>${esc(state.email || 'your email')}</b>. Click it to confirm it’s you, then sign in with your new password.</p><p class="fine">Can’t find it? Check your spam folder, or <a href="#" onclick="toast('Confirmation email sent again.');return false">send it again</a>.</p><div class="modal-actions"><span></span><button class="campaign-primary" onclick="obSignIn()">Preview: I clicked the link</button></div>`);
 }
 function obSignIn() {
-  show(`<span class="eyebrow">EMAIL CONFIRMED</span><h2>Sign in to Resmara.</h2><form onsubmit="event.preventDefault();state.clientSignedIn=true;persist();modal.close();metaGateOnLogin()"><label class="field">Email address<input type="email" required value="${esc(state.email || '')}" autocomplete="email"></label><label class="field">Password<input type="password" required autocomplete="current-password" value="mockclient"></label><p class="fine"><a href="#" onclick="forgotPassword();return false">Forgot your password?</a></p><div class="modal-actions"><span></span><button class="campaign-primary">Sign in →</button></div></form>`);
+  show(`<span class="eyebrow">EMAIL CONFIRMED</span><h2>Sign in to Resmara.</h2><form onsubmit="event.preventDefault();state.clientSignedIn=true;persist();modal.close();metaGateOnLogin()"><label class="field">Email address<input type="email" required value="${esc(state.email || '')}" autocomplete="email"></label><label class="field">Password<input type="password" required autocomplete="current-password" value="mockclient"></label><p class="fine"><a href="#" onclick="forgotPassword();return false">Forgot your password?</a></p><div class="modal-actions"><span></span><button class="campaign-primary">Sign in</button></div></form>`);
 }
 
 // ---- Meta connection is required ------------------------------------------------------------
