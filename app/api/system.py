@@ -15,6 +15,7 @@ import logging
 import os
 import time
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -333,9 +334,26 @@ def _body_section(body: str) -> List[str]:
     return out[:20]
 
 
+_RELEASES_CACHE: Dict[str, Any] = {"at": 0.0, "payload": None}
+
+
 @router.get("/admin/releases")
 def releases(limit: int = 8, user=Depends(team_access.needs("build"))):
-    """Open and recently merged pull requests, each with whether its commit is what is live."""
+    """Open and recently merged pull requests, each with whether its commit is what is live.
+
+    Cached briefly: answering it costs one GitHub compare call per merged PR (that is what makes
+    "live" mean *contained in the build* rather than "happens to be the build"), which is several
+    seconds of third-party latency. The console asks on every open, and a page that times out
+    shows the previous answer - which is exactly how a freshly merged PR reads as still waiting.
+    """
+    fresh_for = float(os.getenv("RESMARA_RELEASES_CACHE_SECONDS", "60") or 60)
+    cached = _RELEASES_CACHE.get("payload")
+    same = cached and cached.get("limit") == limit
+    if same and (time.time() - float(_RELEASES_CACHE.get("at") or 0)) < fresh_for:
+        payload = dict(cached["payload"])
+        payload["cached"] = True
+        return payload
+
     problems: List[str] = []
     pulls: List[Dict[str, Any]] = []
     deploys: List[Dict[str, Any]] = []
@@ -358,13 +376,37 @@ def releases(limit: int = 8, user=Depends(team_access.needs("build"))):
     newest = deploys[0] if deploys else None
     live_commit = (live or {}).get("commit") or ""
 
-    rows = []
-    for pull in pulls:
-        files = []
+    # One GitHub call per PR for its files, plus one compare call each to know whether its merge
+    # commit is inside the live build. Sequentially that is ten round trips and a page that reads
+    # as stuck; concurrently it is one round trip's worth of waiting.
+    def _files_for(pull):
         try:
-            files = [f.get("filename", "") for f in _gh(f"/pulls/{pull['number']}/files", {"per_page": 100})]
+            return pull.get("number"), [f.get("filename", "") for f in
+                                        _gh(f"/pulls/{pull['number']}/files", {"per_page": 100})]
         except Exception as exc:                                 # noqa: BLE001
             log.info("files for PR %s unavailable: %s", pull.get("number"), exc)
+            return pull.get("number"), []
+
+    files_by_pr = {}
+    if pulls:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for number, files in pool.map(_files_for, pulls):
+                files_by_pr[number] = files
+
+    # Same for the ancestry question: one compare call per merged PR, asked at the same time.
+    merged_shas = [p.get("merge_commit_sha") or "" for p in pulls if p.get("state") != "open"]
+    contained = {}
+    if merged_shas and live_commit:
+        def _ask(sha):
+            return sha, _contains(sha, live_commit)
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for sha, inside in pool.map(_ask, [s for s in merged_shas if s]):
+                contained[sha] = inside
+
+    rows = []
+    for pull in pulls:
+        files = files_by_pr.get(pull.get("number")) or []
 
         sha = (pull.get("merge_commit_sha") or "")[:7]
         full_sha = pull.get("merge_commit_sha") or ""
@@ -374,7 +416,7 @@ def releases(limit: int = 8, user=Depends(team_access.needs("build"))):
         if state == "merged" and sha:
             if live_commit.startswith(sha):
                 deploy, live_at = "live", (live or {}).get("finished_at")
-            elif _contains(full_sha, live_commit):
+            elif contained.get(full_sha):
                 # This PR is already in the build being served; it just isn't the tip any more.
                 # No timestamp of its own, so the card falls back to its merge date.
                 deploy = "live"
@@ -406,7 +448,7 @@ def releases(limit: int = 8, user=Depends(team_access.needs("build"))):
     # above is empty for a boring reason, and "Everything is live" would be a lie.
     connected = bool(getattr(settings, "GITHUB_TOKEN", "") or "") and not any(
         "GitHub" in p or "token" in p.lower() for p in problems)
-    return {
+    payload = {
         "repo": settings.GITHUB_REPO,
         "connected": connected,
         "live_commit": live_commit[:7] or None,
@@ -416,4 +458,7 @@ def releases(limit: int = 8, user=Depends(team_access.needs("build"))):
         "recent": merged_rows,
         "releases": rows,
         "problems": problems,
+        "cached": False,
     }
+    _RELEASES_CACHE.update({"at": time.time(), "payload": dict(payload, limit=limit)})
+    return payload

@@ -31,6 +31,8 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///" + os.path.join(TMP, "r.db"))
 os.environ.setdefault("RESMARA_ENV", "test")
 os.environ.setdefault("RESMARA_SIMULATE", "1")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-releases-ancestry-0001")
+# No payload cache in the test: every assertion must see the live answer it just fed in.
+os.environ["RESMARA_RELEASES_CACHE_SECONDS"] = "0"
 
 LIVE = "72a6de758f21" + "0" * 28          # the build being served
 INSIDE = "b" * 40                          # merged earlier, contained in LIVE
