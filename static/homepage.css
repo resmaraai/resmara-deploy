@@ -926,6 +926,15 @@ html.dark .shell .card-body,html.dark .shell .tabs,html.dark .shell .welcome+div
 html.dark .shell input,html.dark .shell select,html.dark .shell textarea{background:#0f2231!important;border-color:#2a4a63!important;color:#eef6fb!important}
 html.dark .shell .ticket-msg{border-color:#2d6a92}
 html.dark .shell .progress{background:#1f3d52}
+html.dark .shell .leads-list li{background:#0f2231;border-color:#23425a}
+html.dark .shell .leads-list li.done{background:#0c1d2b}
+html.dark .shell .lead-av{background:#1d3a50;color:#f2f8fc}
+html.dark .shell .lead-body p{color:#d6e6f1!important}
+html.dark .shell .lead-body small{color:#6cc4ee}
+html.dark .shell .lead-tick{background:#1d3a50!important;color:#e2f0f8!important}
+html.dark .shell .leads-list li.done .lead-tick{background:#173a2a!important;color:#7fd9a3!important}
+html.dark .shell .leads-empty{background:#0f2231;color:#9db6c8}
+html.dark .shell .lead-add{color:#6cc4ee!important}
 html.dark #modal{background:#13283a;color:#d6e6f1;border-color:#23425a}
 html.dark #modal h2,html.dark #modal b,html.dark #modal label{color:#f2f8fc}
 html.dark .shell .camp-tabs{background:#13283a!important}
