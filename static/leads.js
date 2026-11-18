@@ -103,7 +103,20 @@ function resumeCampaign(i) { setCampaignPaused(i, false); }
 // 2 weeks, tuned from how the last round's ad did, until the listing goes pending or sells.
 // Set in Launch details while setting up, or from the campaign card once it's running.
 const UNTIL_SOLD_LINE = 'We’ll market your home with fresh content and ads every 2 weeks until it’s under contract.';
-function untilSoldOn(c) { return (state.untilSoldCampaigns || []).includes(c && c.address); }
+// The server is the record. A campaign that exists as a row carries until_sold; sample/demo cards
+// have no row, so they keep the old per-browser answer. Reading the row first is what stops the
+// card saying "On" for a campaign the server has never heard of - the mismatch that made the
+// interface a promise with nothing behind it.
+function untilSoldServer(c) {
+  if (typeof campaignBoostId !== 'function' || campaignBoostId(c) == null) return null;
+  if (c.until_sold === undefined || c.until_sold === null) return null;
+  return !!c.until_sold;
+}
+function untilSoldOn(c) {
+  const server = untilSoldServer(c);
+  if (server !== null) return server;
+  return (state.untilSoldCampaigns || []).includes(c && c.address);
+}
 function untilSoldButton(c) {
   if (!campaignIsLive(c) || campaignPhase(c) === 'completed') return '';
   const i = [...state.campaigns, ...examples].indexOf(c);
@@ -129,6 +142,27 @@ function untilSoldInfo(i, from) {
 }
 function setUntilSold(i, on, from) {
   const c = [...state.campaigns, ...examples][i];
+  const boostId = (typeof campaignBoostId === 'function') ? campaignBoostId(c) : null;
+  // A real campaign writes to the record, and only re-renders when the server has accepted it: a
+  // refusal (409 for a pending or sold listing, 401 for an ended session) leaves the card showing
+  // the truth instead of flipping a switch that did nothing.
+  if (boostId != null && window.RM && RM.setUntilSold) {
+    RM.setUntilSold(boostId, on).then(function (saved) {
+      c.until_sold = !!(saved && saved.until_sold !== undefined ? saved.until_sold : on);
+      c.until_sold_at = (saved && saved.until_sold_at) || null;
+      if (Array.isArray(state.untilSoldCampaigns)) {          // clear any stale browser copy
+        state.untilSoldCampaigns = state.untilSoldCampaigns.filter(function (a) { return a !== c.address; });
+        persist();
+      }
+      if (modal.open) modal.close();
+      if (from === 'scope') details(i); else dashboard('campaigns');
+      toast(on ? 'On. Resmara will run a fresh campaign every 2 weeks until this home sells.'
+               : 'Turned off. This campaign ends after its 14 days.');
+    }).catch(function (err) {
+      toast((err && err.message) || 'Could not save that just now. Try again.');
+    });
+    return;
+  }
   const list = (state.untilSoldCampaigns || []).filter(a => a !== c.address);
   if (on) list.push(c.address);
   state.untilSoldCampaigns = list; persist();

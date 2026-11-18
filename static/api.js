@@ -263,6 +263,14 @@
       { method: 'POST' });
   }
 
+  // "Run it until it sells" is a fact about the campaign, not a browser preference: the server
+  // builds and charges the next round from this flag, so the toggle has to reach it. A campaign
+  // whose listing is already pending or sold answers 409 with the sentence to show the agent.
+  function setUntilSold(id, on) {
+    return request('/api/boosts/' + segment(id) + '/until-sold?until_sold=' + (on === false ? 'false' : 'true'),
+      { method: 'POST' });
+  }
+
   function deleteBoost(id) {
     return request('/api/boosts/' + segment(id), { method: 'DELETE' });
   }
@@ -568,6 +576,7 @@
     boosts: boosts,
     boost: boost,
     hideBoost: hideBoost,
+    setUntilSold: setUntilSold,
     deleteBoost: deleteBoost,
     createBoost: createBoost,
     uploadPhoto: uploadPhoto,
