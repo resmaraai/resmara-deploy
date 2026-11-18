@@ -10,12 +10,18 @@ Nothing is lost when Pillow cannot read the bytes: the caller falls back to the 
 from __future__ import annotations
 
 import io
+import threading
 from typing import Optional
 
 from PIL import Image
 
 QUALITY = 72
 MIN_SIZE, MAX_SIZE = 48, 1280
+
+# A free instance has 512 MB. Decoding several 2500 px JPEGs at once is what takes it down: a
+# campaign page asks for 100+ previews in one burst, so at most two are decoded at a time and
+# the rest queue for a moment instead of the process being killed.
+_DECODING = threading.BoundedSemaphore(2)
 
 
 def _clamp(size: int) -> int:
@@ -27,6 +33,14 @@ def preview(raw: Optional[bytes], size: int = 360) -> Optional[bytes]:
     if not raw:
         return None
     size = _clamp(size)
+    try:
+        with _DECODING:
+            return _encode(raw, size)
+    except Exception:  # noqa: BLE001 - a broken photo is the caller's fallback, not a 500
+        return None
+
+
+def _encode(raw: bytes, size: int) -> Optional[bytes]:
     try:
         image = Image.open(io.BytesIO(raw))
         # draft() makes the decoder stop early for JPEGs (1/2, 1/4, 1/8 scale) instead of

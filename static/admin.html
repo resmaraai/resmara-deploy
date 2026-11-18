@@ -1500,12 +1500,19 @@ function campTable(rows, withAgent){
 }
 // The campaign's own library, in the order the calendar uses it. An empty campaign says so —
 // never a stock house and never another campaign's photo.
+// A page of the library at a time: 122 previews in one burst is what a small instance cannot
+// do, so the grid draws 24 and the rest is one click away.
+const PHOTO_PAGE = 24;
+let photoShown = PHOTO_PAGE;
 function photosCard(c){
   const ps = c.photos || [];
   if (!ps.length) return '<div class="hint">No photos on this campaign yet. They arrive when the agent imports the listing or uploads them, and the calendar cannot build without them.</div>';
+  const shown = ps.slice(0, photoShown);
+  const more = ps.length - shown.length;
   return '<p class="hint" style="margin:-6px 0 10px">' + esc(ps.length) + ' photo' + (ps.length === 1 ? '' : 's') + ', in the order the calendar uses them. Click one to open it full size.</p><div class="photo-grid">' +
-    ps.map((p, i) => '<figure><a href="' + esc(media(p.url)) + '" target="_blank" rel="noopener"><img src="' + esc(thumb(p.url, 360)) + '" alt="" loading="lazy"></a>' +
-      '<figcaption><b>' + (i + 1) + '</b>' + (p.room ? ' ' + esc(p.room) : '') + (p.tagged_by && p.tagged_by !== 'none' ? ' ✓' : '') + '</figcaption></figure>').join('') + '</div>';
+    shown.map((p, i) => '<figure><a href="' + esc(media(p.url)) + '" target="_blank" rel="noopener"><img src="' + esc(thumb(p.url, 360)) + '" alt="" loading="lazy"></a>' +
+      '<figcaption><b>' + (i + 1) + '</b>' + (p.room ? ' ' + esc(p.room) : '') + (p.tagged_by && p.tagged_by !== 'none' ? ' ✓' : '') + '</figcaption></figure>').join('') + '</div>' +
+    (more > 0 ? '<div class="row-btns" style="margin-top:10px"><button class="tk-toggle" data-more-photos="' + esc(c.id) + '">Show the other ' + esc(more) + ' photos</button></div>' : '');
 }
 function dateOnly(iso){ if (!iso) return '—'; const d = new Date(/T/.test(iso) ? (/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z') : iso + 'T12:00:00'); return isNaN(d) ? String(iso) : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}); }
 async function loadCampaigns(){
@@ -1533,6 +1540,8 @@ function paintCampAttn(){
 document.addEventListener('input', e => { if (e.target.id === 'campSearch') paintCampList(); });
 async function openCampaign(id, focusPost){
   // From an agent's page, a campaign opens in the Campaigns view.
+  if (String(openCampaign.last || '') !== String(id)) photoShown = PHOTO_PAGE;   // a different campaign starts at page one
+  openCampaign.last = id;
   if (!document.getElementById('sec-campaigns').classList.contains('is-view')) window.openSection('campaigns');
   const box = $('campaignDetail'); box.classList.remove('hidden');
   document.querySelector('.camp-list').classList.add('hidden'); $('attn-campaigns').classList.add('hidden'); $('campaignsBody').classList.add('hidden');
@@ -1583,6 +1592,8 @@ function postPill(s){ const st = s || 'scheduled'; const cls = st === 'published
 function closeCampaign(){ $('campaignDetail').classList.add('hidden');
   document.querySelector('.camp-list').classList.remove('hidden'); $('attn-campaigns').classList.remove('hidden'); $('campaignsBody').classList.remove('hidden'); }
 document.addEventListener('click', e => {
+  const more = e.target.closest('[data-more-photos]');
+  if (more) { photoShown = 100000; openCampaign(more.dataset.morePhotos); return; }
   if (e.target.closest('[data-close-campaign]')) { closeCampaign(); return; }
   if (e.target.closest('[data-retry]')) return;
   const r = e.target.closest('[data-campaign]'); if (r) openCampaign(r.dataset.campaign);

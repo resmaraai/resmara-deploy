@@ -37,6 +37,9 @@ def check(label: str, cond: bool, detail: str = "") -> None:
 
 def main() -> int:
     tmp = tempfile.mkdtemp(prefix="resmara-media-")
+    # config.py reads UPLOAD_DIR; RESMARA_UPLOAD_DIR was never the name, so this test used to
+    # write into the repo's own uploads/ and only ever exercised the row fallback.
+    os.environ["UPLOAD_DIR"] = tmp
     os.environ["RESMARA_UPLOAD_DIR"] = tmp
     os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(tmp, "media.db")
     os.environ.setdefault("SECRET_KEY", "test-secret-key-for-media-persistence")
@@ -143,6 +146,8 @@ def main() -> int:
               "%d vs %d" % (len(r.content), len(big.getvalue())))
     except Exception as exc:                                     # noqa: BLE001
         check("the preview decodes", False, repr(exc))
+    cached = os.path.join(tmp, ".thumbs", "200-" + jpg_name)
+    check("a preview is kept on disk, so the next look costs nothing", os.path.isfile(cached), cached)
     r = client.get("/uploads/" + vid_name + "?w=200")            # a video cannot be previewed
     check("a video asked for a preview is served whole, not broken", r.status_code == 200
           and r.content == mp4, str(r.status_code))

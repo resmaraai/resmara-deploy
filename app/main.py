@@ -80,8 +80,24 @@ def serve_upload(filename: str, w: int = 0):
     if w:
         from app.services.thumbs import preview
 
+        # A preview is made once and kept next to the uploads: the second look at a campaign,
+        # and every reload, costs nothing. The directory lives with UPLOAD_DIR so a host with a
+        # volume keeps it and a host without one simply starts empty again.
+        cache_dir = os.path.join(settings.UPLOAD_DIR, ".thumbs")
+        cached = os.path.join(cache_dir, "%d-%s" % (int(w), safe))
+        if os.path.isfile(cached):
+            return FileResponse(cached, media_type="image/jpeg",
+                                headers={"Cache-Control": "public, max-age=604800, immutable"})
         small = preview(raw, w)
         if small:
+            try:
+                os.makedirs(cache_dir, exist_ok=True)
+                tmp = cached + ".part"
+                with open(tmp, "wb") as fh:
+                    fh.write(small)
+                os.replace(tmp, cached)          # atomically: a half-written preview never serves
+            except OSError:
+                pass                             # read-only disk: answer from memory this time
             return Response(content=small, media_type="image/jpeg",
                             headers={"Cache-Control": "public, max-age=604800, immutable"})
         # An unreadable original is still the picture the agent uploaded: serve it whole.
