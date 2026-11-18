@@ -56,6 +56,22 @@
 
   var BASE = detectBase();
 
+  // Photos and other media the API hands us are root-absolute ("/uploads/<file>"), which is
+  // right only when this app is served at the domain root. Mounted under a prefix — the
+  // Command Center serves it at /resmara/ — "/uploads/x.jpg" asks the router for
+  // /uploads/x.jpg, which has no route, so every real campaign photo renders as a broken
+  // image while the bundled demo photos (page-relative "sample/card-1.jpg") keep working.
+  // Prefix app paths with the detected mount; leave absolute URLs, data/blob URIs and
+  // page-relative paths untouched, so the domain-root deploy is byte-for-byte unchanged.
+  function mediaUrl(u) {
+    if (!u) return u;
+    var s = String(u);
+    if (s.charAt(0) !== '/') return s;             // relative already, or data:/blob:/http:
+    if (s.charAt(1) === '/') return s;             // protocol-relative //cdn...
+    return BASE + s;
+  }
+  window.mediaUrl = mediaUrl;
+
   // ---- session / token ----------------------------------------------------
 
   function token() {
@@ -570,6 +586,7 @@
 
   window.RM = {
     base: BASE,           // the detected mount prefix ('' or '/resmara'); read-only
+    media: mediaUrl,      // prefix an API media path for the current mount
 
     token: token,
     setToken: setToken,

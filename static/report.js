@@ -72,7 +72,7 @@ function propertyReportHTML(d) {
       <p class="pr-area">${esc(d.area)}${d.area ? ' · ' : ''}${esc(d.period)}</p>
       <p class="pr-by">Prepared by ${esc(d.agent)}${d.brokerage ? ', ' + esc(d.brokerage) : ''}</p>
     </div>
-    ${d.hero ? `<img class="pr-hero" src="${esc(d.hero)}" alt="">` : ''}
+    ${d.hero ? `<img class="pr-hero" src="${esc(mediaPath(d.hero))}" alt="">` : ''}
   </header>
   <section class="pr-sec">
     <span class="pr-label">${d.day >= 14 ? 'CAMPAIGN TOTALS · ALL 14 DAYS' : 'AT A GLANCE · DAYS 1–' + d.day}</span>
@@ -90,7 +90,7 @@ function propertyReportHTML(d) {
     </div>
   </section>
   ${d.summary && d.day < 14 ? `<section class="pr-sec pr-read"><span class="pr-label">WHAT’S HAPPENING</span><p>${esc(d.summary)}</p></section>` : ''}
-  ${d.top.length ? `<section class="pr-sec"><span class="pr-label">TOP PERFORMING POSTS</span><div class="pr-top">${d.top.map((p, i) => `<figure>${p.img ? `<img src="${esc(p.img)}" alt="">` : '<div class="pr-noimg"></div>'}<em>#${i + 1}</em><figcaption><b>${esc(p.headline || '')}</b><small>${fmtN(p.views)} views${p.stat ? ' · ' + esc(p.stat) : ''}</small></figcaption></figure>`).join('')}</div></section>` : ''}
+  ${d.top.length ? `<section class="pr-sec"><span class="pr-label">TOP PERFORMING POSTS</span><div class="pr-top">${d.top.map((p, i) => `<figure>${p.img ? `<img src="${esc(mediaPath(p.img))}" alt="">` : '<div class="pr-noimg"></div>'}<em>#${i + 1}</em><figcaption><b>${esc(p.headline || '')}</b><small>${fmtN(p.views)} views${p.stat ? ' · ' + esc(p.stat) : ''}</small></figcaption></figure>`).join('')}</div></section>` : ''}
   ${d.daily.length ? `<section class="pr-sec"><span class="pr-label">DAILY ACTIVITY · POST VIEWS</span><div class="pr-chart">${d.daily.map((v, i) => `<div class="${i === peak ? 'peak' : ''}"><small>${i === peak ? fmtN(v) : ''}</small><i style="height:${Math.max(4, Math.round(v / max * 100))}%"></i><span>${i + 1}</span></div>`).join('')}</div><p class="pr-chart-note">Day of the campaign. Busiest day: day ${peak + 1}.</p></section>` : ''}
   ${d.recs.length ? `<section class="pr-sec pr-recs"><div class="pr-recs-head"><span class="robot-avatar" aria-hidden="true"></span><div><span class="pr-label">RECOMMENDATIONS BY RESMARA</span><b>${d.day >= 14 ? 'Summary and what to do next' : 'What happens in week two'}</b></div></div>${d.day >= 14 && d.summary ? `<p class="pr-wrap">${esc(d.summary)}</p><span class="pr-label pr-next">WHAT TO DO NEXT</span>` : ''}<ol>${d.recs.map(r => `<li>${esc(r)}</li>`).join('')}</ol></section>` : ''}
   <footer class="pr-foot"><span>Prepared with <b>Resmara</b> · resmara.com</span><span>${d.illustrative ? 'Example report · illustrative numbers' : 'Figures from Meta for this period'}</span></footer>
