@@ -95,6 +95,15 @@ ok(f"all {hero_calls} hero() calls carry their steps", hero_missing == 0, f"{her
 
 ok("the sign-in handler is bound", "$('loginBtn').addEventListener('click', login)" in console)
 ok("boot runs on load", "boot()" in console)
+# /api/admin/system-check answers an object - {checked_at, cached, checks: [...]} - and the console
+# once put that whole envelope in sysRows, where every reader calls .filter/.map on it. After the
+# first refresh the Campaigns and Connections cards read "Could not read this section:
+# (sysRows || []).filter is not a function", which reads like a server fault and is not one.
+ok("the system-check envelope is unwrapped to its list of rows",
+   "Array.isArray(body.checks) ? body.checks : null" in console,
+   "sysRows has to be a list: the endpoint returns {checked_at, cached, checks}")
+ok("nothing assigns the raw response to sysRows", "sysRows = await api(" not in console)
+
 ok("a syntax error would not be caught by a string test alone",
    "__check__" not in console)
 

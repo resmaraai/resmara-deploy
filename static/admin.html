@@ -1070,6 +1070,14 @@ const $ = (id) => document.getElementById(id);
 function base(){ // works at "/" and behind "/resmara/"
   return new URL('.', location.href).pathname.replace(/\/$/, '');
 }
+// Photos come back from the API as "/uploads/<file>", which only resolves at the domain
+// root; behind a mount prefix it has to carry the same prefix the API calls do.
+function media(u){
+  if(!u) return u;
+  const s = String(u);
+  if(s.charAt(0) !== '/' || s.charAt(1) === '/') return s;
+  return base() + s;
+}
 async function api(path, opts = {}) {
   const t = localStorage.getItem(TOKEN_KEY);
   const headers = Object.assign({}, opts.headers || {});
@@ -1468,7 +1476,7 @@ function postRow(p){
     '<div class="post-line"><b>Day ' + esc(p.day) + '</b><span>' + esc(p.kind || 'post') + ' · ' + esc(p.target || '') + '</span>' +
       '<span class="post-when">' + esc(when(p.scheduled_at)) + '</span>' + postPill(p.publish_status) + '<i class="chev-s">›</i></div>' +
     '<div class="post-open hidden">' +
-      '<div class="post-media">' + (p.image_url ? '<img src="' + esc(p.image_url) + '" alt="">' : '<div class="post-noimg">' + esc(p.kind === 'video' ? 'Video' : 'Photo') + '</div>') + '</div>' +
+      '<div class="post-media">' + (p.image_url ? '<img src="' + esc(media(p.image_url)) + '" alt="">' : '<div class="post-noimg">' + esc(p.kind === 'video' ? 'Video' : 'Photo') + '</div>') + '</div>' +
       '<div class="post-copy"><span class="eyebrow-s">Caption</span><p>' + esc(p.caption || 'No caption saved.') + '</p>' +
         (failed ? '<div class="fail-log"><b>Why it failed</b><p>' + esc(p.reason || p.last_error || 'Meta gave no reason.') + '</p>' +
           ((p.fail_log || []).length ? '<ul>' + p.fail_log.map(f => '<li><span>' + esc(when(f.at)) + '</span>' + esc(f.error) + '</li>').join('') + '</ul>' : '') +
@@ -1578,13 +1586,18 @@ document.addEventListener('click', e => {
 // Needs GET /api/admin/system-check from the back end (runs every 15 minutes there).
 let sysRows = null;
 async function loadSystemCheck(){
-  try { sysRows = await api('/api/admin/system-check'); } catch (err) { sysRows = null; }
+  try {
+    const body = await api('/api/admin/system-check');
+    // The back end answers {checked_at, cached, checks: [...]}; a bare list is the older shape.
+    // sysRows is always a list here so every reader below can filter/map without guessing.
+    sysRows = Array.isArray(body) ? body : (body && Array.isArray(body.checks) ? body.checks : null);
+  } catch (err) { sysRows = null; }
   paintSystemChecks(); if (lastMetrics) paintSystemAttn(lastMetrics);
 }
 function paintSystemChecks(){
   const el = $('sysChecks'); if (!el) return;
   let rows = sysRows;
-  if (!rows) {
+  if (!Array.isArray(rows) || !rows.length) {
     const h = lastHealth || {};
     rows = [
       {name: 'Build room', status: 'ok', detail: 'This page loaded'},
@@ -1609,7 +1622,7 @@ function paintSystemAttn(m){
   const items = [];
   if (h.errors_24h) items.push({main: h.errors_24h + ' error(s) in the last 24 hours', sub: h.last_error_at ? 'last one ' + when(h.last_error_at) : ''});
   if (lastHealth && !h.db_ok) items.push({main: 'The database is not reachable', sub: ''});
-  (sysRows || []).filter(r => r.status === 'fail').forEach(r => items.push({main: r.name + ' is failing', sub: r.detail || ''}));
+  (Array.isArray(sysRows) ? sysRows : []).filter(r => r.status === 'fail').forEach(r => items.push({main: r.name + ' is failing', sub: r.detail || ''}));
   (m.unavailable || []).forEach(x => items.push({main: 'Can\u2019t measure ' + String(x.metric).replace(/_/g, ' ') + ' yet', sub: x.reason}));
   attnBox('attn-health', [], items.length ? attnList(items) : '', items.length);
   navBadge('health', items.length);
