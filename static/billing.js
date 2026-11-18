@@ -74,7 +74,7 @@ function showPaywall(boostId, detail) {
     you used last time, so this is the last time you type it. Meta ad spend is separate.</p>
     <div class="modal-actions">
       <button class="alt" onclick="modal.close()">Not now</button>
-      <button class="campaign-primary" onclick="startCampaignCheckout(${Number(boostId)})">Pay ${esc(price)} and build →</button>
+      <button class="campaign-primary" onclick="startCampaignCheckout(${Number(boostId)})">Pay ${esc(price)} and build</button>
     </div>`);
 }
 

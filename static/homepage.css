@@ -119,7 +119,7 @@
 .review-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:#dcebf4;border:1px solid #dcebf4;border-radius:14px;overflow:hidden}
 .review-calendar-day{min-width:0;background:#fff;padding:8px;display:flex;flex-direction:column;gap:7px}
 .review-calendar-day>strong{font-size:12px;color:#52778f}
-.review-calendar-post{display:grid;gap:5px;text-align:left;width:100%;padding:5px;background:#f0f8fd;color:#143a50;border-radius:9px!important;overflow-wrap:anywhere}
+.review-calendar-post{display:grid;gap:5px;text-align:left;width:100%;padding:5px;background:#f0f8fd;color:#143a50;border-radius:9px!important;overflow-wrap:break-word;hyphens:auto}
 .review-calendar-post img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
 /* The words that go on the photo, previewed on the photo: an overlay an owner cannot see is an
    overlay that ships wrong. */
@@ -472,13 +472,6 @@ summary.campaign-step-title{font-family:"Archivo Black","Arial Black",sans-serif
 .field-help{font-size:12px;line-height:1.55;color:#52778f;margin:-4px 0 14px}.field-help b{color:#12354d}
 .field-help{margin:8px 0 16px!important}
 /* Completed campaign: blurred with a run-it-again offer */
-#content.rerun-locked{position:relative}
-#content.rerun-locked>*:not(.rerun-offer){filter:blur(6px);pointer-events:none;user-select:none}
-.rerun-offer{position:absolute;inset:0;display:flex;justify-content:center;align-items:flex-start;padding-top:140px;z-index:5}
-.rerun-card{background:#fff;border:1px solid #d6e7f1;border-radius:18px;box-shadow:0 20px 50px rgba(18,53,77,.18);padding:30px 32px;max-width:440px;text-align:left}
-.rerun-card h2{font-family:"Archivo Black","Arial Black",sans-serif;letter-spacing:-.8px;font-size:26px;color:#12354d;margin:12px 0 8px}
-.rerun-card p{font-size:14px;line-height:1.6;color:#52778f;margin:0 0 20px}.rerun-card p b{color:#12354d}
-.rerun-card .campaign-primary{display:block;margin-bottom:12px}
 /* New campaign: link or upload */
 .nc-photos{margin:6px 0 4px}
 .nc-tabs{display:inline-flex;background:#e2f0f8;border-radius:999px;padding:4px;margin:4px 0 8px}
@@ -933,6 +926,15 @@ html.dark .shell .card-body,html.dark .shell .tabs,html.dark .shell .welcome+div
 html.dark .shell input,html.dark .shell select,html.dark .shell textarea{background:#0f2231!important;border-color:#2a4a63!important;color:#eef6fb!important}
 html.dark .shell .ticket-msg{border-color:#2d6a92}
 html.dark .shell .progress{background:#1f3d52}
+html.dark .shell .leads-list li{background:#0f2231;border-color:#23425a}
+html.dark .shell .leads-list li.done{background:#0c1d2b}
+html.dark .shell .lead-av{background:#1d3a50;color:#f2f8fc}
+html.dark .shell .lead-body p{color:#d6e6f1!important}
+html.dark .shell .lead-body small{color:#6cc4ee}
+html.dark .shell .lead-tick{background:#1d3a50!important;color:#e2f0f8!important}
+html.dark .shell .leads-list li.done .lead-tick{background:#173a2a!important;color:#7fd9a3!important}
+html.dark .shell .leads-empty{background:#0f2231;color:#9db6c8}
+html.dark .shell .lead-add{color:#6cc4ee!important}
 html.dark #modal{background:#13283a;color:#d6e6f1;border-color:#23425a}
 html.dark #modal h2,html.dark #modal b,html.dark #modal label{color:#f2f8fc}
 html.dark .shell .camp-tabs{background:#13283a!important}
@@ -947,3 +949,75 @@ html.dark .shell .camp-tabs button span{color:inherit}
 @keyframes bc-pulse{50%{transform:scale(1.04)}}
 
 .pip-questions{display:none!important}
+
+/* Run it until it sells */
+.rerun-box{margin:0 0 22px;background:#143a50;border-radius:12px;padding:22px 24px;color:#fff}
+.rerun-box .until-sold-sub b{color:#fff}
+.rerun-box .until-sold-sub{margin-bottom:16px}
+.card-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.card-pause.until-sold-on{background:#d94c0d!important}
+.campaign-scope .until-sold{margin-top:22px;background:#143a50;border-radius:12px;padding:22px 24px;color:#fff}
+.until-sold .until-sold-title{display:block;font-size:17px;font-weight:700;color:#fff!important}
+.until-sold .until-sold-sub{margin:6px 0 16px;font-size:14px;line-height:1.5;color:#c7e2f2!important}
+.until-sold-line{border-left:3px solid #d94c0d;padding:2px 0 2px 14px;margin-bottom:18px}
+.until-sold-line .eyebrow{color:#a2c9de!important}
+.until-sold-line p{margin:6px 0 0;font-size:16px;line-height:1.5;font-weight:600;color:#fff!important}
+.until-sold-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.until-sold-actions .campaign-primary{margin:0;width:auto}
+.until-sold-running{color:#fff!important;margin-right:4px}
+button.until-sold-how{background:#e2f0f8!important;color:#12354d!important;border:0!important;width:auto}
+.until-sold-list{padding-left:18px;margin:14px 0;color:#506b80;line-height:1.6;font-size:14px}
+.until-sold-list li{margin-bottom:8px}
+.until-sold-list b{color:#12354d}
+.until-sold-quote{background:#143a50;border-radius:10px;padding:14px 18px}
+.until-sold-quote .eyebrow{color:#a2c9de}
+.until-sold-quote p{color:#fff;margin:6px 0 0;font-weight:600;line-height:1.5}
+html.dark #modal .until-sold-list{color:#c3d6e4}
+html.dark #modal .until-sold-list b{color:#f2f8fc}
+html.dark #modal .until-sold-quote{background:#0c1d2b}
+
+/* Listing photos (campaign not built yet) */
+.campaign-photos .campaign-step-title{margin-bottom:6px!important}
+.campaign-photos .photos-status{margin:0 0 4px!important;font-size:15px!important;color:#24465d!important}
+.campaign-photos .photos-help{margin:14px 0 10px!important;font-size:14px!important;color:#52778f!important}
+.photos-row{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+.photos-row input{flex:1 1 320px;min-width:0;margin:0!important}
+.photos-row .campaign-primary,.photos-row .photos-upload{margin:0!important;width:auto!important;white-space:nowrap}
+.photos-upload{padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px}
+input.photos-file{display:none!important}
+.photo-permission{display:flex!important;align-items:center;gap:12px;margin-top:18px;padding:14px 16px;border:1px solid #dcebf4;border-radius:12px;background:#f7fbff;font-size:14px;font-weight:600;color:#143a50;cursor:pointer}
+.photo-permission input{width:20px!important;height:20px!important;flex:none;margin:0!important;accent-color:#d94c0d;cursor:pointer}
+html.dark .shell .photo-permission{background:#0f2231;border-color:#23425a}
+html.dark .shell .photo-permission span{color:#f2f8fc}
+html.dark .shell .campaign-photos .photos-status{color:#d6e6f1!important}
+.photo-thumbs:empty{display:none}
+html.dark .shell .photos-upload{background:#13283a!important;color:#d6e6f1!important;border:1px solid #23425a}
+/* Dark mode: My Brand, campaign calendar and report cards */
+html.dark .shell form.mb{background:#13283a!important;border-color:#23425a!important}
+html.dark .shell .mb-foot{background:#0f2231!important;border-color:#23425a!important}
+html.dark .shell .mb-sec,html.dark .shell .mb-two>*{border-color:#23425a!important}
+html.dark .shell .mb-type-h,html.dark .shell .mb-type-b{color:#e6f0f7!important}
+html.dark .shell .mb-looks button:not(.on){background:#0f2231!important;color:#d6e6f1!important;border-color:#2a4a63!important}
+html.dark .shell .mb-sources span{background:#0f2231!important;color:#9db6c8!important;border-color:#2a4a63!important}
+html.dark .shell .mb-chips .ok{background:#173a2a!important;color:#7fd9a3!important}
+html.dark .shell .mb-chips .no{background:#3a1f1f!important;color:#f0a59e!important}
+html.dark .shell .mb-status{background:#173a2a!important;color:#7fd9a3!important}
+html.dark .shell .review-month-weekdays{background:#0f2231!important;color:#9db6c8!important}
+html.dark .shell .review-month-cell,html.dark .shell .review-month-date{background:#13283a!important;border-color:#23425a!important}
+html.dark .shell .review-month-cell.outside-month,html.dark .shell .review-month-date.outside-month{background:#0c1d2b!important}
+html.dark .shell .review-calendar-post{background:#0f2231!important;border-color:#2a4a63!important;color:#e6f0f7!important}
+html.dark .shell .review-calendar-post *{color:#e6f0f7!important}
+html.dark .shell .pr-pick{background:#0f2231!important;border-color:#2a4a63!important}
+html.dark .shell .pr-pick.off{background:#0c1d2b!important}
+html.dark .shell .pr-pick small{color:#9db6c8!important}
+html.dark .shell .pr-pick:not(.off) small{color:#6cc4ee!important}
+html.dark .shell .review-month-week{background:repeating-linear-gradient(to right,#13283a 0 calc(100% / 7 - 1px),#23425a calc(100% / 7 - 1px) calc(100% / 7))!important}
+html.dark .shell .mb-legal li{color:#d6e6f1!important}
+
+/* Campaign card: status pill and actions wrap as a group, never one button per line */
+.card-status-row{flex-wrap:wrap;row-gap:8px}
+.card-actions{flex-wrap:nowrap!important;margin-left:auto}
+.review-approval p:not(.fine){color:#c7e2f2!important}
+/* Phone: the workspace nav stays on one row and scrolls sideways */
+@media(max-width:700px){.shell .side-nav{grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:max-content;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.shell .side-nav::-webkit-scrollbar{display:none}.shell .side-nav button{flex:0 0 auto!important;white-space:nowrap}}
+@media(max-width:700px){body:has(.shell) .pip-launcher{bottom:84px!important;right:14px!important}body:has(.shell) .pip-chat{bottom:150px!important}}

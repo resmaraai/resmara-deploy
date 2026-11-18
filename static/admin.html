@@ -712,9 +712,9 @@ html.dark .rel-body{color:#d6e6f1}
     <input id="email" type="email" autocomplete="username" placeholder="you@example.com">
     <label for="password">Password</label>
     <input id="password" type="password" autocomplete="current-password">
-    <div style="margin-top:18px"><button id="loginBtn">Sign in →</button></div>
+    <div style="margin-top:18px"><button id="loginBtn">Sign in</button></div>
     <div class="msg" id="loginMsg"></div>
-    <a class="login-back" href="/">← Back to resmara.com</a>
+    <a class="login-back" href="/">Back to resmara.com</a>
   </section>
 
   <!-- ── console ───────────────────────────────────────────────────────── -->
@@ -1396,7 +1396,7 @@ async function openCampaign(id, focusPost){
   try { c = await api('/api/admin/campaigns/' + encodeURIComponent(id)); }
   catch (err) { c = (campRows || []).find(r => String(r.id) === String(id)) || {id: id}; c._noPosts = true; }
   const posts = c.posts || [];
-  box.innerHTML = '<button class="back" data-close-campaign>← All campaigns</button>' +
+  box.innerHTML = '<button class="back" data-close-campaign>All campaigns</button>' +
     '<div class="br-card" style="margin-top:12px"><div class="detail-head"><div><span class="eyebrow-s">Campaign #' + esc(c.id) + '</span>' +
       '<h3 class="detail-title">' + esc(c.address || '') + '</h3><div class="detail-sub">' + esc(c.agent_name || '') + (c.agent_email ? ' · ' + esc(c.agent_email) : '') + '</div></div>' +
       (c.stage ? stagePill(c) : '') + '</div>' +
@@ -1458,7 +1458,7 @@ function paintAgent(id){
     (c1.status === 'expiring soon' ? 'Their Meta login runs out ' + when(c1.expires_at) + '. They should reconnect before then.' :
      'Their Meta login stopped working ' + (c1.expires_at ? when(c1.expires_at) : '') + '. Posts can’t go out until they reconnect.');
   const waitingT = tix.filter(t => !t.is_test && waitingOnUs(t)).length;
-  page.innerHTML = '<button class="back" data-close-agent>← All accounts</button>' +
+  page.innerHTML = '<button class="back" data-close-agent>All accounts</button>' +
     '<div class="br-card" style="margin-top:12px"><div class="detail-head"><div><span class="eyebrow-s">Agent #' + esc(u.id) + '</span>' +
       '<h3 class="detail-title">' + esc(u.name || u.email) + '</h3><div class="detail-sub">' + esc(u.email) + '</div></div>' +
       '<button class="ghost tiny" data-resetlink="' + esc(u.id) + '" title="Makes a one-time link you send them if they are locked out">Password reset link</button></div>' +
@@ -2985,6 +2985,29 @@ async function saveFinance(){
 if ($('finSave')) $('finSave').addEventListener('click', saveFinance);
 
 $('loginBtn').addEventListener('click', login);
+
+// Enter does the same as clicking the box's button: sign in, add a task, add a cost, send an
+// invite, fetch a campaign. These boxes are not <form>s, so the browser would not do it on its own.
+const ENTER_SUBMITS = {
+  loginBtn: ['email', 'password'],
+  brAdd: ['brTitle', 'brDue'],
+  cAdd: ['cDate', 'cPayer', 'cVendor', 'cWhat', 'cAmount'],
+  tmAdd: ['tmName', 'tmEmail'],
+  checkBoost: ['boostId'],
+};
+Object.keys(ENTER_SUBMITS).forEach(function (btnId) {
+  ENTER_SUBMITS[btnId].forEach(function (inputId) {
+    const input = $(inputId);
+    if (!input) return;
+    input.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' || ev.isComposing) return;
+      const btn = $(btnId);
+      if (!btn || btn.disabled) return;
+      ev.preventDefault();
+      btn.click();
+    });
+  });
+});
 
 // Password help while email is not connected: mint the one-time link here and send it to the
 // customer by hand. It works once and expires in an hour; nothing is exposed publicly.
