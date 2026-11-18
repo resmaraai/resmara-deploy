@@ -3281,10 +3281,26 @@ function renderFinance(){
     + 'may pay to win one is ' + money(d.acquisition.max_cac_usd[3]) + ', a third of their lifetime contribution.';
   const priceTip = 'What one campaign sells for. A repeat round on the same listing bills '
     + d.price.repeat_label + '. Price and repeat price are set on the server, not here.';
+  // The margin target confuses everybody who reads it next to the margin we actually keep, so the
+  // card does the arithmetic out loud instead of restating the label.
+  const targetMargin = d.price_floor.target_margin_pct, floor = d.price_floor.at_current_volume_usd;
+  const perCampaignCost = u.hosting_usd + u.delivery_usd;
+  const floorTip = targetMargin + '% is a target we set, not a result: the share of a sale meant to be left '
+    + 'after delivery. This line answers one question — what is the cheapest we could charge and still keep '
+    + targetMargin + '%?\n\n'
+    + 'At today’s ' + (v.basis === 'actual' ? 'measured' : 'assumed') + ' ' + (v.used || 0) + ' campaigns a month, '
+    + 'hosting is ' + money(u.hosting_usd) + ' and model + photos ' + money(u.delivery_usd) + ' per campaign — '
+    + money(perCampaignCost) + ' of cost before the price is split.\n'
+    + 'Divide that by what is left after Stripe (' + A.stripe_pct + '%), the refund buffer (' + A.refund_buffer_pct
+    + '%) and the ' + targetMargin + '% target, and the floor is ' + (floor === null ? '—' : money(floor)) + '.\n\n'
+    + 'It is a walk-away line, not a price to charge. At ' + d.price.label + ' we keep ' + money(u.contribution_usd)
+    + ', a ' + u.margin_pct + '% margin — ' + (u.margin_pct - targetMargin).toFixed(1) + ' points above the target, '
+    + 'which is why this tab shows both. Change Target margin in the box below and this line moves with it.';
   sq.innerHTML = '<div class="grid g4">' +
     stat(d.price.label, 'price per campaign', '', 'a repeat round is ' + d.price.repeat_label, priceTip) +
-    stat(usd(u.costs_usd), 'our cost per sale', '', null, costTip) +
-    stat(usd(u.contribution_usd), 'we keep per campaign', u.contribution_usd > 0 ? 'good' : 'bad', u.margin_pct + '% margin', keepTip) +
+    stat(usd(u.costs_usd), 'our cost per sale', '', 'of a ' + d.price.label + ' price', costTip) +
+    stat(usd(u.contribution_usd), 'we keep per campaign', u.contribution_usd > 0 ? 'good' : 'bad',
+         u.margin_pct + '% margin · target ' + targetMargin + '%', keepTip) +
     stat(usd(f.total_monthly_usd), 'hosting per month', '', usd(f.annual_usd) + ' a year', hostingTip) +
     '</div>';
   const cs = $('calcSum'); if (cs) cs.textContent = 'Right now: ' + usd(u.contribution_usd) + ' kept per campaign' +
@@ -3303,7 +3319,7 @@ function renderFinance(){
     calcRow('We keep per campaign', usd(u.contribution_usd) + ' <small>' + esc(u.margin_pct) + '%</small>', true, keepTip) +
     calcRow('Hosting per month', usd(f.total_monthly_usd), false, hostingTip) +
     calcRow('Sales a month to cover hosting', b.campaigns_per_month === null ? '—' : esc(b.campaigns_per_month), false, WHY['sales to cover hosting']) +
-    calcRow('Lowest price for ' + esc(d.price_floor.target_margin_pct) + '% margin', d.price_floor.at_current_volume_usd === null ? '—' : usd(d.price_floor.at_current_volume_usd), false, WHY['price for target margin']) +
+    calcRow('Floor price for ' + esc(targetMargin) + '% margin', floor === null ? '—' : usd(floor), false, floorTip) +
     calcRow('One agent is worth', usd(d.repeat.lifetime_contribution_usd), false, WHY['one agent, all years']) +
     calcRow('Most we may pay to win one', usd(d.acquisition.max_cac_usd[3]), true, WHY['most we may pay per customer']);
 
