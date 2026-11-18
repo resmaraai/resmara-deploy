@@ -678,6 +678,7 @@ html.dark .rel-body{color:#d6e6f1}
       <div class="nav-group">Money</div>
       <a href="#sec-finance" data-go="finance">Finance</a>
       <a href="#sec-costs" data-go="costs">Start-up costs</a>
+      <a href="#sec-filings" data-go="filings">Filings &amp; deadlines</a>
       <div class="nav-group">Business</div>
       <a href="#sec-growth" data-go="growth">Growth</a>
       <a href="#sec-marketing" data-go="marketing">Marketing</a>
@@ -899,6 +900,59 @@ html.dark .rel-body{color:#d6e6f1}
 
         <div class="br-card"><h3 class="card-title">Every cost</h3><div id="costsTable" class="cost-list"></div>
         <div class="hint" style="margin-top:8px">A repeating cost counts once a month (or year) from the day it started. Ending one stops it.</div></div>
+      </div>
+    </details>
+
+    <details class="card sec" data-sec="filings" id="sec-filings">
+      <summary><h2>Filings &amp; deadlines</h2><span class="secsum" id="sum-filings">&hellip;</span><span class="chev">&rsaquo;</span></summary>
+      <div class="body">
+        <div class="view-intro">Every filing, publication and renewal with a date on it &mdash; county, state and federal &mdash; and what each one costs. A row that repeats rolls itself forward when you mark it done, so the next window is on the board before this one closes.</div>
+        <div id="flSquares"><div class="hint">Reading the filings&hellip;</div></div>
+
+        <div class="br-card"><h3 class="card-title">Add a filing</h3>
+        <div class="row" id="flForm" style="align-items:flex-end">
+          <div style="flex:1 1 200px;min-width:180px"><label for="flTitle">What has to happen</label><input id="flTitle" placeholder="Shasta County Fictitious Business Name statement"></div>
+          <div style="flex:0 0 130px"><label for="flJurisdiction">Who it goes to</label><input id="flJurisdiction" placeholder="Shasta County Clerk"></div>
+          <div style="flex:0 0 110px"><label for="flKind">Kind</label>
+            <select id="flKind">
+              <option value="filing">Filing</option>
+              <option value="publication">Publication</option>
+              <option value="tax">Tax return</option>
+              <option value="renewal">Renewal</option>
+              <option value="report">Report</option>
+              <option value="other">Other</option>
+            </select></div>
+          <div style="flex:0 0 130px"><label for="flDue">Due by</label><input type="date" id="flDue"></div>
+          <div style="flex:0 0 90px"><label for="flCost">Cost ($)</label><input id="flCost" inputmode="decimal" placeholder="93.00"></div>
+          <div style="flex:0 0 120px"><label for="flRecur">Repeats</label>
+            <select id="flRecur">
+              <option value="one_off">Once</option>
+              <option value="annual">Every year</option>
+              <option value="every_5_years">Every 5 years</option>
+            </select></div>
+          <div style="flex:0 0 auto"><label>&nbsp;</label><button id="flAdd">Add it</button></div>
+        </div>
+        <div class="row" style="margin-top:10px;align-items:flex-end">
+          <div style="flex:1 1 240px"><label for="flBlocked">Waiting on (who or what)</label><input id="flBlocked" placeholder="Adam's ID and SSN &mdash; leave blank if nothing is holding it"></div>
+          <div style="flex:1 1 240px"><label for="flLink">Where it is filed</label><input id="flLink" placeholder="https://..."></div>
+        </div>
+        <div style="margin-top:10px">
+          <label for="flNotes">Notes &mdash; the rule behind the date, and what happens if it slips</label>
+          <textarea id="flNotes" rows="2" placeholder="For example: 40 days from the day business started; filed late, the whole statement is filed again and the fee is paid twice."></textarea>
+        </div>
+        <div class="msg" id="flMsg"></div></div>
+
+        <div class="brfilters pilltrack">
+          <button class="chip flchip" data-flf="open" aria-pressed="true">Still open</button>
+          <button class="chip flchip" data-flf="soon" aria-pressed="false">Due within 30 days</button>
+          <button class="chip flchip" data-flf="overdue" aria-pressed="false">Past the date</button>
+          <button class="chip flchip" data-flf="all" aria-pressed="false">Everything</button>
+        </div>
+        <div class="br-card"><h3 class="card-title">The board</h3><div class="scrollx"><table id="flTable" style="min-width:900px">
+          <thead><tr><th style="min-width:260px">filing</th><th>goes to</th><th>due</th><th>days left</th><th>cost</th><th>waiting on</th><th></th></tr></thead>
+          <tbody><tr><td colspan="7" class="hint">Loading&hellip;</td></tr></tbody>
+        </table></div>
+        <div class="hint" id="flCount" style="margin-top:6px"></div></div>
       </div>
     </details>
 
@@ -1817,6 +1871,186 @@ function paintWebsite(){
   const s = $('sum-website'); if (s) s.textContent = Number(w.visitors).toLocaleString('en-US') + ' visitors · ' + conv + '% start signing up' + (fails.length ? ' · ' + fails.length + ' check(s) failing' : '');
 }
 
+// ── filings & deadlines ───────────────────────────────────────────────────────────
+// The paperwork with a clock on it. The server owns the arithmetic (days left, what is
+// overdue, the roll-forward when a recurring row is closed); this only paints it. Two
+// things the board must never do: add an unpriced filing in as $0, or let a closed
+// recurring row take its next window with it.
+let flRows = [], flSummary = null, flFilter = 'open', flOpened = false;
+const FL_KIND = { filing: 'Filing', publication: 'Publication', tax: 'Tax return', renewal: 'Renewal', report: 'Report', other: 'Other' };
+const FL_WHY = {
+  open: 'Filings not marked done, whatever their date.',
+  soon: 'Open filings whose date is inside the next 30 days — close enough to act on.',
+  overdue: 'Open filings whose date has already passed. The fee is usually paid twice at this point.',
+  cost: 'The open filings whose cost somebody has quoted, added up.',
+  unpriced: 'Open filings with no price entered yet. They are not counted as $0, because nobody has quoted them.'
+};
+function flMsg(text, ok){
+  const m = $('flMsg'); if (!m) return;
+  m.className = 'msg ' + (ok ? 'ok' : 'bad');
+  m.textContent = text;
+  clearTimeout(flMsg._t);
+  flMsg._t = setTimeout(() => { m.textContent = ''; m.className = 'msg'; }, 8000);
+}
+function flMoney(it){
+  if (it.cost_cents === null || it.cost_cents === undefined) {
+    return '<span class="pill warn">not quoted</span>' + (it.cost_note ? '<div class="hint">' + esc(it.cost_note) + '</div>' : '');
+  }
+  return esc(usd(it.cost_usd)) + (it.cost_note ? '<div class="hint">' + esc(it.cost_note) + '</div>' : '');
+}
+function flWhen(it){
+  if (!it.due_on) return '<span class="hint">no date</span>';
+  const d = new Date(it.due_on + 'T12:00:00');
+  return esc(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
+}
+function flLeft(it){
+  if (it.status !== 'open') return '<span class="pill ok">' + esc(it.status === 'done' ? 'done' : it.status) + '</span>';
+  if (it.days_left === null || it.days_left === undefined) return '<span class="hint">—</span>';
+  if (it.days_left < 0) return '<span class="pill bad">' + Math.abs(it.days_left) + ' days late</span>';
+  if (it.days_left === 0) return '<span class="pill bad">due today</span>';
+  if (it.days_left <= 30) return '<span class="pill warn">in ' + it.days_left + ' days</span>';
+  return '<span class="pill">in ' + it.days_left + ' days</span>';
+}
+async function loadFilings(){
+  try {
+    const d = await api('/api/admin/filings');
+    flRows = d.items || [];
+    flSummary = d.summary || {};
+    renderFilings();
+  } catch (err) {
+    flSummary = null;
+    const sq = $('flSquares');
+    if (sq) sq.innerHTML = '<div class="msg bad">Could not read the filings — ' + esc(err.message) + (err.status === 403 ? ' — this account does not have the Money group.' : '') + '</div>';
+    const s = $('sum-filings'); if (s) s.textContent = 'unavailable';
+  }
+}
+function renderFilings(){
+  const s = flSummary; if (!s) return;
+  const sq = $('flSquares'); if (!sq) return;
+  const known = s.open_cost_usd === null || s.open_cost_usd === undefined ? '—' : usd(s.open_cost_usd);
+  sq.innerHTML = hero({
+    eyebrow: 'Paperwork with a date on it',
+    big: s.next ? esc(s.next.days_left < 0 ? Math.abs(s.next.days_left) + ' days late' : s.next.days_left + ' days') : 'Nothing dated',
+    small: s.next ? s.next.title : 'no open filing has a date yet',
+    bar: null,
+    steps: [
+      { n: s.open, l: 'Still open', s: FL_WHY.open, cls: '' },
+      { n: s.due_soon, l: 'Due within 30 days', s: FL_WHY.soon, cls: s.due_soon ? 'alert' : '' },
+      { n: s.overdue, l: 'Past the date', s: FL_WHY.overdue, cls: s.overdue ? 'alert' : '' },
+      { n: known, l: 'Known cost to finish', s: FL_WHY.cost + (s.open_cost_unknown ? ' ' + s.open_cost_unknown + ' more ' + (s.open_cost_unknown === 1 ? 'has' : 'have') + ' no price yet.' : ''), cls: s.open_cost_unknown ? 'alert' : '' }
+    ]
+  }) + (s.blocked ? '<div class="hint" style="margin-top:8px">' + esc(s.blocked) +
+      (s.blocked === 1 ? ' open filing names what it is waiting on' : ' open filings name what they are waiting on') +
+      ' — that line is in the table below.</div>' : '');
+
+  const rows = flRows.filter(t => {
+    if (flFilter === 'all') return true;
+    if (flFilter === 'overdue') return t.status === 'open' && t.overdue;
+    if (flFilter === 'soon') return t.status === 'open' && t.due_soon;
+    return t.status === 'open';
+  });
+  const tb = $('flTable').querySelector('tbody');
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="7"><span class="hint">' + (!flRows.length
+      ? 'Nothing on the board yet. Add the first obligation above — its date is the point.'
+      : 'Nothing in this view.') + '</span></td></tr>';
+  } else {
+    tb.innerHTML = rows.map(t => '<tr data-flid="' + t.id + '"' + (t.overdue ? ' class="row-alert"' : '') + '>' +
+      '<td><b>' + esc(t.title) + '</b><div class="hint">' + esc(FL_KIND[t.kind] || t.kind) +
+        (t.recurrence && t.recurrence !== 'one_off' ? ' · repeats ' + esc(t.recurrence.replace(/_/g, ' ')) : '') +
+        (t.notes ? ' · ' + esc(t.notes.split('\n')[0].slice(0, 90)) + (t.notes.length > 90 ? '…' : '') : '') + '</div></td>' +
+      '<td>' + (t.jurisdiction ? esc(t.jurisdiction) : '<span class="hint">—</span>') + '</td>' +
+      '<td>' + flWhen(t) + '</td>' +
+      '<td>' + flLeft(t) + '</td>' +
+      '<td>' + flMoney(t) + '</td>' +
+      '<td>' + (t.blocked_on ? '<span class="pill warn">' + esc(t.blocked_on) + '</span>' : '<span class="hint">nothing</span>') + '</td>' +
+      '<td class="tiny nw">' +
+        (t.link ? '<a class="inline-link" href="' + esc(t.link) + '" target="_blank" rel="noopener">open</a> ' : '') +
+        (t.status === 'open'
+          ? '<button class="ghost tiny" data-fldone="' + t.id + '">mark done</button>'
+          : '<button class="ghost tiny" data-flreopen="' + t.id + '">reopen</button>') +
+        ' <button class="ghost tiny" data-fldel="' + t.id + '">delete</button>' +
+      '</td></tr>').join('');
+  }
+  const c = $('flCount');
+  if (c) c.textContent = rows.length + ' of ' + flRows.length + ' shown · ' + s.open + ' still open' +
+    (s.no_deadline ? ' · ' + s.no_deadline + ' with no date entered yet (a gap, not a deadline)' : '');
+  const sum = $('sum-filings');
+  if (sum) sum.innerHTML = (s.overdue ? '<b>' + s.overdue + ' past the date</b> · ' : '') +
+    (s.due_soon ? '<b>' + s.due_soon + ' due within 30 days</b> · ' : '') +
+    s.open + ' open · ' + (s.open_cost_usd === null || s.open_cost_usd === undefined ? '' : usd(s.open_cost_usd) + ' known') +
+    (s.open_cost_unknown ? ' (+' + s.open_cost_unknown + ' unpriced)' : '');
+  navBadge('filings', s.overdue + s.due_soon);
+  // A board nobody looks at misses the date. The first time this browser loads it, an
+  // obligation that is already late or inside 30 days opens the section itself.
+  if (!flOpened) {
+    flOpened = true;
+    const saved = savedOpen();
+    if (!('filings' in saved) && (s.overdue || s.due_soon)) { setOpen('filings', true); const d = $('sec-filings'); if (d) d.open = true; }
+  }
+}
+function flCents(){
+  const raw = ($('flCost').value || '').trim().replace(/[$,]/g, '');
+  if (!raw) return null;
+  const v = Number(raw);
+  return isFinite(v) && v >= 0 ? Math.round(v * 100) : null;
+}
+async function flAdd(){
+  const title = ($('flTitle').value || '').trim();
+  if (!title) { flMsg('Say what has to happen — the title is how you will find it again.', false); return; }
+  const rawCost = ($('flCost').value || '').trim();
+  const cents = flCents();
+  if (rawCost && cents === null) { flMsg('The cost has to be a number in dollars, or left blank if nobody has quoted it.', false); return; }
+  try {
+    await api('/api/admin/filings', { method: 'POST', body: {
+      title: title,
+      jurisdiction: ($('flJurisdiction').value || '').trim(),
+      kind: $('flKind').value,
+      due_on: $('flDue').value || null,
+      cost_cents: cents,
+      recurrence: $('flRecur').value,
+      blocked_on: ($('flBlocked').value || '').trim() || null,
+      link: ($('flLink').value || '').trim() || null,
+      notes: ($('flNotes').value || '').trim() || null,
+      owner: brMe()
+    }});
+    ['flTitle', 'flJurisdiction', 'flDue', 'flCost', 'flBlocked', 'flLink', 'flNotes'].forEach(id => { $(id).value = ''; });
+    flMsg('Added. It is on the board with its date.', true);
+    loadFilings();
+  } catch (err) { flMsg('That did not save: ' + err.message, false); }
+}
+async function flMark(id, status){
+  try {
+    const d = await api('/api/admin/filings/' + id, { method: 'PATCH', body: { status: status, who: brMe() } });
+    const nxt = d && d.next;
+    flMsg(status === 'done'
+      ? ('Marked done.' + (nxt ? ' The next cycle is on the board for ' + nxt.due_on + '.' : ''))
+      : 'Reopened.', true);
+    loadFilings();
+  } catch (err) { flMsg('That did not save: ' + err.message, false); }
+}
+async function flDelete(id){
+  if (!confirm('Delete this filing? A closed one is the record that it was filed — keep it unless it was added by mistake.')) return;
+  try {
+    await api('/api/admin/filings/' + id, { method: 'DELETE' });
+    flMsg('Deleted.', true);
+    loadFilings();
+  } catch (err) { flMsg('That did not delete: ' + err.message, false); }
+}
+document.querySelectorAll('.flchip').forEach(chip => chip.addEventListener('click', () => {
+  document.querySelectorAll('.flchip').forEach(c => c.setAttribute('aria-pressed', String(c === chip)));
+  flFilter = chip.dataset.flf; renderFilings();
+}));
+$('flAdd').addEventListener('click', flAdd);
+$('flTable').addEventListener('click', (e) => {
+  const done = e.target.closest('[data-fldone]');
+  if (done) { flMark(Number(done.dataset.fldone), 'done'); return; }
+  const re = e.target.closest('[data-flreopen]');
+  if (re) { flMark(Number(re.dataset.flreopen), 'open'); return; }
+  const del = e.target.closest('[data-fldel]');
+  if (del) { flDelete(Number(del.dataset.fldel)); }
+});
+
 // ── settings: who is on the team, and which parts of the Team room each person sees ──
 // Needs /api/admin/team (list, invite, change access, remove) from the back end, and the server
 // must refuse a section's data to anyone without access to it; hiding it here is only the look.
@@ -1825,7 +2059,7 @@ const ACCESS = [
   ['build', 'Build', 'Build room, Releases', ['buildroom', 'releases']],
   ['agents', 'Agents', 'Accounts, Support, Connections', ['users', 'support', 'advertising']],
   ['campaigns', 'Campaigns', 'Campaigns and their posts', ['campaigns']],
-  ['money', 'Money', 'Finance, Start-up costs', ['finance', 'costs']],
+  ['money', 'Money', 'Finance, Start-up costs, Filings', ['finance', 'costs', 'filings']],
   ['business', 'Business', 'Growth, Marketing, Website', ['growth', 'marketing', 'website']],
   ['system', 'System', 'System check, Activity', ['health', 'activity']],
 ];
@@ -2603,7 +2837,7 @@ if ($('cAdd')) {
 }
 
 
-function refreshAll(){ loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); loadFinance(); loadBuildroom(); }
+function refreshAll(){ loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); loadFinance(); loadBuildroom(); loadFilings(); }
 
 // ── build room ────────────────────────────────────────────────────────────────────
 // Who is working on what, and who has it claimed. The server owns the lock: a claimed task
@@ -3082,7 +3316,7 @@ boot();
 /* One section at a time. The sidebar picks a view; Overview shows the pulse and a card per section. */
 (function(){
   document.body.classList.add('views');
-  const GROUP={buildroom:'Build',releases:'Build',users:'Agents',growth:'Business',marketing:'Business',website:'Business',support:'Agents',advertising:'Agents',campaigns:'Campaigns',finance:'Money',costs:'Money',health:'System',activity:'System',settings:'System'};
+  const GROUP={buildroom:'Build',releases:'Build',users:'Agents',growth:'Business',marketing:'Business',website:'Business',support:'Agents',advertising:'Agents',campaigns:'Campaigns',finance:'Money',costs:'Money',filings:'Money',health:'System',activity:'System',settings:'System'};
   function paintOverview(){
     const box=document.getElementById('overviewList'); if(!box) return;
     box.innerHTML=[...document.querySelectorAll('#index a[data-go]')].filter(a=>a.dataset.go!=='overview').map(a=>{

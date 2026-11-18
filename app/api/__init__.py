@@ -9,6 +9,9 @@ from app.api import content
 from app.api import engine
 from app.api import billing
 from app.api import costs
+# Filings: /api/admin/filings — the paperwork with a deadline on it (FBN, publication, 1065,
+# 565) and what each one costs, so a window is never missed silently.
+from app.api import filings
 from app.api import finance
 # Build room: /api/admin/buildroom — who is doing what, and who has it claimed. Replaces the
 # outbound ChatGPT Sites tracker: the board lives inside this console now.
@@ -38,6 +41,7 @@ api_router.include_router(engine.router, prefix="", tags=["engine"])
 api_router.include_router(billing.router, prefix="", tags=["billing"])
 # Start-up costs: /api/admin/costs — what the project cost, who paid, receipts, subscriptions.
 api_router.include_router(costs.router, prefix="", tags=["costs"])
+api_router.include_router(filings.router, prefix="", tags=["filings"])
 # Finance: /api/admin/finance — what a campaign sells for, what it costs us, what we may spend
 # to win a repeat agent, and what has actually been collected.
 api_router.include_router(finance.router, prefix="", tags=["finance"])

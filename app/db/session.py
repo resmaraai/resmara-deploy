@@ -438,6 +438,41 @@ class BuildroomTask(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+# --- Filings (the paperwork with a clock on it) ---
+# A general partnership has almost no state paperwork — which is exactly why the little it
+# does have gets forgotten: a Fictitious Business Name statement is due 40 days after
+# business starts, the newspaper run starts within 45 days of that filing, Form 1065 and
+# California's 565 are due on a fixed date every spring. None of those are in anyone's
+# calendar, and a missed one costs the whole fee again. So each row is one obligation:
+# what it is, who it goes to, the date it is due, what it costs, and — when it is not
+# moving — who or what it is waiting on. A recurring row rolls itself forward when it is
+# marked done, so the next window is on the board before this one is closed.
+class Filing(Base):
+    __tablename__ = "filings"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(240), nullable=False)
+    kind = Column(String(24), nullable=False, default="filing")     # filing|publication|tax|renewal|report|other
+    jurisdiction = Column(String(120), nullable=True)               # "Shasta County, CA", "IRS", "CA FTB"
+    due_on = Column(Date, nullable=True)                            # the hard date
+    window_opens_on = Column(Date, nullable=True)                   # earliest it may be filed
+    recurrence = Column(String(24), nullable=False, default="one_off")  # one_off|annual|every_5_years
+    # Money is nullable on purpose: NULL means "nobody has quoted this yet", which is a
+    # different fact from $0 (free) and must not be summed as zero.
+    cost_cents = Column(Integer, nullable=True)
+    cost_note = Column(String(240), nullable=True)                  # "$84 + $9 per extra registrant"
+    status = Column(String(16), nullable=False, default="open")     # open|done|not_needed
+    done_on = Column(Date, nullable=True)
+    paid_cents = Column(Integer, nullable=True)
+    confirmation = Column(String(240), nullable=True)               # receipt or confirmation number
+    blocked_on = Column(String(240), nullable=True)                 # who or what it is waiting on
+    owner = Column(String(160), nullable=True)
+    link = Column(String(400), nullable=True)
+    notes = Column(Text, nullable=True)
+    rolled_from = Column(Integer, nullable=True)                    # id of the cycle this one followed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class HelpMiss(Base):
     """A question the Ask Resmara chat could not answer.
 
