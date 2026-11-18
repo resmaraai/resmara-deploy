@@ -119,7 +119,7 @@
 .review-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:#dcebf4;border:1px solid #dcebf4;border-radius:14px;overflow:hidden}
 .review-calendar-day{min-width:0;background:#fff;padding:8px;display:flex;flex-direction:column;gap:7px}
 .review-calendar-day>strong{font-size:12px;color:#52778f}
-.review-calendar-post{display:grid;gap:5px;text-align:left;width:100%;padding:5px;background:#f0f8fd;color:#143a50;border-radius:9px!important;overflow-wrap:anywhere}
+.review-calendar-post{display:grid;gap:5px;text-align:left;width:100%;padding:5px;background:#f0f8fd;color:#143a50;border-radius:9px!important;overflow-wrap:break-word;hyphens:auto}
 .review-calendar-post img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
 /* The words that go on the photo, previewed on the photo: an overlay an owner cannot see is an
    overlay that ships wrong. */
@@ -992,3 +992,32 @@ html.dark .shell .photo-permission span{color:#f2f8fc}
 html.dark .shell .campaign-photos .photos-status{color:#d6e6f1!important}
 .photo-thumbs:empty{display:none}
 html.dark .shell .photos-upload{background:#13283a!important;color:#d6e6f1!important;border:1px solid #23425a}
+/* Dark mode: My Brand, campaign calendar and report cards */
+html.dark .shell form.mb{background:#13283a!important;border-color:#23425a!important}
+html.dark .shell .mb-foot{background:#0f2231!important;border-color:#23425a!important}
+html.dark .shell .mb-sec,html.dark .shell .mb-two>*{border-color:#23425a!important}
+html.dark .shell .mb-type-h,html.dark .shell .mb-type-b{color:#e6f0f7!important}
+html.dark .shell .mb-looks button:not(.on){background:#0f2231!important;color:#d6e6f1!important;border-color:#2a4a63!important}
+html.dark .shell .mb-sources span{background:#0f2231!important;color:#9db6c8!important;border-color:#2a4a63!important}
+html.dark .shell .mb-chips .ok{background:#173a2a!important;color:#7fd9a3!important}
+html.dark .shell .mb-chips .no{background:#3a1f1f!important;color:#f0a59e!important}
+html.dark .shell .mb-status{background:#173a2a!important;color:#7fd9a3!important}
+html.dark .shell .review-month-weekdays{background:#0f2231!important;color:#9db6c8!important}
+html.dark .shell .review-month-cell,html.dark .shell .review-month-date{background:#13283a!important;border-color:#23425a!important}
+html.dark .shell .review-month-cell.outside-month,html.dark .shell .review-month-date.outside-month{background:#0c1d2b!important}
+html.dark .shell .review-calendar-post{background:#0f2231!important;border-color:#2a4a63!important;color:#e6f0f7!important}
+html.dark .shell .review-calendar-post *{color:#e6f0f7!important}
+html.dark .shell .pr-pick{background:#0f2231!important;border-color:#2a4a63!important}
+html.dark .shell .pr-pick.off{background:#0c1d2b!important}
+html.dark .shell .pr-pick small{color:#9db6c8!important}
+html.dark .shell .pr-pick:not(.off) small{color:#6cc4ee!important}
+html.dark .shell .review-month-week{background:repeating-linear-gradient(to right,#13283a 0 calc(100% / 7 - 1px),#23425a calc(100% / 7 - 1px) calc(100% / 7))!important}
+html.dark .shell .mb-legal li{color:#d6e6f1!important}
+
+/* Campaign card: status pill and actions wrap as a group, never one button per line */
+.card-status-row{flex-wrap:wrap;row-gap:8px}
+.card-actions{flex-wrap:nowrap!important;margin-left:auto}
+.review-approval p:not(.fine){color:#c7e2f2!important}
+/* Phone: the workspace nav stays on one row and scrolls sideways */
+@media(max-width:700px){.shell .side-nav{grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:max-content;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.shell .side-nav::-webkit-scrollbar{display:none}.shell .side-nav button{flex:0 0 auto!important;white-space:nowrap}}
+@media(max-width:700px){body:has(.shell) .pip-launcher{bottom:84px!important;right:14px!important}body:has(.shell) .pip-chat{bottom:150px!important}}
