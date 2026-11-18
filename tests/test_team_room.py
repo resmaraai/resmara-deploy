@@ -36,7 +36,7 @@ from fastapi.testclient import TestClient                              # noqa: E
 
 from app.core.config import settings                                   # noqa: E402
 from app.core.security import get_password_hash                        # noqa: E402
-from app.db.session import (Base, Boost, Order, Post, SessionLocal,     # noqa: E402
+from app.db.session import (Asset, Base, Boost, Order, Post, SessionLocal,  # noqa: E402
                             User, engine)
 from app.main import app                                               # noqa: E402
 from app.services import llm, team_access                              # noqa: E402
@@ -87,6 +87,10 @@ db.add(Order(user_id=customer.id, boost_id=client_boost.id, amount_cents=299,
              status="paid", paid_at=datetime.utcnow() - timedelta(days=1)))
 db.add(Order(user_id=customer.id, boost_id=client_boost.id, amount_cents=299,
              status="pending", created_at=datetime.utcnow() - timedelta(days=1)))
+# One listing photo, so the console can show a campaign's own library rather than a blank.
+db.add(Asset(user_id=customer.id, boost_id=client_boost.id, filename="12-test-st.jpg",
+             url="/uploads/12-test-st.jpg", original_name="front-of-house.jpg",
+             kind="photo", room="front", tagged_by="ai"))
 db.add(Post(boost_id=client_boost.id, day=1, slot=1, publish_status="failed",
             failure_kind="connection", last_error="token expired",
             failure_note="Meta rejected the photo",
@@ -173,6 +177,12 @@ ok("campaigns is the list the table draws", isinstance(campaigns, list) and len(
 ok("with the agent's name on the row", campaigns and campaigns[0].get("agent_name") == "Client", str(campaigns)[:200])
 detail = own.get(f"/api/admin/campaigns/{campaigns[0]['id']}").json()
 ok("a campaign opens with its posts", len(detail.get("posts") or []) == 1, str(detail)[:200])
+ok("its row carries the cover and the photo count",
+   campaigns[0].get("photos_total") == 1 and campaigns[0].get("photo_cover") == "/uploads/12-test-st.jpg",
+   str(campaigns[0])[:220])
+ok("the campaign opens with the photos the calendar will use",
+   [p.get("url") for p in (detail.get("photos") or [])] == ["/uploads/12-test-st.jpg"],
+   str(detail.get("photos"))[:220])
 ok("and the reason it failed is on the post",
    (detail.get("posts") or [{}])[0].get("reason") == "Meta rejected the photo", str(detail.get("posts"))[:200])
 failed = own.get("/api/admin/posts/failed").json()

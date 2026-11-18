@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.db.session import AdAccount, Boost, Event, Post, User, get_db
+from app.db.session import AdAccount, Asset, Boost, Event, Post, User, get_db
 from app.services import team_access
 
 log = logging.getLogger("resmara.console")
@@ -82,7 +82,31 @@ def _post_counts(db: Session, boost_ids: List[int]) -> Dict[int, Dict[str, int]]
     return out
 
 
-def _campaign_row(boost: Boost, owner: Optional[User], counts: Dict[str, int]) -> Dict[str, Any]:
+def _photo_index(db: Session, boost_ids: List[int]) -> tuple:
+    """Cover url and photo count per campaign, in one pass.
+
+    The Team room draws a campaign's own photos: a thumbnail on the row and the whole library
+    inside it. Nothing here loads the image bytes — `Asset.data` is deferred, and the console
+    only ever needs the path.
+    """
+    covers: Dict[int, str] = {}
+    counts: Dict[int, int] = {}
+    if not boost_ids:
+        return covers, counts
+    rows = (
+        db.query(Asset.boost_id, Asset.url)
+        .filter(Asset.boost_id.in_(boost_ids))
+        .order_by(Asset.boost_id, Asset.id)
+        .all()
+    )
+    for boost_id, url in rows:
+        counts[boost_id] = counts.get(boost_id, 0) + 1
+        covers.setdefault(boost_id, url)
+    return covers, counts
+
+
+def _campaign_row(boost: Boost, owner: Optional[User], counts: Dict[str, int],
+                  cover: Optional[str] = None, photos: int = 0) -> Dict[str, Any]:
     return {
         "id": boost.id,
         "user_id": boost.user_id,
@@ -93,6 +117,8 @@ def _campaign_row(boost: Boost, owner: Optional[User], counts: Dict[str, int]) -
         "built": bool(boost.plan),
         "day": _day_of(boost),
         "campaign_days": int(boost.campaign_days or 14),
+        "photos_total": int(photos),
+        "photo_cover": cover,
         "posts_total": counts.get("total", 0),
         "posts_published": counts.get("published", 0),
         "posts_failed": counts.get("failed", 0),
@@ -118,11 +144,13 @@ def list_campaigns(include_hidden: bool = False, limit: int = 200,
         query = query.filter(Boost.hidden.isnot(True))
     boosts = query.order_by(Boost.id.desc()).limit(max(1, min(limit, 500))).all()
     counts = _post_counts(db, [b.id for b in boosts])
+    covers, photo_counts = _photo_index(db, [b.id for b in boosts])
     owners = {
         u.id: u
         for u in db.query(User).filter(User.id.in_({b.user_id for b in boosts} or {0})).all()
     }
-    return [_campaign_row(b, owners.get(b.user_id), counts.get(b.id, {})) for b in boosts]
+    return [_campaign_row(b, owners.get(b.user_id), counts.get(b.id, {}),
+                          covers.get(b.id), photo_counts.get(b.id, 0)) for b in boosts]
 
 
 @router.get("/admin/campaigns/{campaign_id}")
@@ -134,7 +162,23 @@ def campaign_detail(campaign_id: int, user=Depends(team_access.needs("campaigns"
         raise HTTPException(status_code=404, detail="No such campaign")
     owner = db.query(User).filter(User.id == boost.user_id).first()
     counts = _post_counts(db, [boost.id]).get(boost.id, {})
-    row = _campaign_row(boost, owner, counts)
+    covers, photo_counts = _photo_index(db, [boost.id])
+    row = _campaign_row(boost, owner, counts, covers.get(boost.id), photo_counts.get(boost.id, 0))
+    # The campaign's own library, in the order the calendar will use it. A campaign with no
+    # photos says so with an empty list — never a stand-in image from somewhere else.
+    assets = (db.query(Asset).filter(Asset.boost_id == boost.id).order_by(Asset.id).all())
+    row["photos"] = [
+        {
+            "id": a.id,
+            "url": a.url,
+            "room": a.room,
+            "name": a.original_name,
+            "kind": a.kind,
+            "shape": a.shape,
+            "tagged_by": a.tagged_by,
+        }
+        for a in assets
+    ]
     posts = db.query(Post).filter(Post.boost_id == boost.id).order_by(Post.day, Post.slot).all()
     row["posts"] = [
         {

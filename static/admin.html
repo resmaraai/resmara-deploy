@@ -378,6 +378,17 @@ nav#index a{display:flex;align-items:center}
 .log-kind.k-posted{background:#dff3e6;color:#1f7a45}
 .log-text{flex:1}.log-text i{font-style:normal;color:#57768d}
 .stat{cursor:default}
+.stat[data-tip]{cursor:help}
+/* One hover card for every square and row that carries its explanation in data-tip. A native
+   title= waits a second, cannot be styled and cannot hold a breakdown — and a section's
+   .card{overflow:hidden} would clip any tooltip drawn inside it. So the card is one fixed
+   element, positioned by script and clamped to the window. */
+#tipCard{position:fixed;z-index:1200;left:0;top:0;max-width:330px;background:#12354d;color:#eef6fb;
+  font-size:12.5px;line-height:1.55;font-weight:500;padding:12px 14px;border-radius:14px;
+  box-shadow:0 16px 38px rgba(18,53,77,.24);white-space:pre-line;opacity:0;visibility:hidden;
+  transition:opacity .1s ease;pointer-events:none}
+#tipCard.on{opacity:1;visibility:visible}
+#tipCard b{display:block;color:#fff;font-size:13px;margin-bottom:5px}
 .detail-title,.card-title{text-transform:none!important}
 #overviewList .og{display:flex;align-items:center;justify-content:space-between}
 
@@ -437,6 +448,16 @@ nav#index a{display:flex;align-items:center}
 .post-open{display:grid;grid-template-columns:260px 1fr;gap:22px;padding:18px;border-top:1px solid #e3eef6;background:#f8fbfd}
 .post-open.hidden{display:none}
 .post-media img,.post-noimg{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:12px;background:#dcebf5;display:grid;place-items:center;color:#57768d;font-weight:700}
+/* A campaign's own photos: the cover on its row, the whole library inside the campaign. */
+.property-cell{display:flex;align-items:center;gap:10px}
+.property-cell small{display:block;color:#57768d;font-size:12px;margin-top:1px}
+.camp-thumb{width:46px;height:34px;object-fit:cover;border-radius:6px;background:#dcebf5;flex:0 0 auto}
+.camp-nophoto{width:46px;height:34px;border-radius:6px;background:#dcebf5;color:#6d8ea4;font-size:9px;line-height:1.1;display:grid;place-items:center;text-align:center;flex:0 0 auto}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-top:4px}
+.photo-grid figure{margin:0}
+.photo-grid img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;background:#dcebf5;display:block}
+.photo-grid figcaption{font-size:11px;color:#57768d;margin-top:3px}
+.photo-grid b{color:#12354d}
 .post-copy p{color:#12354d;font-size:15px;line-height:1.6;margin:6px 0 0}
 .fail-log{margin-top:18px;background:#fff4ee;border:1px solid #f2b999;border-radius:14px;padding:16px 18px}
 .fail-log>b{color:#b23c08;font-size:15px}
@@ -1223,8 +1244,50 @@ const WHY = {
   'Reconnect': 'Meta rejected the token; nothing publishes until it is renewed.'
 };
 function whyFor(l){ return ''; }
-// The explanation of a box lives in its hover text, so the page shows numbers, not paragraphs.
-function tip(l){ return WHY[l] ? ' title="' + esc(WHY[l]) + '"' : ''; }
+// The explanation of a box lives in its hover card, so the page shows numbers, not paragraphs.
+// `explain` (optional) overrides the dictionary for a square that can quote its own breakdown.
+function tipFor(l, explain){ const t = explain || WHY[l]; return t ? ' data-tip="' + esc(t) + '"' : ''; }
+function tip(l){ return tipFor(l); }
+
+// ── one hover card for every square ───────────────────────────────────────────────
+// A square names what it counts in data-tip (see WHY above), and a finance square carries its
+// own itemised breakdown. This is drawn as a single fixed card rather than a native title= for
+// three reasons: it appears at once instead of after a second, it can hold several lines, and it
+// cannot be clipped by the .card{overflow:hidden} on the section it lives in.
+function tipCardEl(){
+  let el = document.getElementById('tipCard');
+  if (!el) { el = document.createElement('div'); el.id = 'tipCard'; document.body.appendChild(el); }
+  return el;
+}
+function showTip(target){
+  const text = target.getAttribute('data-tip'); if (!text) return;
+  const el = tipCardEl();
+  el.textContent = text;
+  el.classList.add('on');
+  const box = target.getBoundingClientRect(), card = el.getBoundingClientRect(), pad = 8;
+  let left = box.left;
+  if (left + card.width + pad > window.innerWidth) left = window.innerWidth - card.width - pad;
+  let top = box.bottom + pad;
+  if (top + card.height + pad > window.innerHeight) top = box.top - card.height - pad;
+  el.style.left = Math.max(pad, left) + 'px';
+  el.style.top = Math.max(pad, top) + 'px';
+}
+function hideTip(){ const el = document.getElementById('tipCard'); if (el) el.classList.remove('on'); }
+document.addEventListener('mouseover', e => {
+  const t = e.target && e.target.closest ? e.target.closest('[data-tip]') : null;
+  if (t) showTip(t); else hideTip();
+});
+document.addEventListener('mouseout', e => {
+  const t = e.target && e.target.closest ? e.target.closest('[data-tip]') : null;
+  if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) hideTip();
+});
+document.addEventListener('focusin', e => {
+  const t = e.target && e.target.closest ? e.target.closest('[data-tip]') : null;
+  if (t) showTip(t); else hideTip();
+});
+document.addEventListener('scroll', hideTip, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
+window.addEventListener('resize', hideTip);
 // Everything below interpolates API values through esc() (or through fmt(), which escapes)
 // before it reaches innerHTML, so a crafted name, subject or reply cannot inject markup.
 // Friendly date for people: "Nov 16, 9:00 AM" in the viewer's own time zone.
@@ -1240,7 +1303,7 @@ function hero(o){
     '<div class="goal-steps">' + o.steps.map(s => '<div class="goal-step ' + (s.cls || '') + '"' + (s.go ? ' data-go="' + s.go + '" role="button"' : '') + '>' +
       '<b>' + esc(s.n) + '</b><span>' + esc(s.l) + '</span>' + (s.s ? '<small>' + esc(s.s) + '</small>' : '') + '</div>').join('') + '</div></div>';
 }
-function stat(n, l, cls, sub){ return '<div class="stat ' + (cls||'') + '"' + tip(l) + '><div class="n">' + (n === null || n === undefined ? '—' : esc(n)) + '</div><div class="l">' + esc(l) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + whyFor(l) + '</div>'; }
+function stat(n, l, cls, sub, explain){ return '<div class="stat ' + (cls||'') + '"' + tipFor(l, explain) + '><div class="n">' + (n === null || n === undefined ? '—' : esc(n)) + '</div><div class="l">' + esc(l) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + whyFor(l) + '</div>'; }
 // For tiles whose value is already safe HTML built by pills() (each value escaped there):
 // escaping the whole thing again would print the markup instead of the pills.
 function statRaw(html, l, cls, sub){ return '<div class="stat ' + (cls||'') + '"' + tip(l) + '><div class="n">' + (html || '—') + '</div><div class="l">' + esc(l) + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + whyFor(l) + '</div>'; }
@@ -1418,11 +1481,24 @@ function stagePill(r){ const l = stageLabel(r); const cls = l === 'Live' ? 'ok' 
 function campTable(rows, withAgent){
   return '<div class="scrollx"><table><thead><tr><th>ID</th><th>property</th>' + (withAgent ? '<th>agent</th>' : '') +
     '<th>status</th><th>day</th><th>posts</th><th>goes live</th></tr></thead><tbody>' +
-    rows.map(r => '<tr class="rowlink" data-campaign="' + esc(r.id) + '"><td><b>#' + esc(r.id) + '</b></td><td>' + esc(r.address) + '</td>' +
+    rows.map(r => '<tr class="rowlink" data-campaign="' + esc(r.id) + '"><td><b>#' + esc(r.id) + '</b></td>' +
+      '<td><div class="property-cell">' + (r.photo_cover
+        ? '<img class="camp-thumb" src="' + esc(media(r.photo_cover)) + '" alt="' + esc(r.address) + '" loading="lazy">'
+        : '<span class="camp-nophoto">no photos</span>') +
+        '<div>' + esc(r.address) + '<small>' + (r.photos_total ? esc(r.photos_total) + ' photo' + (r.photos_total === 1 ? '' : 's') : 'no photos yet') + '</small></div></div></td>' +
       (withAgent ? '<td>' + esc(r.agent_name || r.agent_email || '') + '</td>' : '') +
       '<td>' + stagePill(r) + '</td><td>' + (r.stage === 'LIVE' && r.day ? 'Day ' + esc(r.day) + ' of 14' : '—') + '</td>' +
       '<td>' + esc(r.posts_published || 0) + ' of ' + esc(r.posts_total || 0) + ' posted' + (r.posts_failed ? ' · <b class="bad-t">' + esc(r.posts_failed) + ' failed</b>' : '') + '</td>' +
       '<td>' + esc(dateOnly(r.go_live_date)) + '</td></tr>').join('') + '</tbody></table></div>';
+}
+// The campaign's own library, in the order the calendar uses it. An empty campaign says so —
+// never a stock house and never another campaign's photo.
+function photosCard(c){
+  const ps = c.photos || [];
+  if (!ps.length) return '<div class="hint">No photos on this campaign yet. They arrive when the agent imports the listing or uploads them, and the calendar cannot build without them.</div>';
+  return '<p class="hint" style="margin:-6px 0 10px">' + esc(ps.length) + ' photo' + (ps.length === 1 ? '' : 's') + ', in the order the calendar uses them. Click one to open it full size.</p><div class="photo-grid">' +
+    ps.map((p, i) => '<figure><a href="' + esc(media(p.url)) + '" target="_blank" rel="noopener"><img src="' + esc(media(p.url)) + '" alt="" loading="lazy"></a>' +
+      '<figcaption><b>' + (i + 1) + '</b>' + (p.room ? ' ' + esc(p.room) : '') + (p.tagged_by && p.tagged_by !== 'none' ? ' ✓' : '') + '</figcaption></figure>').join('') + '</div>';
 }
 function dateOnly(iso){ if (!iso) return '—'; const d = new Date(/T/.test(iso) ? (/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z') : iso + 'T12:00:00'); return isNaN(d) ? String(iso) : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}); }
 async function loadCampaigns(){
@@ -1466,6 +1542,7 @@ async function openCampaign(id, focusPost){
       '<div class="facts">' + fact('Goes live', dateOnly(c.go_live_date)) + fact('Launched', c.launched_at ? when(c.launched_at) : '—') +
         fact('Created', when(c.created_at)) + fact('Ad budget', c.ad_budget_usd != null ? usd(c.ad_budget_usd) : '—') +
         fact('Meta campaign ID', c.meta_campaign_id || '—') + '</div></div>' +
+    '<div class="br-card"><h3 class="card-title">Photos</h3>' + photosCard(c) + '</div>' +
     '<div class="br-card"><h3 class="card-title">Posts</h3>' + (c._noPosts ? '<div class="hint">Its posts appear here once the back end sends them.</div>' :
       posts.length ? '<p class="hint" style="margin:-6px 0 10px">Click a post to see it.</p><div class="posts">' + posts.map(p => postRow(p)).join('') + '</div>' : '<div class="hint">No posts written yet.</div>') + '</div>';
   if (focusPost) { const r = document.querySelector('[data-post="' + focusPost + '"]'); if (r) { togglePost(r); setTimeout(() => r.scrollIntoView({behavior: 'smooth', block: 'center'}), 50); } }
@@ -3144,16 +3221,53 @@ async function loadFinance(){
   }
 }
 
-function calcRow(k, v, big){ return '<div class="calc-row' + (big ? ' big' : '') + '"><span>' + esc(k) + '</span><b>' + v + '</b></div>'; }
+function calcRow(k, v, big, explain){ return '<div class="calc-row' + (big ? ' big' : '') + '"' + tipFor(k, explain) + '><span>' + esc(k) + '</span><b>' + v + '</b></div>'; }
 function renderFinance(){
   const d = finData; if (!d) return;
   const sq = $('finSquares'); if (!sq) return;
-  const u = d.unit, a = d.actuals, f = d.fixed, b = d.breakeven, v = d.volume;
+  const u = d.unit, a = d.actuals, f = d.fixed, b = d.breakeven, v = d.volume, A = d.assumptions || {};
+  // Each square says what it is for when hovered, and the four that are built out of parts quote
+  // the parts with their live figures — a run-rate whose lines cannot be read is a number nobody
+  // can check, and "what is included in that?" is the question actually asked of this tab.
+  const money = n => (n === null || n === undefined) ? '—' : usd(n);
+  const hostingTip = [
+    'The bill that arrives whether or not we sell anything:',
+    '',
+    'Web service · ' + money(f.web_usd) + ' — the public site, sign-in, the admin console and the API',
+    'Database · ' + money(f.postgres_usd) + ' — Postgres: accounts, campaigns, posts, orders, receipts',
+    'Publisher cron · ' + money(f.cron_usd) + ' — the job that sends scheduled posts on time',
+    'Domain · ' + money(f.domain_usd) + ' — resmara.com at GoDaddy, about $14 a year divided by twelve',
+    '',
+    'Total ' + money(f.total_monthly_usd) + ' a month · ' + money(f.annual_usd) + ' a year.',
+    'Plans assumed: Render Starter web + Basic Postgres. Both are on the free plan today, so the '
+      + 'only line actually being charged is the domain.',
+    (d.ledger && d.ledger.entries ? 'The Start-up costs ledger records ' + money(d.ledger.monthly_recurring_usd)
+                                  + ' a month actually repeating.'
+      : 'The Start-up costs ledger has no rows yet, so nothing here is recorded as actually paid.')
+  ].join('\n');
+  const costTip = [
+    'What one ' + d.price.label + ' campaign costs us before it sells:',
+    '',
+    'Stripe · ' + money(u.stripe_fee_usd) + ' — ' + A.stripe_pct + '% + ' + money(A.stripe_fixed_usd) + ' on every charge',
+    'Model and photo tagging · ' + money(u.engine_usd) + ' — the engine writes the plan and the posts',
+    'Photo storage · ' + money(u.storage_usd) + ' — ' + A.gb_per_campaign + ' GB per campaign at '
+      + money(A.r2_usd_per_gb_month) + '/GB-month',
+    'Hosting share · ' + money(u.hosting_usd) + ' — one campaign’s slice of the monthly bill at '
+      + (v.used || 0) + ' campaigns a month',
+    'Refund buffer · ' + money(u.refunds_usd) + ' — ' + A.refund_buffer_pct + '% set aside for refunds and redos',
+    '',
+    'Total ' + money(u.costs_usd) + '. On a ' + d.price.label + ' sale that leaves ' + money(u.contribution_usd) + '.'
+  ].join('\n');
+  const keepTip = 'What is left of one sale after it is delivered: ' + money(u.contribution_usd) + ' of '
+    + d.price.label + ' (' + u.margin_pct + '%). Not profit — winning the customer comes out of this. The most we '
+    + 'may pay to win one is ' + money(d.acquisition.max_cac_usd[3]) + ', a third of their lifetime contribution.';
+  const priceTip = 'What one campaign sells for. A repeat round on the same listing bills '
+    + d.price.repeat_label + '. Price and repeat price are set on the server, not here.';
   sq.innerHTML = '<div class="grid g4">' +
-    stat(d.price.label, 'price per campaign') +
-    stat(usd(u.costs_usd), 'our cost per sale') +
-    stat(usd(u.contribution_usd), 'we keep per campaign', u.contribution_usd > 0 ? 'good' : 'bad', u.margin_pct + '% margin') +
-    stat(usd(f.total_monthly_usd), 'hosting per month', '', usd(f.annual_usd) + ' a year') +
+    stat(d.price.label, 'price per campaign', '', 'a repeat round is ' + d.price.repeat_label, priceTip) +
+    stat(usd(u.costs_usd), 'our cost per sale', '', null, costTip) +
+    stat(usd(u.contribution_usd), 'we keep per campaign', u.contribution_usd > 0 ? 'good' : 'bad', u.margin_pct + '% margin', keepTip) +
+    stat(usd(f.total_monthly_usd), 'hosting per month', '', usd(f.annual_usd) + ' a year', hostingTip) +
     '</div>';
   const cs = $('calcSum'); if (cs) cs.textContent = 'Right now: ' + usd(u.contribution_usd) + ' kept per campaign' +
     (b.campaigns_per_month === null ? '' : ' · ' + b.campaigns_per_month + ' sale(s) a month covers hosting');
