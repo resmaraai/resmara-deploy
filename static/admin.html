@@ -944,7 +944,7 @@ html.dark .rel-body{color:#d6e6f1}
 
         <div class="brfilters pilltrack">
           <button class="chip flchip" data-flf="open" aria-pressed="true">Still open</button>
-          <button class="chip flchip" data-flf="soon" aria-pressed="false">Due within 30 days</button>
+          <button class="chip flchip" data-flf="soon" aria-pressed="false">Due soon</button>
           <button class="chip flchip" data-flf="overdue" aria-pressed="false">Past the date</button>
           <button class="chip flchip" data-flf="all" aria-pressed="false">Everything</button>
         </div>
@@ -1880,7 +1880,7 @@ let flRows = [], flSummary = null, flFilter = 'open', flOpened = false;
 const FL_KIND = { filing: 'Filing', publication: 'Publication', tax: 'Tax return', renewal: 'Renewal', report: 'Report', other: 'Other' };
 const FL_WHY = {
   open: 'Filings not marked done, whatever their date.',
-  soon: 'Open filings whose date is inside the next 30 days — close enough to act on.',
+  soon: 'Open filings whose date is close enough to act on — the window is on the square.',
   overdue: 'Open filings whose date has already passed. The fee is usually paid twice at this point.',
   cost: 'The open filings whose cost somebody has quoted, added up.',
   unpriced: 'Open filings with no price entered yet. They are not counted as $0, because nobody has quoted them.'
@@ -1908,7 +1908,7 @@ function flLeft(it){
   if (it.days_left === null || it.days_left === undefined) return '<span class="hint">—</span>';
   if (it.days_left < 0) return '<span class="pill bad">' + Math.abs(it.days_left) + ' days late</span>';
   if (it.days_left === 0) return '<span class="pill bad">due today</span>';
-  if (it.days_left <= 30) return '<span class="pill warn">in ' + it.days_left + ' days</span>';
+  if (it.due_soon) return '<span class="pill warn">in ' + it.days_left + ' days</span>';
   return '<span class="pill">in ' + it.days_left + ' days</span>';
 }
 async function loadFilings(){
@@ -1935,7 +1935,7 @@ function renderFilings(){
     bar: null,
     steps: [
       { n: s.open, l: 'Still open', s: FL_WHY.open, cls: '' },
-      { n: s.due_soon, l: 'Due within 30 days', s: FL_WHY.soon, cls: s.due_soon ? 'alert' : '' },
+      { n: s.due_soon, l: 'Due within ' + (s.due_soon_days || 45) + ' days', s: FL_WHY.soon, cls: s.due_soon ? 'alert' : '' },
       { n: s.overdue, l: 'Past the date', s: FL_WHY.overdue, cls: s.overdue ? 'alert' : '' },
       { n: known, l: 'Known cost to finish', s: FL_WHY.cost + (s.open_cost_unknown ? ' ' + s.open_cost_unknown + ' more ' + (s.open_cost_unknown === 1 ? 'has' : 'have') + ' no price yet.' : ''), cls: s.open_cost_unknown ? 'alert' : '' }
     ]
@@ -1977,7 +1977,7 @@ function renderFilings(){
     (s.no_deadline ? ' · ' + s.no_deadline + ' with no date entered yet (a gap, not a deadline)' : '');
   const sum = $('sum-filings');
   if (sum) sum.innerHTML = (s.overdue ? '<b>' + s.overdue + ' past the date</b> · ' : '') +
-    (s.due_soon ? '<b>' + s.due_soon + ' due within 30 days</b> · ' : '') +
+    (s.due_soon ? '<b>' + s.due_soon + ' due within ' + (s.due_soon_days || 45) + ' days</b> · ' : '') +
     s.open + ' open · ' + (s.open_cost_usd === null || s.open_cost_usd === undefined ? '' : usd(s.open_cost_usd) + ' known') +
     (s.open_cost_unknown ? ' (+' + s.open_cost_unknown + ' unpriced)' : '');
   navBadge('filings', s.overdue + s.due_soon);

@@ -37,8 +37,10 @@ KINDS = ("filing", "publication", "tax", "renewal", "report", "other")
 STATUSES = ("open", "done", "not_needed")
 RECURRENCES = ("one_off", "annual", "every_5_years")
 # A filing whose date is inside this many days is "due soon": enough notice to gather the
-# money and the signature, not so much that everything looks urgent.
-DUE_SOON_DAYS = 30
+# money and a signature, not so much that everything looks urgent. 45 because the two county
+# windows are 40 days (the FBN) and 45 days (the publication's first run) — a 30-day horizon
+# reports "nothing due" while the only live deadline is a month and a half away.
+DUE_SOON_DAYS = 45
 
 
 # ── dates ────────────────────────────────────────────────────────────────────────────

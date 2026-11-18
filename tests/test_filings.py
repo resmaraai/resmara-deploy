@@ -125,6 +125,21 @@ def main() -> int:
     check("no date reads as no deadline",
           pub["due_on"] is None and pub["days_left"] is None and pub["due_soon"] is False, str(pub))
 
+    # The horizon has to cover the county windows (40 days for the FBN, 45 for the first
+    # publication run): at 30 days the board said "nothing due" with a live deadline 34 days out.
+    r = client.post("/api/admin/filings", headers=dan, json={
+        "title": "FBN publication horizon probe", "kind": "publication",
+        "due_on": (date.today() + timedelta(days=40)).isoformat(), "cost_cents": 100})
+    probe = r.json()
+    check("a date 40 days out is already due soon", probe["due_soon"] is True, str(probe))
+    client.delete("/api/admin/filings/%d" % probe["id"], headers=dan)
+    r = client.post("/api/admin/filings", headers=dan, json={
+        "title": "far away probe", "kind": "tax",
+        "due_on": (date.today() + timedelta(days=200)).isoformat()})
+    far = r.json()
+    check("a date 200 days out is not", far["due_soon"] is False, str(far))
+    client.delete("/api/admin/filings/%d" % far["id"], headers=dan)
+
     s = board()["summary"]
     check("the board counts two open", s["open"] == 2, str(s))
     check("one is due soon", s["due_soon"] == 1, str(s))
