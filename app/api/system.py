@@ -347,10 +347,14 @@ def releases(limit: int = 8, user=Depends(team_access.needs("build"))):
     shows the previous answer - which is exactly how a freshly merged PR reads as still waiting.
     """
     fresh_for = float(os.getenv("RESMARA_RELEASES_CACHE_SECONDS", "60") or 60)
+    # What is stored under "payload" is the answer itself (with the limit it was built for), so a
+    # hit copies that: reading cached["payload"] is a KeyError on the very answer it just stored,
+    # which is a 500 on the second open of the page rather than the cached one.
     cached = _RELEASES_CACHE.get("payload")
     same = cached and cached.get("limit") == limit
     if same and (time.time() - float(_RELEASES_CACHE.get("at") or 0)) < fresh_for:
-        payload = dict(cached["payload"])
+        payload = dict(cached)
+        payload.pop("limit", None)
         payload["cached"] = True
         return payload
 

@@ -113,6 +113,21 @@ check(sysmod._contains(DIVERGED, LIVE) is False, "_contains refuses a commit Git
 check(sysmod._contains(LIVE, LIVE) is True, "_contains is true for the build itself")
 check(sysmod._contains("", LIVE) is False, "_contains is false with no commit")
 
+# The cache is what makes the page quick, and the store is the answer itself. Reading a nested
+# "payload" out of it raised KeyError on the second open, which shipped as a 500 because the test
+# window above disables the cache entirely: the branch only ever runs in production.
+os.environ["RESMARA_RELEASES_CACHE_SECONDS"] = "60"
+sysmod._RELEASES_CACHE.update({"at": 0.0, "payload": None})
+sysmod.releases(limit=8, user=object())          # fills the cache
+second = sysmod.releases(limit=8, user=object())  # must be served from it, not raise
+check(second.get("cached") is True, "a second read inside the window is answered from the cache")
+check(second.get("limit") is None, "the cache's own limit key does not leak into the answer")
+check(len(second.get("releases") or []) == len(payload["releases"]),
+      "the cached answer is the same shape as the fresh one")
+os.environ["RESMARA_RELEASES_CACHE_SECONDS"] = "0"
+sysmod._RELEASES_CACHE.update({"at": 0.0, "payload": None})
+
+
 # --------------------------------------------------------------------------- Clarity cache
 from app.services import analytics                                           # noqa: E402
 
