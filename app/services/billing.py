@@ -272,6 +272,118 @@ async def list_cards(customer_id: str, client: httpx.AsyncClient | None = None) 
             await client.aclose()
 
 
+# ── saved card: add one without buying, then charge it on Build ───────────────
+# The agent adds a card once (Stripe Checkout in setup mode: nothing is charged). From then on,
+# clicking Build on a campaign IS the approval: the server charges that card off-session for the
+# campaign's price, with no second page. A card the bank will not charge without the agent present
+# (3-D Secure, a decline) falls back to the normal Checkout page, which can ask them.
+
+
+def card_setup_payload(customer_id: str, user_id: int, base_url: str) -> list:
+    """The body for a Checkout session that only saves a card (mode=setup): no charge."""
+    base = (base_url or "").rstrip("/")
+    return [
+        ("mode", "setup"),
+        ("customer", customer_id),
+        ("currency", CURRENCY),
+        ("payment_method_types[0]", "card"),
+        ("success_url", "%s/?card=saved" % base),
+        ("cancel_url", "%s/?card=cancelled" % base),
+        # kind=card_setup tells the webhook this session has no campaign and no order behind it.
+        ("metadata[kind]", "card_setup"),
+        ("metadata[user_id]", str(user_id)),
+        ("setup_intent_data[metadata][user_id]", str(user_id)),
+    ]
+
+
+async def create_card_setup_session(customer_id: str, user_id: int, base_url: str,
+                                    client: httpx.AsyncClient | None = None) -> dict:
+    """Create the 'add a card' Checkout session and return its JSON (id + url)."""
+    if not billing_enabled():
+        raise RuntimeError("Stripe is not configured: set STRIPE_SECRET_KEY on the service.")
+    body, headers = form_body(card_setup_payload(customer_id, user_id, base_url))
+    owns = client is None
+    client = client or httpx.AsyncClient(timeout=30)
+    try:
+        resp = await client.post("%s/checkout/sessions" % STRIPE_API, content=body, headers=headers)
+        resp.raise_for_status()
+        return resp.json()
+    finally:
+        if owns:
+            await client.aclose()
+
+
+def saved_card_charge_payload(customer_id: str, payment_method_id: str, cents: int, boost_id: int,
+                              user_id: int, address: str = "", round_no: int = 0) -> list:
+    """The body for an off-session PaymentIntent on the agent's saved card, confirmed at once.
+
+    Same metadata as a Checkout payment (boost, round, price type, price), so Finance and Stripe's
+    own reports cannot tell a one-click charge from a Checkout one.
+    """
+    round_no = max(0, int(round_no or 0))
+    price_type = "repeat" if round_no >= 1 else "first"
+    desc = "Resmara campaign — %s" % (address or "your listing")
+    if round_no:
+        desc += " · round %d" % (round_no + 1)
+    return [
+        ("amount", str(int(cents))),
+        ("currency", CURRENCY),
+        ("customer", customer_id),
+        ("payment_method", payment_method_id),
+        ("off_session", "true"),
+        ("confirm", "true"),
+        ("description", desc[:250]),
+        ("metadata[boost_id]", str(boost_id)),
+        ("metadata[user_id]", str(user_id)),
+        ("metadata[round]", str(round_no)),
+        ("metadata[price_type]", price_type),
+        ("metadata[price_cents]", str(int(cents))),
+        ("metadata[kind]", "saved_card"),
+    ]
+
+
+async def charge_saved_card(customer_id: str, payment_method_id: str, cents: int, boost_id: int,
+                            user_id: int, address: str = "", round_no: int = 0,
+                            client: httpx.AsyncClient | None = None) -> dict:
+    """Charge the saved card now. Returns {"paid": bool, "payment_intent": id, "message": str}.
+
+    Never raises for a declined card: a decline is an answer, not an error. The idempotency key
+    is per campaign and round, so a double-clicked Build cannot charge twice.
+    """
+    if not billing_enabled():
+        raise RuntimeError("Stripe is not configured: set STRIPE_SECRET_KEY on the service.")
+    body, headers = form_body(saved_card_charge_payload(
+        customer_id, payment_method_id, cents, boost_id, user_id, address, round_no))
+    # The card is in the key too: after a decline the agent can add a new card and the retry must
+    # reach Stripe instead of replaying the cached decline.
+    headers["Idempotency-Key"] = "resmara-boost-%s-round-%s-%s-%s" % (
+        boost_id, int(round_no or 0), int(cents), payment_method_id)
+    owns = client is None
+    client = client or httpx.AsyncClient(timeout=30)
+    try:
+        resp = await client.post("%s/payment_intents" % STRIPE_API, content=body, headers=headers)
+        data = {}
+        try:
+            data = resp.json()
+        except Exception:  # noqa: BLE001
+            data = {}
+        if resp.status_code >= 400:
+            err = data.get("error") or {}
+            if resp.status_code == 402 or err.get("type") == "card_error":
+                intent = err.get("payment_intent") or {}
+                return {"paid": False, "payment_intent": intent.get("id"),
+                        "message": err.get("message") or "Your card was declined."}
+            resp.raise_for_status()
+        status = data.get("status")
+        if status == "succeeded":
+            return {"paid": True, "payment_intent": data.get("id"), "message": ""}
+        return {"paid": False, "payment_intent": data.get("id"),
+                "message": "Your bank wants to confirm this payment."}
+    finally:
+        if owns:
+            await client.aclose()
+
+
 def parse_signature_header(header: str) -> tuple[int, list[str]]:
     """Split a Stripe-Signature header into (timestamp, [v1 signatures])."""
     ts = 0

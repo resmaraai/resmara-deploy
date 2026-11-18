@@ -13,8 +13,10 @@
 var BILLING_PRICE_CENTS = 4900;
 
 function billingMoney(cents) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-    .format((Number(cents) || 0) / 100);
+  var n = Number(cents) || 0;
+  // $49, not $49.00: whole-dollar prices read cleaner, and cents only show when there are some.
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD',
+    minimumFractionDigits: n % 100 ? 2 : 0, maximumFractionDigits: 2 }).format(n / 100);
 }
 
 // ---- balance helpers ------------------------------------------------------
@@ -61,20 +63,57 @@ async function startCampaignCheckout(boostId) {
   return null;
 }
 
-/* The screen a locked campaign shows: what it costs, why it is locked, one button. */
-function showPaywall(boostId, detail) {
+/* Build said "this campaign isn't paid for yet" (402).
+ *  - Card on file: charge it straight away and carry on building. Clicking Build is the approval,
+ *    so there is no second page.
+ *  - No card yet: one screen to add it. Paying the first campaign on Stripe's page saves the card,
+ *    and every campaign after that is charged automatically.
+ *  - Card declined (or the bank wants the agent present): Stripe's page, where they can confirm
+ *    or use another card. */
+async function showPaywall(boostId, detail) {
   var price = (detail && detail.price_cents) ? billingMoney(detail.price_cents)
     : billingMoney(BILLING_PRICE_CENTS);
-  var left = Number(detail && detail.campaigns_left) || 0;
-  show(`<span class="eyebrow">CAMPAIGN CHECKOUT</span>
-    <h2>This campaign is ${esc(price)}</h2>
-    <p>${esc((detail && detail.message) || 'Buy the campaign to build its 14 days of posts.')}</p>
-    ${left > 0 ? `<p class="fine">You have ${left} prepaid campaign${left === 1 ? '' : 's'} left — building will use one.</p>` : ''}
-    <p class="fine">Card details go to Stripe — Resmara never stores them. Stripe will offer the card
-    you used last time, so this is the last time you type it. Meta ad spend is separate.</p>
+  var live = window.RM && RM.chargeSaved && boostId != null;
+  if (live) {
+    show(`<span class="eyebrow">PAYMENT</span><h2>Charging your card…</h2>
+      <p role="status">Paying ${esc(price)} for this campaign with your card on file.</p>`);
+    try {
+      var paid = await RM.chargeSaved(Number(boostId));
+      if (paid && paid.status === 'paid') {
+        toast(paid.already ? 'This campaign is already paid for.'
+          : 'Charged ' + (paid.amount_label || price) + (paid.card ? ' to ' + paid.card.split(',')[0] : '') + '.');
+        modal.close();
+        if (typeof buildCampaignFromBackend === 'function') buildCampaignFromBackend();
+        return;
+      }
+    } catch (err) {
+      var d = (err && err.detail) || {};
+      if (err && err.status === 402 && d.error === 'card_declined') {
+        show(`<span class="eyebrow">PAYMENT</span><h2>Your card didn’t go through</h2>
+          <p>${esc(d.message || 'Your card was declined.')}${d.card ? ' (' + esc(d.card.split(',')[0]) + ')' : ''}</p>
+          <p class="fine">Nothing was charged. Pay on Stripe’s secure page instead, where you can confirm the payment or use another card. The card you use there becomes your card on file.</p>
+          <div class="modal-actions"><button class="alt" onclick="modal.close()">Not now</button>
+          <button class="campaign-primary" onclick="startCampaignCheckout(${Number(boostId)})">Pay ${esc(price)} on Stripe</button></div>`);
+        return;
+      }
+      if (!(err && err.status === 409)) {
+        // Billing switched off, Stripe down: say so plainly, no dead end.
+        show(`<span class="eyebrow">PAYMENT</span><h2>We couldn’t take the payment</h2>
+          <p>${esc((err && err.message) || 'Something went wrong with the payment.')}</p>
+          <p class="fine">Nothing was charged. Try again in a minute.</p>
+          <div class="modal-actions"><button class="campaign-primary" onclick="modal.close()">OK</button></div>`);
+        return;
+      }
+    }
+  }
+  // No card on file yet: the first campaign is where it gets added.
+  show(`<span class="eyebrow">ADD YOUR CARD</span>
+    <h2>Add your card to build this campaign</h2>
+    <p>This campaign is <b>${esc(price)}</b>. Add your card on Stripe’s secure page and this campaign is paid in the same step.</p>
+    <p class="fine">Your card is saved with Stripe, not Resmara. From then on, every campaign you build is charged to it automatically, with no checkout page. Your Meta ad budget is separate.</p>
     <div class="modal-actions">
       <button class="alt" onclick="modal.close()">Not now</button>
-      <button class="campaign-primary" onclick="startCampaignCheckout(${Number(boostId)})">Pay ${esc(price)} and build</button>
+      <button class="campaign-primary" onclick="startCampaignCheckout(${Number(boostId)})">Add card and pay ${esc(price)}</button>
     </div>`);
 }
 
@@ -146,13 +185,14 @@ async function myCredits() {
   if (cardBox && RM.savedCards) {
     RM.savedCards().then(function (res) {
       var cards = (res && res.cards) || [];
+      var addBtn = document.querySelector('.billing-add-card');
+      if (addBtn) addBtn.textContent = cards.length ? 'Change card' : 'Add a card';
       cardBox.innerHTML = cards.length
         ? '<ul class="campaign-report-list">' + cards.map(function (c) {
-            return '<li><strong>' + esc(c.label) + '</strong><span class="fine">Stored by Stripe — ' +
-              'checkout will offer it, no number to retype.</span></li>';
-          }).join('') + '</ul><p class="fine">Your card number never reaches Resmara.</p>'
+            return '<li><strong>' + esc(c.label) + '</strong><span class="fine">Each campaign you build is charged to this card.</span></li>';
+          }).slice(0, 1).join('') + '</ul><p class="fine">Stored by Stripe. Your card number never reaches Resmara.</p>'
         : '<p class="fine">' + esc((res && res.note) || 'No card saved yet.') +
-          ' Your first campaign saves it for next time.</p>';
+          ' Add one now, or when you build your first campaign.</p>';
     }).catch(function () {
       cardBox.innerHTML = '<p class="fine">Could not read your saved card right now.</p>';
     });
@@ -191,6 +231,14 @@ async function myCredits() {
 (function handleCheckoutReturn() {
   if (typeof location === 'undefined') return;
   var params = new URLSearchParams(location.search || '');
+  var card = params.get('card');
+  if (card) {
+    window.history.replaceState({}, document.title, location.pathname + (location.hash || ''));
+    toast(card === 'saved' ? 'Card saved. Each campaign you build is charged to it.'
+                           : 'No card added. Nothing was charged.');
+    if (typeof dashboard === 'function') setTimeout(function () { dashboard('credits'); }, 400);
+    return;
+  }
   var state_ = params.get('checkout');
   if (!state_) return;
   var boostId = Number(params.get('boost')) || null;

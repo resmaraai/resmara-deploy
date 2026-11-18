@@ -290,6 +290,10 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     # A pack session has no boost and no order: it credits the account's balance instead.
     if outcome.get("kind") == "pack":
         return settle_pack(outcome, db)
+    # Saving a card (Checkout in setup mode) has no campaign and no order: Stripe has already
+    # attached the card to the customer, which is all Build needs.
+    if outcome.get("kind") == "card_setup":
+        return {"received": True, "status": "card_saved"}
 
     order = None
     if outcome.get("session_id"):
@@ -345,9 +349,117 @@ async def my_cards(current_user: User = Depends(get_current_user)):
     return {
         "enabled": True,
         "cards": cards,
-        "note": ("Your card is saved - checkout will offer it." if cards
+        "note": ("Each campaign you build is charged to this card." if cards
                  else "No card saved yet."),
     }
+
+
+@router.post("/billing/card")
+async def add_card(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Start Stripe's 'add a card' page (nothing is charged) and return its URL.
+
+    The card is saved on the account's Stripe customer. Adding another later makes the new one
+    the card Build charges.
+    """
+    if not billing.billing_enabled():
+        raise HTTPException(status_code=503, detail=(
+            "Billing is not configured yet: set STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY "
+            "on the service."))
+    customer_id = await customer_for(current_user, db)
+    try:
+        session = await billing.create_card_setup_session(
+            customer_id=customer_id, user_id=current_user.id, base_url=settings.PUBLIC_BASE_URL)
+    except httpx.HTTPStatusError as e:
+        detail = "Stripe refused to open the card page"
+        try:
+            detail = (e.response.json().get("error") or {}).get("message") or detail
+        except Exception:  # noqa: BLE001
+            pass
+        raise HTTPException(status_code=502, detail=detail)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    db.add(Event(user_id=current_user.id, event_type="card_setup_started",
+                 payload={"session_id": session.get("id")}))
+    db.commit()
+    return {"url": session.get("url"), "session_id": session.get("id")}
+
+
+class ChargeRequest(BaseModel):
+    boost_id: int
+
+
+@router.post("/billing/charge")
+async def charge_campaign(body: ChargeRequest, current_user: User = Depends(get_current_user),
+                          db: Session = Depends(get_db)):
+    """Pay for one campaign with the card on file. Clicking Build is the agent's approval.
+
+    Answers:
+      {"status": "paid"}          charged (or already paid): build can go ahead
+      409 {"error": "no_card"}    no saved card: the UI sends them to add one / to Checkout
+      402 {"error": "card_declined", "message", "checkout"}  the bank said no or wants the agent
+                                  present: the UI falls back to the Checkout page
+    """
+    q = db.query(Boost).filter(Boost.id == body.boost_id)
+    if not current_user.is_admin:
+        q = q.filter(Boost.user_id == current_user.id)
+    boost = q.first()
+    if not boost:
+        raise HTTPException(status_code=404, detail="Boost not found")
+    if boost_is_paid(boost, db):
+        return {"status": "paid", "already": True, "boost_id": boost.id}
+    if not billing.billing_enabled():
+        raise HTTPException(status_code=503, detail="Card payments are not switched on yet.")
+    customer_id = current_user.stripe_customer_id
+    cards = []
+    if customer_id:
+        try:
+            cards = await billing.list_cards(customer_id)
+        except Exception:  # noqa: BLE001 - treat an unreadable card list as no card
+            cards = []
+    if not cards:
+        raise HTTPException(status_code=409, detail={
+            "error": "no_card", "message": "Add a card to build this campaign.",
+            "boost_id": boost.id})
+    card = cards[0]   # Stripe lists newest first: the card added last is the one charged
+    cents = billing.price_for(boost)
+    round_no = billing.round_of(boost)
+    try:
+        result = await billing.charge_saved_card(
+            customer_id=customer_id, payment_method_id=card["id"], cents=cents,
+            boost_id=boost.id, user_id=current_user.id, address=boost.address or "",
+            round_no=round_no)
+    except httpx.HTTPStatusError as e:
+        detail = "Stripe refused the payment"
+        try:
+            detail = (e.response.json().get("error") or {}).get("message") or detail
+        except Exception:  # noqa: BLE001
+            pass
+        raise HTTPException(status_code=502, detail=detail)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    if not result.get("paid"):
+        db.add(Event(user_id=current_user.id, boost_id=boost.id, event_type="card_charge_failed",
+                     payload={"payment_intent": result.get("payment_intent"),
+                              "message": result.get("message"), "amount_cents": cents}))
+        db.commit()
+        raise HTTPException(status_code=402, detail={
+            "error": "card_declined", "message": result.get("message") or "Your card was declined.",
+            "checkout": "/api/billing/checkout", "boost_id": boost.id, "card": card.get("label")})
+
+    now = datetime.utcnow()
+    order = Order(user_id=current_user.id, boost_id=boost.id, amount_cents=cents,
+                  currency=billing.CURRENCY, status="paid", paid_at=now,
+                  stripe_payment_intent=result.get("payment_intent"))
+    db.add(order)
+    boost.paid_at = now
+    boost.paid_amount_cents = cents
+    db.add(Event(user_id=current_user.id, boost_id=boost.id, event_type="campaign_paid",
+                 payload={"payment_intent": result.get("payment_intent"), "amount_cents": cents,
+                          "via": "saved_card", "card": card.get("label")}))
+    db.commit()
+    return {"status": "paid", "boost_id": boost.id, "amount_cents": cents,
+            "amount_label": billing.price_label(cents), "card": card.get("label")}
 
 
 @router.get("/billing/orders")
