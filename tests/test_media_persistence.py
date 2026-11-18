@@ -117,6 +117,36 @@ def main() -> int:
     finally:
         content_mod.MAX_KEPT_BYTES = was
 
+    # ── the console's grid: one campaign can hold 122 originals, so it asks for previews ──
+    import io as _io
+
+    from PIL import Image as _Image
+
+    big = _io.BytesIO()
+    _Image.new("RGB", (1600, 1200), (40, 90, 130)).save(big, "JPEG", quality=90)
+    r = client.post("/api/content/upload/photo", headers=H,
+                    files={"file": ("front-of-house.jpg", big.getvalue(), "image/jpeg")},
+                    data={"kind": "photo"})
+    check("a photo uploads for the grid", r.status_code == 201, r.text[:200])
+    jpg_name = r.json().get("filename", "") if r.status_code == 201 else ""
+    disk_jpg = os.path.join(tmp, jpg_name)
+    if os.path.exists(disk_jpg):
+        os.remove(disk_jpg)          # the deploy that follows wiped the disk; the row still has it as a JPEG
+    r = client.get("/uploads/" + jpg_name + "?w=200")
+    check("/uploads?w= answers with a preview", r.status_code == 200, str(r.status_code))
+    check("as a jpeg", r.headers.get("content-type", "").startswith("image/jpeg"),
+          r.headers.get("content-type", ""))
+    try:
+        served = _Image.open(_io.BytesIO(r.content))
+        check("no wider than asked", max(served.size) <= 200, str(served.size))
+        check("and much smaller than the original", len(r.content) < len(big.getvalue()),
+              "%d vs %d" % (len(r.content), len(big.getvalue())))
+    except Exception as exc:                                     # noqa: BLE001
+        check("the preview decodes", False, repr(exc))
+    r = client.get("/uploads/" + vid_name + "?w=200")            # a video cannot be previewed
+    check("a video asked for a preview is served whole, not broken", r.status_code == 200
+          and r.content == mp4, str(r.status_code))
+
     print("PASS — uploaded video and bulk photos keep their bytes with the row, /uploads answers\n"
           "       after the disk is wiped, and an oversized file is refused by name")
     return 1 if FAILS else 0

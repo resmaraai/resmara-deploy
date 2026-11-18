@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from app.api import api_router
 from app.core.config import settings
+import mimetypes
 import os
 
 app = FastAPI(title="Resmara API", version="0.2.0",
@@ -37,31 +38,57 @@ os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 # them from another, so every published picture 404'd.
 
 
-@app.get("/uploads/{filename}", include_in_schema=False)
-def serve_upload(filename: str):
-    """The file from disk, or the copy stored with the asset when the disk was reset.
-
-    A hosted instance without a persistent volume starts empty, so an imported photo would
-    otherwise be a 404 until someone re-uploaded it. Asset rows carry the bytes for exactly
-    this case; this route is registered before the StaticFiles mount so it wins.
-    """
-    safe = os.path.basename(filename)
-    on_disk = os.path.join(settings.UPLOAD_DIR, safe)
+def _upload_bytes(safe: str, on_disk: str):
+    """The photo's bytes and content type: the file on disk, else the copy stored on its row."""
     if os.path.isfile(on_disk):
-        return FileResponse(on_disk)
-    from fastapi import HTTPException
-    from fastapi.responses import Response
+        with open(on_disk, "rb") as fh:
+            return fh.read(), mimetypes.guess_type(on_disk)[0] or "application/octet-stream"
     from app.db.session import Asset, SessionLocal
 
     db = SessionLocal()
     try:
         asset = db.query(Asset).filter(Asset.filename == safe).first()
         if asset is not None and asset.data:
-            return Response(content=bytes(asset.data), media_type=asset.content_type or "image/jpeg",
-                            headers={"Cache-Control": "public, max-age=3600"})
+            return bytes(asset.data), asset.content_type or "image/jpeg"
     finally:
         db.close()
-    raise HTTPException(status_code=404, detail="Not Found")
+    return None, None
+
+
+@app.get("/uploads/{filename}", include_in_schema=False)
+def serve_upload(filename: str, w: int = 0):
+    """The file from disk, the copy stored with the asset, or a preview of either.
+
+    A hosted instance without a persistent volume starts empty, so an imported photo would
+    otherwise be a 404 until someone re-uploaded it. Asset rows carry the bytes for exactly
+    this case; this route is registered before the StaticFiles mount so it wins.
+
+    `?w=` asks for a preview whose long edge is that many pixels. A page that draws a whole
+    campaign (122 originals, 2-7 MB each) needs it: the console asks for 360 px thumbs and
+    the full-size file stays one click away.
+    """
+    from fastapi import HTTPException
+    from fastapi.responses import Response
+
+    safe = os.path.basename(filename)
+    on_disk = os.path.join(settings.UPLOAD_DIR, safe)
+    raw, ctype = None, None
+    if w or not os.path.isfile(on_disk):
+        raw, ctype = _upload_bytes(safe, on_disk)
+        if raw is None:
+            raise HTTPException(status_code=404, detail="Not Found")
+    if w:
+        from app.services.thumbs import preview
+
+        small = preview(raw, w)
+        if small:
+            return Response(content=small, media_type="image/jpeg",
+                            headers={"Cache-Control": "public, max-age=604800, immutable"})
+        # An unreadable original is still the picture the agent uploaded: serve it whole.
+    if raw is not None:
+        return Response(content=raw, media_type=ctype or "image/jpeg",
+                        headers={"Cache-Control": "public, max-age=3600"})
+    return FileResponse(on_disk)
 
 
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
