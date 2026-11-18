@@ -1772,19 +1772,25 @@ function paintWebsite(){
     // "0 visitors" would be a lie; saying what is measured and what is missing is not.
     const why = ((w.unavailable || []).find(u => u.metric === 'visitors') || {}).reason || 'connect Google Analytics to fill this page';
     const speed = w.speed_mobile != null ? w.speed_mobile : '—', desk = w.speed_desktop != null ? w.speed_desktop : '—';
-    h.innerHTML = hero({eyebrow: 'resmara.com · last ' + (w.days || 30) + ' days', big: 'Not connected yet', small: why,
+    // Sign-ups and page speed are ours; visitors and the conversion rate are the two numbers that
+    // genuinely need Google Analytics. Clarity can be connected while GA4 is not, so its panel says
+    // what it actually holds instead of claiming the whole third party is missing.
+    const clarityOn = w.clarity_sessions != null;
+    h.innerHTML = hero({eyebrow: 'resmara.com · last ' + (w.days || 30) + ' days', big: 'No visitor numbers yet', small: why,
       steps: [{n: '—', l: 'Visitors', s: 'needs Google Analytics'},
-              {n: '—', l: 'Sign-ups started', s: 'needs Google Analytics'},
-              {n: '—', l: 'Conversion rate', s: 'needs Google Analytics'},
+              {n: Number(w.signups_started || 0).toLocaleString('en-US'), l: 'Sign-ups started', s: 'counted here, and real'},
+              {n: '—', l: 'Conversion rate', s: 'needs visitors from Google Analytics'},
               {n: speed, l: 'Page speed', s: 'on phones, out of 100 · ' + desk + ' on desktop', cls: speed >= 90 ? 'good' : speed < 50 && speed !== '—' ? 'alert' : ''}]});
     $('webChecks').className = ''; $('webChecks').innerHTML = checkGrid(w.checks || []);
     ['webSources', 'webPages'].forEach(id => { const el = $(id); if (el) { el.className = 'hint'; el.textContent = 'Needs Google Analytics.'; } });
-    $('webHeatTxt').textContent = 'Needs Microsoft Clarity.';
-    const hb = $('webHeatBtn'); if (hb) hb.innerHTML = '';
+    $('webHeatTxt').textContent = clarityOn
+      ? Number(w.clarity_sessions).toLocaleString('en-US') + ' recorded visits in the last 3 days. See where people click, scroll and give up.'
+      : 'Needs Microsoft Clarity.';
+    const hb = $('webHeatBtn'); if (hb) hb.innerHTML = w.clarity_url ? '<a class="tk-send heat-btn" href="' + esc(w.clarity_url) + '" target="_blank" rel="noopener">Open heat maps</a>' : '';
     const fails = (w.checks || []).filter(c => c.status === 'fail');
     attnBox('attn-website', [], fails.length ? attnList(fails.map(c => ({main: c.name + ' is not working', sub: c.detail || ''}))) : '', fails.length);
     navBadge('website', fails.length);
-    const s = $('sum-website'); if (s) s.textContent = 'not connected · speed ' + speed;
+    const s = $('sum-website'); if (s) s.textContent = 'no visitor numbers · speed ' + speed + (clarityOn ? ' · ' + Number(w.clarity_sessions).toLocaleString('en-US') + ' recorded visits' : '');
     return;
   }
   const conv = w.visitors ? Math.round(w.signups_started / w.visitors * 1000) / 10 : 0;
