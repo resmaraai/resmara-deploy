@@ -30,6 +30,9 @@ from app.api import team
 from app.api import marketing
 # The two ids a browser needs before it can be measured: /api/public/tags. Nothing secret.
 from app.api import public
+# Social leads (Post Engine §10.4): /api/boosts/{id}/leads and the scan the scheduler calls.
+# Before this router existed the panel was a browser mockup with sample comments.
+from app.api import leads
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(resmara.router, prefix="", tags=["resmara"])
@@ -63,3 +66,4 @@ api_router.include_router(marketing.router, prefix="", tags=["console"])
 # Public, unauthenticated, and safe: a GA4 measurement id and a Clarity project id are printed in
 # the source of every site that uses them. The homepage fetches these to install its tags.
 api_router.include_router(public.router, prefix="", tags=["public"])
+api_router.include_router(leads.router, prefix="", tags=["leads"])

@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, func, JSON, LargeBinary, Date
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, func, JSON, LargeBinary, Date, UniqueConstraint
 from sqlalchemy.orm import deferred
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -187,6 +187,10 @@ class Boost(Base):
     # Meta pulls it from there and Resmara never stores the file.
     video_found_at = Column(DateTime, nullable=True)
     listing_checked_at = Column(DateTime(timezone=True), nullable=True)
+    # The social-leads scan: when it last ran for this campaign and what it saw, so "no leads
+    # yet" and "Meta refused the comments call" stop looking the same on the campaign page.
+    leads_checked_at = Column(DateTime(timezone=True), nullable=True)
+    leads_scan_note = Column(Text, nullable=True)
     reboost_offer_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     launched_at = Column(DateTime(timezone=True), nullable=True)
@@ -232,6 +236,50 @@ class Post(Base):
     # shows what happened last time instead of only the newest sentence in last_error.
     fail_log = Column(JSON, default=list)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# --- Social lead (Post Engine §10.4) ---
+class Lead(Base):
+    """One comment on a campaign post or ad that reads like buying interest.
+
+    This is the record the Social leads panel reads. Before it existed the panel kept its
+    leads in the browser: sample comments for the demo campaigns, an empty list for a real
+    one, and "Add a lead" vanishing on reload or on another device. The comment id Meta
+    gave it is the identity, so a scan that runs every 15 minutes cannot insert the same
+    person twice.
+    """
+    __tablename__ = "leads"
+    id = Column(Integer, primary_key=True, index=True)
+    boost_id = Column(Integer, ForeignKey("boosts.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    # The post the comment landed on, when it was one of ours. An ad's comment has no post row.
+    post_id = Column(Integer, nullable=True)
+    platform = Column(String, nullable=False)                 # instagram | facebook | manual
+    # What the panel prints next to the name ("Instagram", "Facebook ad", "Phone or text"):
+    # a comment from an ad reads as "Facebook ad" because that is what the agent saw.
+    channel = Column(String, nullable=True)
+    source = Column(String, default="comment")                # comment | ad_comment | manual
+    # Meta's own id for the comment. Unique per platform: the dedupe key for every scan.
+    platform_comment_id = Column(String, nullable=True)
+    author_name = Column(String, nullable=True)
+    author_handle = Column(String, nullable=True)
+    text = Column(Text, nullable=True)
+    permalink = Column(Text, nullable=True)
+    # Which post (or "the ad") the comment landed on: what the panel prints under the quote.
+    post_label = Column(String, nullable=True)
+    comment_at = Column(DateTime(timezone=True), nullable=True)
+    # new -> handled (ticked off) or removed (not a lead). Rows are never deleted: a removed
+    # comment stays removed instead of being re-flagged by the next scan.
+    status = Column(String, default="new", nullable=False)
+    # How it was judged: ai (the engine), keyword (rule fallback, no engine configured),
+    # manual (the agent typed it in). interest/confidence are kept so a wrong call can be
+    # reviewed instead of being an invisible opinion.
+    classified_by = Column(String, nullable=True)
+    confidence = Column(Float, nullable=True)
+    reason = Column(String, nullable=True)
+    notified_at = Column(DateTime(timezone=True), nullable=True)   # the alert email actually went
+    email_error = Column(Text, nullable=True)                      # why it did not
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (UniqueConstraint("platform", "platform_comment_id", name="uq_leads_comment"),)
 
 # --- Ad ---
 class Ad(Base):

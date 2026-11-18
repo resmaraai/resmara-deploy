@@ -5,6 +5,7 @@
 #
 # Every 5 minutes:
 #   - publish every approved post that is due (and let the retry ladder in post_retry run)
+#   - every 15 minutes, read the comments on live campaigns and email new Social leads
 #   - every 6th hour, re-read the listing on each running campaign (sold / pending / offline)
 #   - once a day around 14:00 UTC, check every Meta connection's token health
 #
@@ -59,6 +60,19 @@ if [ $((10#$(date -u +%M) % 15)) -lt 5 ]; then
   case "$code" in
     200) case "$body" in *'"fail"'*) say "system check found a failure: $body" ;; esac ;;
     *) say "system-check returned $code: $body" ;;
+  esac
+fi
+
+# Social leads (Post Engine §10.4), every 15 minutes on the same dial: read the comments on the
+# posts and ad that are live, keep the ones that read like buying interest and email the agent.
+# Quiet when nothing new came in, so a silent log means "nobody commented", not "the scan died".
+if [ $((10#$(date -u +%M) % 15)) -lt 5 ]; then
+  code=$(post "/api/admin/leads/scan" 240)
+  body=$(head -c 400 /tmp/resmara-sched-body.$$ 2>/dev/null)
+  rm -f /tmp/resmara-sched-body.$$
+  case "$code" in
+    200) case "$body" in *'"leads": 0'*|*'"leads":0'*) ;; *) say "leads: $body" ;; esac ;;
+    *) say "leads/scan returned $code: $body" ;;
   esac
 fi
 

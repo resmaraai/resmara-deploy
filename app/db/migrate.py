@@ -124,6 +124,10 @@ ADDITIONS = {
         ("photo_permission_at", "TIMESTAMP"),
         ("video_found_at", "TIMESTAMP"),
         ("listing_checked_at", "TIMESTAMP"),
+        # The social-leads scan's own heartbeat (Post Engine §10.4): when it ran and what it
+        # saw. Without these, "no leads yet" and "Meta refused the call" look identical.
+        ("leads_checked_at", "TIMESTAMP"),
+        ("leads_scan_note", "TEXT"),
         ("reboost_offer_sent_at", "TIMESTAMP"),
     ],
     "orders": [

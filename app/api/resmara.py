@@ -230,6 +230,7 @@ def campaign_again(boost_id: int, payload: RepeatRequest | None = None,
 def list_boosts(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
     """This client's campaigns, each with its real post counts (no invented progress)."""
     from sqlalchemy import func
+    from app.db.session import Lead
     boosts = db.query(Boost).filter(Boost.user_id == current_user.id).all()
     ids = [b.id for b in boosts]
     counted = {}
@@ -237,9 +238,19 @@ def list_boosts(current_user=Depends(get_current_user), db: Session = Depends(ge
         total = dict(db.query(Post.boost_id, func.count(Post.id)).filter(Post.boost_id.in_(ids)).group_by(Post.boost_id).all())
         approved = dict(db.query(Post.boost_id, func.count(Post.id)).filter(
             Post.boost_id.in_(ids), Post.client_status == "approved").group_by(Post.boost_id).all())
+        # The publisher writes "posted"; the older spelling is "published". Counting only one
+        # of them told the campaign card a campaign with fourteen posts had published none.
         published = dict(db.query(Post.boost_id, func.count(Post.id)).filter(
-            Post.boost_id.in_(ids), Post.publish_status == "published").group_by(Post.boost_id).all())
+            Post.boost_id.in_(ids),
+            Post.publish_status.in_(("posted", "published"))).group_by(Post.boost_id).all())
         counted = {bid: (total.get(bid, 0), approved.get(bid, 0), published.get(bid, 0)) for bid in ids}
+    # Leads waiting to be ticked off, per campaign (§10.4). A lead the agent already handled
+    # or removed is not "new", so the badge cannot nag about work that is done.
+    new_leads = {}
+    if ids:
+        new_leads = dict(db.query(Lead.boost_id, func.count(Lead.id))
+                         .filter(Lead.boost_id.in_(ids), Lead.status == "new")
+                         .group_by(Lead.boost_id).all())
     covers = {}
     if ids:
         for asset in (db.query(Asset).filter(Asset.boost_id.in_(ids))
@@ -249,6 +260,7 @@ def list_boosts(current_user=Depends(get_current_user), db: Session = Depends(ge
     for b in boosts:
         row = BoostOut.model_validate(b)
         row.posts_total, row.posts_approved, row.posts_published = counted.get(b.id, (0, 0, 0))
+        row.new_leads = new_leads.get(b.id, 0)
         row.image = covers.get(b.id)
         rows.append(row)
     return rows

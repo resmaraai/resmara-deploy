@@ -1,9 +1,20 @@
 // Social leads: comments on the campaign's posts and ad that read like buying interest.
-// Resmara's AI flags them; the agent ticks them off, removes the ones that aren't leads, or adds one.
-// Review copy: demo campaigns carry sample comments. Live campaigns fill this from Meta comments.
+// The server reads Meta and judges the comments (app/services/leads.py); this file shows what it
+// found and writes back the agent's own actions. Until Nov 2026 this panel was a mockup: sample
+// comments for the demo campaigns and a localStorage list for real ones, so a lead seen on a
+// phone did not exist on a laptop. The demo addresses still carry sample comments, because a
+// demo has to look alive; a real campaign asks the server.
 
-function campaignIsLive(c) { return Number(c && c.day) > 0 || Boolean(c && c.live && Number(c.posts_published) > 0); }
+function campaignIsLive(c) {
+  // A campaign is live when the server says it was launched (launched_at) or it has run at
+  // least one day. "It has published posts" used to be part of this test, and because the
+  // publisher stores "posted" while one endpoint counted "published", a launched campaign
+  // read as un-launched and opened on the pre-launch approval screen forever.
+  return Number(c && c.day) > 0 || Boolean(c && c.live && c.launched_at);
+}
 function leadsKey(c) { return 'leads-' + (c.reviewId || c.address); }
+// A campaign the account actually owns has a boost id; the sample addresses do not.
+function leadsIsServer(c) { return typeof campaignBoostId === 'function' && campaignBoostId(c) != null; }
 
 const DEMO_LEADS = {
   '1248 Oakridge Drive': [
@@ -20,43 +31,177 @@ const DEMO_LEADS = {
   ]
 };
 
+// Sample campaigns keep their comments in state; a real campaign's leads live on the server and
+// are cached here only for the moment they are on screen.
 function campaignLeads(c) {
   state.leads = state.leads || {};
   const k = leadsKey(c);
   if (!state.leads[k]) state.leads[k] = (examples.includes(c) ? (DEMO_LEADS[c.address] || []) : []).map((l, i) => ({ id: Date.now() + i, done: false, ...l }));
   return state.leads[k];
 }
-function newLeadCount(c) { return campaignIsLive(c) ? campaignLeads(c).filter(l => !l.done).length : 0; }
+function newLeadCount(c) {
+  if (!campaignIsLive(c)) return 0;
+  // The server's count is the truth a reload, a phone and the console all agree on.
+  if (leadsIsServer(c)) return Number(c.new_leads || 0);
+  return campaignLeads(c).filter(l => !l.done).length;
+}
+
+// ---- the server side ------------------------------------------------------------------------
+// Deliberately NOT on `state`: state is written to localStorage, and a cache that was mid-fetch
+// during a reload came back as a permanent "Checking the comments…" that nothing could clear.
+let leadCacheStore = {};
+function leadCache(c) { return leadCacheStore[campaignBoostId(c)] || null; }
+function setLeadCache(c, value) {
+  const k = campaignBoostId(c);
+  if (value === null || value === undefined) delete leadCacheStore[k];
+  else leadCacheStore[k] = value;
+}
+function leadTimeAgo(iso) {
+  if (!iso) return '';
+  // The server's timestamps carry no offset in SQLite, so "2026-11-18T20:17:40" would be read
+  // as local time and a comment from a minute ago could say "5h from now". Treat it as UTC.
+  const s = String(iso);
+  const hasZone = /([zZ]|[+-]\d\d:?\d\d)$/.test(s);
+  const then = new Date(hasZone ? s : s + 'Z');
+  if (isNaN(then.getTime())) return '';
+  const mins = Math.round((Date.now() - then.getTime()) / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.round(mins / 60); if (hrs < 24) return hrs + 'h ago';
+  const days = Math.round(hrs / 24); return days === 1 ? 'Yesterday' : days + 'd ago';
+}
+function leadFromServer(row) {
+  return { id: row.id, remoteId: row.id, name: row.author_name || 'Someone',
+    where: row.channel || (row.platform === 'instagram' ? 'Instagram' : 'Facebook'),
+    ago: leadTimeAgo(row.comment_at || row.created_at), text: row.text || '',
+    post: row.post_label || '', done: row.status === 'handled', status: row.status || 'new',
+    permalink: row.permalink || null };
+}
+function ensureLeads(c, index) {
+  const cache = leadCache(c);
+  if (cache && (cache.loading || cache.rows || cache.error)) return;
+  if (!window.RM || !RM.leads) return;
+  setLeadCache(c, { loading: true });
+  RM.leads(campaignBoostId(c)).then(function (data) {
+    setLeadCache(c, {
+      loading: false,
+      rows: (data.leads || []).map(leadFromServer),
+      scan: data.scan || null
+    });
+    refreshLeads(index);
+  }).catch(function (err) {
+    setLeadCache(c, { loading: false, error: (err && err.message) || 'Could not load leads.' });
+    refreshLeads(index);
+  });
+}
+function checkLeadsNow(index) {
+  const c = [...state.campaigns, ...examples][index];
+  if (!leadsIsServer(c) || !window.RM || !RM.scanLeads) return;
+  setLeadCache(c, { loading: true });
+  refreshLeads(index);
+  RM.scanLeads(campaignBoostId(c)).then(function () {
+    setLeadCache(c, null);
+    ensureLeads(c, index);
+    toast('Checked the comments on this campaign.');
+  }).catch(function (err) {
+    setLeadCache(c, { loading: false, error: (err && err.message) || 'Could not check for comments just now.' });
+    refreshLeads(index);
+  });
+}
 
 function leadsPanel(c, index) {
-  const leads = campaignLeads(c), open = leads.filter(l => !l.done).length;
-  const initials = n => n.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-  return `<section class="panel leads-panel" id="leads">
-  <div class="leads-head"><div><h2 class="campaign-step-title"><span>1</span> Social leads ${open ? `<span class="lead-count">${open} new</span>` : ''}</h2><p class="fine">People who commented on your posts or ad and sound interested in the home. Resmara emails you the moment one comes in.</p></div><button type="button" class="leads-email" onclick="previewLeadEmail(${index})">See the alert email</button></div>
-  ${leads.length ? `<ul class="leads-list">${leads.map((l, i) => `<li class="${l.done ? 'done' : ''}">
+  const server = leadsIsServer(c);
+  if (server) ensureLeads(c, index);
+  const cache = server ? leadCache(c) : null;
+  const leads = server ? ((cache && cache.rows) || []) : campaignLeads(c);
+  const open = server ? Number(c.new_leads || 0) : leads.filter(l => !l.done).length;
+  const initials = n => String(n || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  let body;
+  if (server && cache && cache.loading) {
+    body = '<p class="leads-empty">Checking the comments on your posts and ad…</p>';
+  } else if (server && cache && cache.error) {
+    body = `<p class="leads-empty">Could not check for comments just now: ${esc(cache.error)}</p>`;
+  } else if (leads.length) {
+    body = `<ul class="leads-list">${leads.map((l, i) => `<li class="${l.done ? 'done' : ''}">
     <span class="lead-av">${esc(initials(l.name))}</span>
-    <div class="lead-body"><b>${esc(l.name)}</b><span class="lead-where">${esc(l.where)} · ${esc(l.ago)}</span><p>“${esc(l.text)}”</p><small>On: ${esc(l.post)}</small></div>
+    <div class="lead-body"><b>${esc(l.name)}</b><span class="lead-where">${esc(l.where)} · ${esc(l.ago)}</span><p>“${esc(l.text)}”</p>${l.post ? `<small>On: ${esc(l.post)}</small>` : ''}</div>
     <div class="lead-actions"><button type="button" class="lead-tick" title="${l.done ? 'Mark as new' : 'Mark as handled'}" aria-pressed="${l.done}" onclick="toggleLead(${index},${i})">${l.done ? '✓ Handled' : '✓ Mark handled'}</button><button type="button" class="lead-remove" title="Not a lead" aria-label="Remove lead" onclick="removeLead(${index},${i})">✕</button></div>
-  </li>`).join('')}</ul>` : '<p class="leads-empty">No leads yet. When someone comments with interest in the home, they show up here.</p>'}
+  </li>`).join('')}</ul>`;
+  } else {
+    body = '<p class="leads-empty">No leads yet. When someone comments with interest in the home, they show up here.</p>';
+  }
+  const scan = server ? (cache && cache.scan) : null;
+  const scanLine = server
+    ? `<p class="fine">${scan && scan.checked_at ? 'Last checked ' + esc(leadTimeAgo(scan.checked_at)) : 'Not checked yet.'}${scan && scan.note ? ' · ' + esc(scan.note) : ''}</p>`
+    : '';
+  return `<section class="panel leads-panel" id="leads">
+  <div class="leads-head"><div><h2 class="campaign-step-title"><span>1</span> Social leads ${open ? `<span class="lead-count">${open} new</span>` : ''}</h2><p class="fine">People who commented on your posts or ad and sound interested in the home. Resmara emails you the moment one comes in.</p>${scanLine}</div><div class="leads-head-btns">${server ? `<button type="button" class="leads-email" onclick="checkLeadsNow(${index})">Check now</button>` : ''}<button type="button" class="leads-email" onclick="previewLeadEmail(${index})">See the alert email</button></div></div>
+  ${body}
   <button type="button" class="lead-add" onclick="addLead(${index})">＋ Add a lead</button>
 </section>`;
 }
 
-function toggleLead(index, i) { const c = [...state.campaigns, ...examples][index], l = campaignLeads(c)[i]; l.done = !l.done; persist(); refreshLeads(index); }
-function removeLead(index, i) { const c = [...state.campaigns, ...examples][index]; campaignLeads(c).splice(i, 1); persist(); refreshLeads(index); toast('Removed. Resmara won’t flag that comment again.'); }
+function leadActionFailed(err) { toast((err && err.message) || 'Could not save that just now. Try again.'); }
+
+function toggleLead(index, i) {
+  const c = [...state.campaigns, ...examples][index];
+  if (leadsIsServer(c)) {
+    const cache = leadCache(c); const l = cache && cache.rows && cache.rows[i];
+    if (!l) return;
+    const next = l.done ? 'new' : 'handled';
+    RM.setLeadStatus(l.remoteId, next).then(function (saved) {
+      l.done = saved.status === 'handled'; l.status = saved.status;
+      c.new_leads = Math.max(0, Number(c.new_leads || 0) + (next === 'handled' ? -1 : 1));
+      persist(); refreshLeads(index);
+    }).catch(leadActionFailed);
+    return;
+  }
+  const l = campaignLeads(c)[i]; l.done = !l.done; persist(); refreshLeads(index);
+}
+function removeLead(index, i) {
+  const c = [...state.campaigns, ...examples][index];
+  if (leadsIsServer(c)) {
+    const cache = leadCache(c); const l = cache && cache.rows && cache.rows[i];
+    if (!l) return;
+    RM.removeLead(l.remoteId).then(function () {
+      cache.rows.splice(i, 1);
+      if (!l.done) c.new_leads = Math.max(0, Number(c.new_leads || 0) - 1);
+      persist(); refreshLeads(index);
+      toast('Removed. Resmara won’t flag that comment again.');
+    }).catch(leadActionFailed);
+    return;
+  }
+  campaignLeads(c).splice(i, 1); persist(); refreshLeads(index); toast('Removed. Resmara won’t flag that comment again.');
+}
 function refreshLeads(index) { const c = [...state.campaigns, ...examples][index], el = document.querySelector('#leads'); if (el) el.outerHTML = leadsPanel(c, index); }
 function addLead(index) {
   show(`<span class="eyebrow">SOCIAL LEADS</span><h2>Add a lead.</h2><form onsubmit="event.preventDefault();saveLead(${index},this)"><label class="field">Name<input name="name" required placeholder="Who is it?"></label><label class="field">Where<select name="where"><option>Instagram</option><option>Facebook</option><option>Facebook ad</option><option>Phone or text</option><option>Email</option><option>Other</option></select></label><label class="field">What they said<textarea name="text" rows="3" required></textarea></label><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Cancel</button><button class="campaign-primary">Add lead</button></div></form>`);
 }
 function saveLead(index, form) {
   const c = [...state.campaigns, ...examples][index];
-  campaignLeads(c).unshift({ id: Date.now(), name: form.name.value.trim(), where: form.where.value, text: form.text.value.trim(), post: 'Added by you', ago: 'Just now', done: false });
+  const where = form.where.value, text = form.text.value.trim(), name = form.name.value.trim();
+  if (leadsIsServer(c)) {
+    RM.addLead(campaignBoostId(c), { name: name, text: text, where: where }).then(function (row) {
+      const cache = leadCache(c) || (setLeadCache(c, { loading: false, rows: [] }), leadCache(c));
+      cache.rows = cache.rows || [];
+      cache.rows.unshift(leadFromServer(row));
+      c.new_leads = Number(c.new_leads || 0) + 1;
+      persist(); modal.close(); refreshLeads(index);
+    }).catch(leadActionFailed);
+    return;
+  }
+  campaignLeads(c).unshift({ id: Date.now(), name: name, where: where, text: text, post: 'Added by you', ago: 'Just now', done: false });
   persist(); modal.close(); refreshLeads(index);
 }
 
 // What the agent receives the moment a lead comes in.
 function previewLeadEmail(index) {
-  const c = [...state.campaigns, ...examples][index], l = campaignLeads(c).find(x => !x.done) || campaignLeads(c)[0] || { name: 'Sarah Mitchell', where: 'Instagram', post: 'Just listed', text: 'Is this still available?' };
+  const c = [...state.campaigns, ...examples][index];
+  // The preview shows a real lead when there is one: sample copy for a sample campaign, the
+  // newest open lead for a campaign the server is reading.
+  const cache = leadsIsServer(c) ? leadCache(c) : null;
+  const pool = cache && cache.rows && cache.rows.length ? cache.rows : campaignLeads(c);
+  const l = pool.find(x => !x.done) || pool[0] || { name: 'Sarah Mitchell', where: 'Instagram', post: 'Just listed', text: 'Is this still available?' };
   const brand = typeof brandKitData === 'function' ? brandKitData() : {};
   show(`<span class="eyebrow">EMAIL PREVIEW</span><div class="lead-mail">
    <div class="lead-mail-meta"><div><b>From</b> Resmara &lt;support@resmara.com&gt;</div><div><b>To</b> ${esc(brand.agent || 'You')}</div><div><b>Subject</b> New lead on ${esc(c.address)}: ${esc(l.name)}</div></div>

@@ -135,6 +135,11 @@ class BoostOut(BaseModel):
     video_url: Optional[str] = None
     listing_status: Optional[str] = None
     listing_checked_at: Optional[datetime] = None
+    # How many leads are waiting on this campaign (Post Engine §10.4). The card badge reads
+    # this, so "1 new lead" is a fact from the database rather than a browser's memory.
+    new_leads: int = 0
+    leads_checked_at: Optional[datetime] = None
+    leads_scan_note: Optional[str] = None
     budget_confirmed_at: Optional[datetime] = None
     paused_at: Optional[datetime] = None
     paused_days: int = 0

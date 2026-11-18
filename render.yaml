@@ -98,7 +98,10 @@ services:
   # The scheduler. Without this service nothing calls the publisher: a post can be approved
   # and scheduled and then sit there forever, because "scheduled" is a clock, and a clock
   # needs someone to look at it. Every 15 minutes this container opens the database directly
-  # and publishes what is due, then exits — Render bills the run in seconds, ~$1/month floor.
+  # and publishes what is due, then reads the comments on everything that is live and emails
+  # the agent about buying interest (Post Engine §10.4) - same clock, one service, so the lead
+  # scan costs nothing extra. Reading comments needs pages_read_engagement (held) on the Page;
+  # an ad thread Meta refuses is reported on the campaign instead of failing the run.
   - type: cron
     name: resmara-publisher
     runtime: docker

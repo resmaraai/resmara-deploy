@@ -582,6 +582,30 @@
     return parse(res);
   }
 
+  // ---- social leads (Post Engine §10.4) -----------------------------------
+  // The campaign page shows what the server found in Meta's comments. A lead lives on the
+  // server, not in this browser, so ticking one off on a phone is the same lead everywhere.
+
+  function leads(boostId) {
+    return request('/api/boosts/' + segment(boostId) + '/leads');
+  }
+
+  function addLead(boostId, lead) {
+    return json('/api/boosts/' + segment(boostId) + '/leads', 'POST', lead || {});
+  }
+
+  function setLeadStatus(leadId, status) {
+    return json('/api/leads/' + segment(leadId), 'PATCH', { status: status });
+  }
+
+  function removeLead(leadId) {
+    return request('/api/leads/' + segment(leadId), { method: 'DELETE' });
+  }
+
+  function scanLeads(boostId) {
+    return request('/api/boosts/' + segment(boostId) + '/leads/scan', { method: 'POST' });
+  }
+
   // ---- export -------------------------------------------------------------
 
   window.RM = {
@@ -630,6 +654,11 @@
     publishStatus: publishStatus,
     publishNow: publishNow,
     report: report,
+    leads: leads,
+    addLead: addLead,
+    setLeadStatus: setLeadStatus,
+    removeLead: removeLead,
+    scanLeads: scanLeads,
     photoIndex: photoIndex,
     gallery: gallery,
     importPhotos: importPhotos,

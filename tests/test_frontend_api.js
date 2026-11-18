@@ -210,6 +210,17 @@ async function one(name, run, expect) {
   await one('RM.report(day=14)', () => RM.report(7, 14), { method: 'GET', path: '/api/content/reports/7?day=14' });
   await one('RM.report(default day=7)', () => RM.report(7), { method: 'GET', path: '/api/content/reports/7?day=7' });
 
+  // Social leads (§10.4): the panel's five calls, and nothing invented on the way.
+  await one('RM.leads(id)', () => RM.leads(12), { method: 'GET', path: '/api/boosts/12/leads' });
+  await one('RM.addLead(id, lead)', () => RM.addLead(12, { name: 'Ann', text: 'Can I see it?', where: 'Instagram' }),
+    { method: 'POST', path: '/api/boosts/12/leads',
+      body: { name: 'Ann', text: 'Can I see it?', where: 'Instagram' } });
+  await one('RM.setLeadStatus(id, handled)', () => RM.setLeadStatus(5, 'handled'),
+    { method: 'PATCH', path: '/api/leads/5', body: { status: 'handled' } });
+  await one('RM.removeLead(id)', () => RM.removeLead(5), { method: 'DELETE', path: '/api/leads/5' });
+  await one('RM.scanLeads(id)', () => RM.scanLeads(12),
+    { method: 'POST', path: '/api/boosts/12/leads/scan' });
+
   // ---- health / version ------------------------------------------------------
   console.log('\nhealth and version');
   const health = await one('RM.checkHealth', () => RM.checkHealth(), { method: 'GET', path: '/', raw: '<!doctype html><title>Resmara</title>' });

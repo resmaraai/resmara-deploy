@@ -659,6 +659,10 @@ dialog button.alt,dialog .alt{background:#e2f0f8!important;border-color:#e2f0f8!
 .leads-head .fine{margin:0!important}
 .lead-count{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:800;letter-spacing:0;background:#d94c0d;color:#fff;border-radius:999px;padding:4px 10px}
 .leads-email{background:#12354d!important;color:#fff!important;border:0!important;white-space:nowrap;font-size:13px!important;padding:10px 16px!important}
+/* Two buttons on a live campaign (Check now + the email preview): they stack rather than
+   squeezing the heading, and the second one reads as the secondary action it is. */
+.leads-head-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.leads-head-btns .leads-email+.leads-email{background:#fff!important;color:#12354d!important;border:1px solid #cfe2ee!important}
 .leads-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .leads-list li{display:flex;gap:14px;align-items:flex-start;border:1px solid #e1edf5;border-radius:14px;padding:14px 16px;background:#fff}
 .leads-list li.done{background:#f6f9fb;opacity:.7}

@@ -20,11 +20,11 @@ async function syncLiveCampaigns(){
   // a visible change and must repaint, even though the campaign list itself is unchanged.
   // until_sold is in the signature too: turning autopilot on or off (here or on a phone) is a
   // visible change and the card must repaint, not wait for a reload.
-  const signature=list=>list.map(c=>[campaignBoostId(c),c.image||'',c.status,c.until_sold?'on':'off'].join(':')).join(',').slice(0,4000);
+  const signature=list=>list.map(c=>[campaignBoostId(c),c.image||'',c.status,c.until_sold?'on':'off',Number(c.new_leads||0),c.launched_at||''].join(':')).join(',').slice(0,4000);
   const before=signature(state.campaigns);
   list.forEach(b=>{
    if(!b||b.id==null)return;
-   const card={address:b.address,area:(b.campaign_days||14)+'-day campaign · $'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',status:liveStatusLabel(b),boostId:b.id,live:true,day:0,hidden:b.hidden===true,posts_total:b.posts_total||0,posts_approved:b.posts_approved||0,posts_published:b.posts_published||0,url:'',media:'',image:b.image||undefined,budget:'$'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',until_sold:b.until_sold===true,until_sold_at:b.until_sold_at||null};
+   const card={address:b.address,area:(b.campaign_days||14)+'-day campaign · $'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',status:liveStatusLabel(b),boostId:b.id,live:true,day:0,hidden:b.hidden===true,posts_total:b.posts_total||0,posts_approved:b.posts_approved||0,posts_published:b.posts_published||0,url:'',media:'',image:b.image||undefined,budget:'$'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',until_sold:b.until_sold===true,until_sold_at:b.until_sold_at||null,new_leads:b.new_leads||0,launched_at:b.launched_at||null,stage:b.stage||null};
    const existing=state.campaigns.find(c=>String(campaignBoostId(c))===String(b.id));
    if(existing)Object.assign(existing,card);else state.campaigns.push(card);
   });
