@@ -404,6 +404,16 @@
     return json('/api/billing/checkout', 'POST', { boost_id: boostId });
   }
 
+  function addCard() {
+    // Stripe's "add a card" page: nothing is charged. Returns { url }.
+    return json('/api/billing/card', 'POST', {});
+  }
+
+  function chargeSaved(boostId) {
+    // Pay for this campaign with the card on file. Clicking Build is the approval.
+    return json('/api/billing/charge', 'POST', { boost_id: boostId });
+  }
+
   function orders() {
     return request('/api/billing/orders');
   }
@@ -592,6 +602,8 @@
     billingConfig: billingConfig,
     savedCards: savedCards,
     checkout: checkout,
+    addCard: addCard,
+    chargeSaved: chargeSaved,
     orders: orders,
     boostBilling: boostBilling,
     balance: balance,

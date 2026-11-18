@@ -399,7 +399,7 @@ function runMetaAudit() {
     if (box) {
       box.innerHTML = (r.connected ? '' : `<p class="notice">${esc(state.message || 'Please connect your Meta account so we can run campaigns for you.')}</p>`) +
         `<ul class="audit-list">${rows}</ul>` +
-        `<p class="fine">Once you've done this, come back here and click Check again.</p>` +
+        `<p class="fine">Once you've done this, come back here and click Check connection.</p>` +
         (r.connected ? '' : `<div class="btn-pair"><button class="campaign-primary" onclick="connectMeta()">Connect Meta</button><button class="alt" onclick="obBook()">Book a free setup session</button></div>`);
     }
     state.metaAudit = { status: r.connected && (r.checks || []).every(c => c.ok) ? 'ready' : 'blocked', checkedAt: new Date().toISOString() };
