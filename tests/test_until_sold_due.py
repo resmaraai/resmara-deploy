@@ -119,9 +119,17 @@ def main() -> int:
         check("it reports ok", payload.get("ok") is True, str(payload)[:160])
         check("it lists what is due", isinstance(payload.get("due"), list))
         check("it says no action was taken", "none" in (payload.get("actions") or ""), str(payload.get("actions")))
-        check("--apply refuses while the builder is missing",
-              subprocess.run([sys.executable, str(script), "--apply"], capture_output=True,
-                             text=True, env={**os.environ}).returncode == 1)
+        # --apply now does the work. With no Stripe key in this environment it must charge
+        # nothing and say so, which is the behaviour a misconfigured cron has to have.
+        applied = subprocess.run([sys.executable, str(script), "--apply"], capture_output=True,
+                                 text=True, env={**os.environ})
+        check("--apply runs and exits 0", applied.returncode == 0, (applied.stderr or "")[-200:])
+        line2 = (applied.stdout or "").strip().splitlines()[-1] if applied.stdout.strip() else ""
+        payload2 = json.loads(line2) if line2.startswith("{") else {}
+        check("--apply reports mode=apply", payload2.get("mode") == "apply", str(payload2)[:160])
+        check("...and charges nothing without a card",
+              all(r.get("status") != "renewed" for r in payload2.get("applied") or []),
+              str(payload2.get("applied"))[:200])
     finally:
         db.close()
 
