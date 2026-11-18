@@ -74,6 +74,35 @@ def main():
           body["success_url"])
     check("names the property on the Stripe page", "1248 Oakridge Drive" in body["line_items[0][price_data][product_data][name]"])
 
+    print("\n[the round is stamped on the payment]")
+    check("a first campaign says first", body["metadata[price_type]"] == "first", body.get("metadata[price_type]"))
+    check("a first campaign is round 0", body["metadata[round]"] == "0", body.get("metadata[round]"))
+    check("the price goes with it", body["metadata[price_cents]"] == "4900", body.get("metadata[price_cents]"))
+    check("the payment intent carries it too",
+          body.get("payment_intent_data[metadata][price_type]") == "first"
+          and body.get("payment_intent_data[metadata][round]") == "0",
+          body.get("payment_intent_data[metadata][price_type]"))
+    repeat = dict(billing.checkout_payload(7, 3, "1248 Oakridge Drive", "https://resmara.com",
+                                          cents=billing.repeat_price_cents(), round_no=1))
+    check("a repeat charges $39", repeat["line_items[0][price_data][unit_amount]"] == "3900")
+    check("a repeat says repeat", repeat["metadata[price_type]"] == "repeat", repeat.get("metadata[price_type]"))
+    check("a repeat carries its round", repeat["metadata[round]"] == "1", repeat.get("metadata[round]"))
+    check("the payment intent says repeat too",
+          repeat.get("payment_intent_data[metadata][price_type]") == "repeat",
+          repeat.get("payment_intent_data[metadata][price_type]"))
+    check("the receipt still names the property",
+          "1248 Oakridge Drive" in repeat["line_items[0][price_data][product_data][name]"],
+          repeat["line_items[0][price_data][product_data][name]"])
+    check("and says which round it is", "round 2" in repeat["line_items[0][price_data][product_data][name]"],
+          repeat["line_items[0][price_data][product_data][name]"])
+
+    class FakeBoost:
+        def __init__(self, r): self.repeat_round = r
+    check("round_of reads the campaign", billing.round_of(FakeBoost(3)) == 3)
+    check("round_of survives a missing round", billing.round_of(object()) == 0)
+    check("price_for follows the round",
+          billing.price_for(FakeBoost(0)) == 4900 and billing.price_for(FakeBoost(2)) == 3900)
+
     print("\n[webhook signature]")
     payload = json.dumps({"type": "checkout.session.completed"}).encode()
     good = sign(payload, "whsec_test")

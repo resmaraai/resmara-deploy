@@ -169,6 +169,27 @@ def main() -> int:
           row["campaigns"] == 1 and row["packs"] == 1 and abs(row["paid_usd"] - 245.0) <= 0.01,
           str(row))
 
+    # ── the $39 renewal is counted as a renewal, not just as money ────────────
+    with SessionLocal() as db:
+        agent = db.query(User).filter(User.email == "agent@example.com").first()
+        repeat = Boost(user_id=agent.id, address="12 Repeat St, Austin TX", repeat_round=1)
+        db.add(repeat)
+        db.commit()
+        db.refresh(repeat)
+        db.add(Order(user_id=agent.id, boost_id=repeat.id, amount_cents=3900, status="paid",
+                     paid_at=datetime.utcnow(), stripe_session_id="cs_test_fin_3"))
+        db.commit()
+
+    body = client.get("/api/admin/finance", headers=admin).json()
+    a = body["actuals"]
+    check("a repeat round is one renewal", a["renewal_orders"] == 1, str(a.get("renewal_orders")))
+    check("at $39, not $49", abs(a["renewal_gross_usd"] - 39.0) <= 0.01, str(a.get("renewal_gross_usd")))
+    check("and it is inside the collected total",
+          abs(a["gross_usd"] - 284.0) <= 0.01, str(a["gross_usd"]))
+    check("the repeat price is published to the console",
+          body["price"]["repeat_label"] == "$39" and body["price"]["repeat_cents"] == 3900,
+          str(body["price"]))
+
     if FAILS:
         print("FAIL — %d check(s) failed" % FAILS)
         return 1

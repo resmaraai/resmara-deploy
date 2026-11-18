@@ -1082,6 +1082,7 @@ const WHY = {
   'awaiting build': 'No plan yet, so there is nothing for a human to review.',
   'budget configured': 'Daily spend the campaign may use. Not money received.',
   'collected': 'Card payments Stripe has recorded. Zero until a key is added.',
+  'collected from renewals': 'Paid orders on a second or later round of the same listing — the $39 repeats, not the first $49 campaign.',
   'price per campaign': 'What one campaign sells for, set on the server.',
   'campaigns paid for': 'Orders Stripe reports as paid.',
   'last order': 'Newest payment. Blank means nobody has bought yet.',
@@ -2928,7 +2929,9 @@ function renderFinance(){
     calcRow('Most we may pay to win one', usd(d.acquisition.max_cac_usd[3]), true);
 
   const rep = $('finRepeat');
-  if (rep) rep.innerHTML = '<div class="grid g3">' +
+  if (rep) rep.innerHTML = '<div class="grid g4">' +
+    stat(usd(a.renewal_gross_usd), 'collected from renewals', a.renewal_orders ? 'good' : '',
+         a.renewal_orders + ' round(s) at ' + (d.price && d.price.repeat_label ? d.price.repeat_label : '$39') + ' each') +
     stat(usd(d.repeat.annual_contribution_usd), 'one agent, one year', '',
          d.repeat.campaigns_per_agent_per_year + ' campaigns') +
     stat(usd(d.repeat.lifetime_contribution_usd), 'one agent, all years', '',
@@ -2966,7 +2969,8 @@ function renderFinance(){
   }
 
   const s = $('sum-finance');
-  if (s) s.textContent = usd(u.contribution_usd) + ' kept per campaign · ' + usd(a.gross_usd) + ' collected';
+  if (s) s.textContent = usd(u.contribution_usd) + ' kept per campaign · ' + usd(a.gross_usd) + ' collected' +
+    (a.renewal_orders ? ' (' + usd(a.renewal_gross_usd) + ' of it renewals)' : '');
 }
 
 async function saveFinance(){

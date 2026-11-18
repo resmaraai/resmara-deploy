@@ -182,6 +182,13 @@ def finance(db: Session = Depends(get_db), current_user: User = Depends(team_acc
     gross_cents = sum(int(o.amount_cents or 0) for o in paid_orders) \
         + sum(int(p.amount_cents or 0) for p in paid_packs)
     gross = gross_cents / 100.0
+    # Renewals: a paid order on a campaign whose round is 1 or more. The $39 is never inferred
+    # from the amount (a promo could change it) — the round on the campaign decides it.
+    rounds = {b.id: int(getattr(b, "repeat_round", 0) or 0)
+              for b in db.query(Boost).filter(Boost.id.in_(
+                  [o.boost_id for o in paid_orders] or [-1])).all()}
+    renewal_orders = [o for o in paid_orders if rounds.get(o.boost_id, 0) >= 1]
+    renewal_cents = sum(int(o.amount_cents or 0) for o in renewal_orders)
     month_gross = (sum(int(o.amount_cents or 0) for o in paid_orders
                        if o.paid_at and o.paid_at >= month_ago)
                    + sum(int(p.amount_cents or 0) for p in paid_packs
@@ -247,6 +254,8 @@ def finance(db: Session = Depends(get_db), current_user: User = Depends(team_acc
         "price": {
             "cents": price_cents,
             "label": billing.price_label(price_cents),
+            "repeat_cents": billing.repeat_price_cents(),
+            "repeat_label": billing.price_label(billing.repeat_price_cents()),
         },
         "fixed": {
             "web_usd": a["hosting_web_usd"],
@@ -299,6 +308,8 @@ def finance(db: Session = Depends(get_db), current_user: User = Depends(team_acc
         "actuals": {
             "gross_usd": round(gross, 2),
             "gross_last_30d_usd": round(month_gross, 2),
+            "renewal_orders": len(renewal_orders),
+            "renewal_gross_usd": round(renewal_cents / 100.0, 2),
             "paid_campaigns": len(paid_orders),
             "paid_packs": len(paid_packs),
             "customers": len(customers),
