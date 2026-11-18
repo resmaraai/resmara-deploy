@@ -472,13 +472,6 @@ summary.campaign-step-title{font-family:"Archivo Black","Arial Black",sans-serif
 .field-help{font-size:12px;line-height:1.55;color:#52778f;margin:-4px 0 14px}.field-help b{color:#12354d}
 .field-help{margin:8px 0 16px!important}
 /* Completed campaign: blurred with a run-it-again offer */
-#content.rerun-locked{position:relative}
-#content.rerun-locked>*:not(.rerun-offer){filter:blur(6px);pointer-events:none;user-select:none}
-.rerun-offer{position:absolute;inset:0;display:flex;justify-content:center;align-items:flex-start;padding-top:140px;z-index:5}
-.rerun-card{background:#fff;border:1px solid #d6e7f1;border-radius:18px;box-shadow:0 20px 50px rgba(18,53,77,.18);padding:30px 32px;max-width:440px;text-align:left}
-.rerun-card h2{font-family:"Archivo Black","Arial Black",sans-serif;letter-spacing:-.8px;font-size:26px;color:#12354d;margin:12px 0 8px}
-.rerun-card p{font-size:14px;line-height:1.6;color:#52778f;margin:0 0 20px}.rerun-card p b{color:#12354d}
-.rerun-card .campaign-primary{display:block;margin-bottom:12px}
 /* New campaign: link or upload */
 .nc-photos{margin:6px 0 4px}
 .nc-tabs{display:inline-flex;background:#e2f0f8;border-radius:999px;padding:4px;margin:4px 0 8px}
@@ -949,6 +942,9 @@ html.dark .shell .camp-tabs button span{color:inherit}
 .pip-questions{display:none!important}
 
 /* Run it until it sells */
+.rerun-box{margin:0 0 22px;background:#143a50;border-radius:12px;padding:22px 24px;color:#fff}
+.rerun-box .until-sold-sub b{color:#fff}
+.rerun-box .until-sold-sub{margin-bottom:16px}
 .card-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .card-pause.until-sold-on{background:#d94c0d!important}
 .campaign-scope .until-sold{margin-top:22px;background:#143a50;border-radius:12px;padding:22px 24px;color:#fff}

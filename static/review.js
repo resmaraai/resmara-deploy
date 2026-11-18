@@ -479,16 +479,17 @@ async function publishApprovedPosts(){
 }
 
 // --- Run a completed campaign again -------------------------------------------
-// A completed campaign opens blurred with one offer. Paying builds a fresh 14 days
-// (new angles, same home). Once the agent approves it, it moves up to Active as Republished.
+// A completed campaign opens normally, so the agent can still see the calendar, leads and
+// reports they paid for. A box under the address offers to run it again. Paying builds a
+// fresh 14 days (new angles, same home); once approved it moves up to Active as Republished.
 const RERUN_PRICE='$39';
 function showRerunOffer(index){
  const main=document.querySelector('#content');if(!main)return;
- main.classList.add('rerun-locked');
  const c=[...state.campaigns,...examples][index];
- const box=document.createElement('div');box.className='rerun-offer';
- box.innerHTML=`<div class="rerun-card"><span class="pill phase-completed">Completed</span><h2>Run this campaign again.</h2><p><b>${esc(c.address)}</b> finished its 14 days. Resmara builds a fresh 14 days of posts and a new listing ad, with new angles on the same home.</p><button class="campaign-primary" onclick="startRerun(${index})">Run it again · ${RERUN_PRICE}</button><button class="alt" onclick="dashboard('campaigns')">Back to my campaigns</button></div>`;
- main.appendChild(box);
+ const box=document.createElement('div');box.className='until-sold rerun-box';
+ box.innerHTML=`<b class="until-sold-title">↻ Run this campaign again</b><p class="until-sold-sub"><b>${esc(c.address)}</b> finished its 14 days. Its calendar and reports stay below. Running it again builds a fresh 14 days of posts and a new listing ad, with new angles on the same home.</p><div class="until-sold-actions"><button type="button" class="campaign-primary" onclick="startRerun(${index})">Run it again · ${RERUN_PRICE}</button></div>`;
+ const head=main.querySelector('.review-heading');
+ if(head)head.after(box);else main.prepend(box);
 }
 function startRerun(index){
  const c=[...state.campaigns,...examples][index];if(!c)return;
