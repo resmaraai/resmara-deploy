@@ -65,7 +65,7 @@ function previewLeadEmail(index) {
     <h3>${esc(l.name)} is interested in ${esc(c.address)}.</h3>
     <div class="lead-mail-quote"><p>“${esc(l.text)}”</p><small>${esc(l.where)} · on “${esc(l.post)}”</small></div>
     <p>Reply while they’re still looking. Resmara spotted this comment and thinks it shows real interest in the home.</p>
-    <div class="lead-mail-btns"><span class="lm-primary">Reply on ${esc(/Instagram/.test(l.where) ? 'Instagram' : 'Facebook')} →</span><span class="lm-secondary">See all leads in Resmara</span></div>
+    <div class="lead-mail-btns"><span class="lm-primary">Reply on ${esc(/Instagram/.test(l.where) ? 'Instagram' : 'Facebook')}</span><span class="lm-secondary">See all leads in Resmara</span></div>
     <small class="lead-mail-foot">You get these because you have an active campaign in Resmara.</small>
    </div></div>
    <div class="modal-actions"><button class="campaign-primary" onclick="modal.close()">Close</button></div>`);
@@ -108,14 +108,14 @@ function untilSoldButton(c) {
   if (!campaignIsLive(c) || campaignPhase(c) === 'completed') return '';
   const i = [...state.campaigns, ...examples].indexOf(c);
   return untilSoldOn(c)
-    ? `<button type="button" class="card-pause until-sold-on" onclick="untilSoldInfo(${i},'card')">↻ Until it sells · On</button>`
-    : `<button type="button" class="card-pause" onclick="untilSoldInfo(${i},'card')">↻ Until it sells</button>`;
+    ? `<button type="button" class="card-pause until-sold-on" onclick="untilSoldInfo(${i},'card')">Until it sells · On</button>`
+    : `<button type="button" class="card-pause" onclick="untilSoldInfo(${i},'card')">Until it sells</button>`;
 }
 function untilSoldPanel(i) {
   const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);
-  return `<div class="until-sold"><b class="until-sold-title">↻ Run it until it sells</b><p class="until-sold-sub">A fresh campaign every 2 weeks until it’s under contract. $39 per renewal.</p><div class="until-sold-line"><div class="eyebrow">TELL YOUR SELLERS</div><p>“${UNTIL_SOLD_LINE}”</p></div><div class="until-sold-actions">${on
+  return `<div class="until-sold"><b class="until-sold-title">Run it until it sells</b><p class="until-sold-sub">A fresh campaign every 2 weeks until it’s under contract. $39 per renewal.</p><div class="until-sold-line"><div class="eyebrow">TELL YOUR SELLERS</div><p>“${UNTIL_SOLD_LINE}”</p></div><div class="until-sold-actions">${on
     ? `<strong class="until-sold-running">✓ Running until it sells</strong><button type="button" class="until-sold-how" onclick="setUntilSold(${i},false,'scope')">Turn off</button>`
-    : `<button type="button" class="campaign-primary" onclick="setUntilSold(${i},true,'scope')">Run it until it sells →</button>`}<button type="button" class="until-sold-how" onclick="untilSoldInfo(${i},'scope')">How it works</button></div></div>`;
+    : `<button type="button" class="campaign-primary" onclick="setUntilSold(${i},true,'scope')">Run it until it sells</button>`}<button type="button" class="until-sold-how" onclick="untilSoldInfo(${i},'scope')">How it works</button></div></div>`;
 }
 function untilSoldInfo(i, from) {
   const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);
@@ -125,7 +125,7 @@ function untilSoldInfo(i, from) {
     ? `<div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Got it</button></div>`
     : `<div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">${on ? 'Keep it on' : 'Not now'}</button>${on
       ? `<button class="campaign-primary" onclick="setUntilSold(${i},false,'${from}')">Turn off</button>`
-      : `<button class="campaign-primary" onclick="setUntilSold(${i},true,'${from}')">Run it until it sells →</button>`}</div>`}</div>`);
+      : `<button class="campaign-primary" onclick="setUntilSold(${i},true,'${from}')">Run it until it sells</button>`}</div>`}</div>`);
 }
 function setUntilSold(i, on, from) {
   const c = [...state.campaigns, ...examples][i];

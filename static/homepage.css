@@ -975,3 +975,20 @@ button.until-sold-how{background:#e2f0f8!important;color:#12354d!important;borde
 html.dark #modal .until-sold-list{color:#c3d6e4}
 html.dark #modal .until-sold-list b{color:#f2f8fc}
 html.dark #modal .until-sold-quote{background:#0c1d2b}
+
+/* Listing photos (campaign not built yet) */
+.campaign-photos .campaign-step-title{margin-bottom:6px!important}
+.campaign-photos .photos-status{margin:0 0 4px!important;font-size:15px!important;color:#24465d!important}
+.campaign-photos .photos-help{margin:14px 0 10px!important;font-size:14px!important;color:#52778f!important}
+.photos-row{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+.photos-row input{flex:1 1 320px;min-width:0;margin:0!important}
+.photos-row .campaign-primary,.photos-row .photos-upload{margin:0!important;width:auto!important;white-space:nowrap}
+.photos-upload{padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px}
+input.photos-file{display:none!important}
+.photo-permission{display:flex!important;align-items:center;gap:12px;margin-top:18px;padding:14px 16px;border:1px solid #dcebf4;border-radius:12px;background:#f7fbff;font-size:14px;font-weight:600;color:#143a50;cursor:pointer}
+.photo-permission input{width:20px!important;height:20px!important;flex:none;margin:0!important;accent-color:#d94c0d;cursor:pointer}
+html.dark .shell .photo-permission{background:#0f2231;border-color:#23425a}
+html.dark .shell .photo-permission span{color:#f2f8fc}
+html.dark .shell .campaign-photos .photos-status{color:#d6e6f1!important}
+.photo-thumbs:empty{display:none}
+html.dark .shell .photos-upload{background:#13283a!important;color:#d6e6f1!important;border:1px solid #23425a}

@@ -233,7 +233,7 @@ function helpGo(where){
 }
 function helpGoButton(where){
   const panel = document.querySelector('#pip-messages'); if (!panel || !where || !HELP_GO_LABEL[where]) return;
-  const b = document.createElement('button'); b.type = 'button'; b.className = 'pip-go'; b.textContent = HELP_GO_LABEL[where] + ' →';
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'pip-go'; b.textContent = HELP_GO_LABEL[where] + '';
   b.addEventListener('click', () => helpGo(where)); panel.append(b); panel.scrollTop = panel.scrollHeight;
 }
 function helpCanon(q){ let s = ' ' + helpNorm(q) + ' '; HELP_SYNONYMS.forEach(([re, to]) => { s = s.replace(re, to); }); return s; }
