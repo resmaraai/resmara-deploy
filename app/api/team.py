@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import secrets
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -22,7 +23,8 @@ from sqlalchemy.orm import Session
 from app.api.auth import RESET_TTL_MINUTES, reset_link
 from app.core.config import settings
 from app.core.security import get_password_hash
-from app.db.session import Boost, PasswordReset, User, get_db
+from app.db.session import (Ad, AdAccount, Asset, Boost, Creative, CreditPurchase, Event, HelpMiss,
+                            Lead, Order, PasswordReset, Post, SupportTicket, User, get_db)
 from app.services import mail, team_access
 
 log = logging.getLogger("resmara.team")
@@ -207,3 +209,68 @@ def remove_member(member_id: int, user=Depends(team_access.needs("team")), db: S
             "message": ("Removed. The account had nothing of its own, so it is switched off."
                         if not has_business else
                         "Removed from the team. Their account and campaigns are untouched.")}
+
+
+@router.delete("/admin/team/{member_id}/account")
+def delete_account(member_id: int, payload: Optional[Dict[str, Any]] = Body(default=None),
+                   user=Depends(team_access.needs("team")), db: Session = Depends(get_db)):
+    """Delete the account itself, with everything it owns.
+
+    "Remove from team" is the reversible one. This is the other thing an operator needs when a
+    signup is a test, a duplicate or a spam account: the row and its campaigns go away.
+
+    It is deliberately hard to fire by accident - the caller has to echo the account's email in
+    `confirm`, and the button that sends it names how much is destroyed first. Owners and your own
+    account are refused: they are the way back in.
+    """
+    if not team_access.is_super(user):
+        raise HTTPException(status_code=403, detail="Only a super admin can delete an account")
+    member = db.query(User).filter(User.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="No such account")
+    email = (member.email or "").strip().lower()
+    if member.id == user.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+    if _is_owner(member):
+        raise HTTPException(status_code=400, detail="That account is an owner in the service settings")
+    payload = payload or {}
+    if str(payload.get("confirm") or "").strip().lower() != email:
+        raise HTTPException(status_code=422,
+                            detail=f"Type {email} in the confirmation box to delete this account")
+
+    boost_ids = [b.id for b in db.query(Boost.id).filter(Boost.user_id == member.id).all()]
+    counts = {
+        "campaigns": len(boost_ids),
+        "photos": db.query(Asset).filter(Asset.user_id == member.id).count(),
+        "posts": db.query(Post).filter(Post.boost_id.in_(boost_ids)).count() if boost_ids else 0,
+        "leads": db.query(Lead).filter(Lead.user_id == member.id).count(),
+        "orders": db.query(Order).filter(Order.user_id == member.id).count(),
+    }
+    # Photos are bytes on the row *and* a file on disk; the rows cascade, the files do not, so
+    # they are unlinked here or every deleted account leaves its gallery behind in uploads/.
+    upload_dir = settings.UPLOAD_DIR
+    for asset in db.query(Asset).filter(Asset.user_id == member.id).all():
+        if asset.filename:
+            try:
+                os.unlink(os.path.join(upload_dir, os.path.basename(asset.filename)))
+            except OSError:
+                pass
+    # Children before parents: orders/leads/assets name a boost, boosts name an ad account, so a
+    # delete in the other order trips a foreign key on Postgres and silently orphans rows on SQLite.
+    if boost_ids:
+        for model in (Order, Post, Ad, Lead):
+            db.query(model).filter(model.boost_id.in_(boost_ids)).delete(synchronize_session=False)
+        db.query(Asset).filter(Asset.boost_id.in_(boost_ids)).delete(synchronize_session=False)
+    db.query(Asset).filter(Asset.user_id == member.id).delete(synchronize_session=False)
+    for model in (Lead, Order, CreditPurchase, SupportTicket, Creative, PasswordReset, Boost,
+                  AdAccount):
+        db.query(model).filter(model.user_id == member.id).delete(synchronize_session=False)
+    # Tables that name a person but carry no cascade: an audit trail that keeps a dead user id is
+    # worse than a gap, so the rows go with the account.
+    db.query(HelpMiss).filter(HelpMiss.user_id == member.id).update({"user_id": None},
+                                                                   synchronize_session=False)
+    db.query(Event).filter(Event.user_id == member.id).delete(synchronize_session=False)
+    db.delete(member)
+    db.commit()
+    log.info("account %s (%s) deleted by %s: %s", email, member_id, user.email, counts)
+    return {"id": member_id, "email": email, "deleted": True, "removed": counts}

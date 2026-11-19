@@ -2205,7 +2205,8 @@ function paintTeam(){
       '<label class="owner-pick"><input type="checkbox" data-tmowner="' + esc(t.id) + '"' + (isSuper(t) ? ' checked' : '') + '> <span><b>Super admin</b></span></label>' +
       '<div class="cost-btns" style="margin-top:12px"><button class="cb light" data-tmsave="' + esc(t.id) + '">Save access</button>' +
         (t.status === 'invited' ? '<button class="cb light" data-tmresend="' + esc(t.id) + '">Resend invite</button>' : '') + '</div></div>' +
-      '<button class="cb danger" data-tmremove="' + esc(t.id) + '">Remove from team</button></div>') + '</div>';
+      '<div class="cost-btns" style="flex-direction:column;align-items:flex-start;gap:8px"><button class="cb danger" data-tmremove="' + esc(t.id) + '">Remove from team</button>' +
+      '<button class="cb danger" data-tmdelete="' + esc(t.id) + '">Delete account</button></div></div>') + '</div>';
   }).join('') + '</div>' + (teamRows ? '' : '<p class="hint" style="margin:12px 0 0">Adding people needs the back end to save team members. Until then only you are listed.</p>');
   const s = $('sum-settings'); if (s && window.resmaraSuper !== false) s.textContent = rows.length + ' team member' + (rows.length === 1 ? '' : 's');
   const h = $('teamHero');
@@ -2235,6 +2236,18 @@ document.addEventListener('click', async e => {
   const rs = e.target.closest('[data-tmresend]'); if (rs) { try { await api('/api/admin/team/' + rs.dataset.tmresend + '/invite', {method: 'POST'}); rs.textContent = 'Invite sent'; } catch (err) { alertMsg(err); } return; }
   const rm = e.target.closest('[data-tmremove]'); if (rm) { if (!confirm('Remove them from the team? They will not be able to sign in to the Team room.')) return;
     try { await api('/api/admin/team/' + rm.dataset.tmremove, {method: 'DELETE'}); loadTeam(); } catch (err) { alertMsg(err); } return; }
+  // Delete is the irreversible one, so it names what goes and makes the operator type the email:
+  // a single misclick on the wrong row must not be able to destroy a customer's campaigns.
+  const del = e.target.closest('[data-tmdelete]'); if (del) {
+    const row = (teamRows || []).find(x => String(x.id) === String(del.dataset.tmdelete)) || {};
+    const email = row.email || '';
+    const what = (row.campaigns ? row.campaigns + ' campaign' + (row.campaigns === 1 ? '' : 's') + ', ' : '') + 'its posts, photos, reports and billing records';
+    const typed = prompt('Delete ' + email + ' completely?\n\nThis removes ' + what + '. It cannot be undone.\n\nType the email address to confirm.');
+    if (typed === null) return;
+    if (String(typed).trim().toLowerCase() !== String(email).trim().toLowerCase()) { alertMsg('That is not the account\'s email, so nothing was deleted.'); return; }
+    try { await api('/api/admin/team/' + del.dataset.tmdelete + '/account', {method: 'DELETE', body: {confirm: String(typed).trim()}}); loadTeam(); } catch (err) { alertMsg(err); }
+    return;
+  }
 });
 // What the signed-in person may see. Owners (and anyone the server does not describe yet) see it all.
 function applyAccess(me){

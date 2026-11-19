@@ -33,7 +33,12 @@ CONTENT_TYPE_EXT = {
 MAX_BYTES = 12 * 1024 * 1024
 # A 14-day campaign wants a different photo most days, and the importer used to stop at ten,
 # silently discarding the rest of the gallery. Twenty leaves room for a longer run.
-DEFAULT_LIMIT = 20
+DEFAULT_LIMIT = 60
+# A listing's gallery is routinely 40-60 photos (this MLS's own share link for one Redding home
+# carries 52). 20 was a storage guess from the first MVP and silently dropped two thirds of a
+# gallery; the ceiling stays a guard against a page that lists a whole office's inventory, not a
+# limit on one listing.
+MAX_LIMIT = 80
 
 _JPEG_END = b"\xff\xd9"
 _PNG_END = b"IEND\xaeB`\x82"

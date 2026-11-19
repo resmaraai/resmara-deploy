@@ -31,7 +31,7 @@ class PhotoImportRequest(BaseModel):
     boost_id: int
     listing_url: str | None = None
     urls: list[str] = []
-    limit: int = 10
+    limit: int = 60  # photos.DEFAULT_LIMIT; a real gallery is 40-60 photos, not 20
 
 
 def _owned_boost(boost_id: int, current_user: User, db: Session) -> Boost:
@@ -175,7 +175,7 @@ async def import_photos_endpoint(payload: PhotoImportRequest, current_user: User
     from app.services import photos
 
     boost = _owned_boost(payload.boost_id, current_user, db)
-    limit = max(1, min(int(payload.limit or photos.DEFAULT_LIMIT), 20))
+    limit = max(1, min(int(payload.limit or photos.DEFAULT_LIMIT), photos.MAX_LIMIT))
     urls = [u.strip() for u in (payload.urls or []) if (u or "").strip()][:limit]
     source = "urls"
     listed = 0
