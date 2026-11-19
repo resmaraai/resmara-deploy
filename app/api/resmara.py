@@ -409,6 +409,26 @@ def approve_post(post_id: int, current_user=Depends(get_current_user), db: Sessi
     db.commit()
     return {"status": "approved", "post_id": post.id}
 
+@router.patch("/posts/{post_id}/withdraw")
+def withdraw_post(post_id: int, current_user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Take one scheduled post off a live campaign. The publisher only sends posts whose
+    publish_status is "scheduled", so moving it to "withdrawn" is all it takes; nothing is deleted
+    and the rest of the calendar runs as approved. A post that already went out can't be withdrawn
+    from here: it is on the agent's Page, and Meta is where it comes down."""
+    post = db.query(Post).filter(Post.id == post_id).first()
+    boost = db.query(Boost).filter(Boost.id == post.boost_id).first() if post else None
+    if not post or not boost or (boost.user_id != current_user.id and not current_user.is_admin):
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.publish_status == "withdrawn":
+        return {"status": "withdrawn", "post_id": post.id}
+    if post.publish_status in ("posted", "published", "publishing"):
+        raise HTTPException(status_code=409, detail="This post has already gone out, so it can't be withdrawn here. Remove it from your Facebook Page or Instagram.")
+    post.publish_status = "withdrawn"
+    db.add(Event(user_id=current_user.id, event_type="post_withdrawn",
+                 payload={"boost_id": boost.id, "post_id": post.id, "day": post.day}))
+    db.commit()
+    return {"status": "withdrawn", "post_id": post.id}
+
 # --- Support ---
 @router.post("/support", response_model=SupportTicketOut, status_code=201)
 def create_ticket(ticket: SupportTicketCreate, current_user=Depends(get_current_user), db: Session = Depends(get_db)):

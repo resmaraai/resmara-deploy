@@ -93,6 +93,8 @@ Otherwise the ad is a photo carousel and Day 1 is a photo post.
 - **Campaign leads**: people who filled in the form or tapped Call on the listing page, and people
   who commented with interest. Listing page leads are listed first. Open the campaign to see them,
   mark them handled, or add a lead by hand. Resmara emails the agent the moment one comes in.
+- **Withdraw a post**: after approval nothing can be edited, but any post that hasn't gone out yet
+  can be pulled from the calendar (open it, then Withdraw post). The rest of the campaign keeps running.
 - **Your listing page**: Resmara builds a simple page for every listing in the agent's brand
   (photos, details, the agent's phone, a Call button and a form). Every post and the ad send people
   there. The campaign shows a preview of the page with its visits, form leads and calls.

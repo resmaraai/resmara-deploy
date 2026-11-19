@@ -340,6 +340,11 @@
   }
 
   // Open a listing link before a campaign is built: the home, its photo count and any video.
+  // Take one scheduled post off a live campaign (the rest keeps running).
+  function withdrawPost(postId) {
+    return request('/api/posts/' + segment(postId) + '/withdraw', { method: 'PATCH' });
+  }
+
   function checkListing(url) {
     return json('/api/content/listing/check', 'POST', { url: url });
   }
@@ -668,6 +673,7 @@
     gallery: gallery,
     importPhotos: importPhotos,
     checkListing: checkListing,
+    withdrawPost: withdrawPost,
     tagAssets: tagAssets,
     createTicket: createTicket,
     tickets: tickets,

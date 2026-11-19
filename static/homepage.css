@@ -1155,3 +1155,9 @@ h2.campaign-step-title,summary.campaign-step-title,.campaign-step-title{font-fam
 .fold.folded .campaign-step-title{margin:0!important}
 .fold .leads-head{margin:0 0 8px}
 .fold .fold-chev{margin:0 6px 0 auto!important}
+
+/* Withdrawn posts */
+.withdrawn-note{align-self:center;font-size:14px;font-weight:700;color:#12354d}
+html.dark #modal .withdrawn-note{color:#fff}
+.review-calendar .review-calendar-post.is-withdrawn{opacity:.5}
+.review-calendar .review-calendar-post.is-withdrawn b{text-decoration:line-through}
