@@ -86,6 +86,9 @@ def _new_task(db: Session, *, pr: int, kind: str, bullet: int, title: str, area:
         created_by=SYNC_BY,
     )
     db.add(task)
+    # Flush so the row has an id before anything reports on it: the caller's answer names the
+    # rows it wrote, and an id assigned only at commit turns that answer into "#None".
+    db.flush()
     return task
 
 
