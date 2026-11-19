@@ -1161,3 +1161,7 @@ h2.campaign-step-title,summary.campaign-step-title,.campaign-step-title{font-fam
 html.dark #modal .withdrawn-note{color:#fff}
 .review-calendar .review-calendar-post.is-withdrawn{opacity:.5}
 .review-calendar .review-calendar-post.is-withdrawn b{text-decoration:line-through}
+/* Homepage problem block: the 30-second video sits in the right column, sized to the space */
+.home-problem-video{display:flex;justify-content:center;align-items:center}
+.home-problem-video video{display:block;height:min(620px,72vh);width:auto;max-width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:28px;background:#e8f3fa;box-shadow:0 24px 60px rgba(18,53,77,.18)}
+@media(max-width:700px){.home-problem-video video{height:auto;width:100%;max-width:360px}}
