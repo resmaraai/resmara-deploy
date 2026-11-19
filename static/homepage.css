@@ -1165,3 +1165,18 @@ html.dark #modal .withdrawn-note{color:#fff}
 .home-problem-video{display:flex;justify-content:center;align-items:center}
 .home-problem-video video{display:block;height:min(620px,72vh);width:auto;max-width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:28px;background:#e8f3fa;box-shadow:0 24px 60px rgba(18,53,77,.18)}
 @media(max-width:700px){.home-problem-video video{height:auto;width:100%;max-width:360px}}
+/* Problem block: dark blue like "What makes Resmara different", with a smaller video */
+.home-workload:not(.home-link-band){background:#143a50}
+.home-workload:not(.home-link-band) h2{color:#fff!important}
+.home-workload:not(.home-link-band) h2 span{color:#8ae8ff!important}
+.home-workload:not(.home-link-band) p{color:#cfe3ef!important}
+.home-workload:not(.home-link-band) .home-kicker{color:#8ae8ff}
+.home-workload:not(.home-link-band) .home-workload-inner{padding-top:64px;padding-bottom:64px}
+.home-problem-video video{height:min(460px,62vh);box-shadow:0 24px 60px rgba(0,0,0,.35);background:#0f2a3c}
+@media(max-width:700px){.home-problem-video video{height:auto;width:100%;max-width:240px}}
+/* Play button over the homepage video: nothing plays until it is clicked */
+.home-problem-video{position:relative;width:max-content;max-width:100%;margin:0 auto}
+.hpv-play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78px;height:78px;padding:0!important;border:0!important;border-radius:50%!important;background:#d94c0d!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;cursor:pointer;display:grid;place-items:center}
+.hpv-play:hover{background:#bd400b!important}
+.hpv-play span{display:block;width:0;height:0;margin-left:6px;border-top:15px solid transparent;border-bottom:15px solid transparent;border-left:24px solid #fff}
+.hpv-play[hidden]{display:none}
