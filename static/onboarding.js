@@ -70,24 +70,43 @@ function obCheck(scenario) {
   const results = (OB_SCENARIOS[scenario] || OB_SCENARIOS.ready).results.map(Boolean);
   ok = results.every(Boolean);
   obWalk(document.querySelector('#ob-box'), labels, results, '', () => {
-    state.metaAudit = { status: ok ? 'ready' : 'blocked', checkedAt: new Date().toISOString() };
-    state.connected = ok; persist();
+    // Only the Facebook Page is required: it's where the posts go. A personal Instagram or a
+    // missing ad account limits the campaign (no Instagram posts, no ad) but never locks the
+    // agent out. What's missing is kept so every page can say so until it's fixed.
+    const issues = results.map((r, i) => r ? null : i).filter(i => i !== null);
+    const pageOk = results[0] && results[1];
+    state.metaIssues = issues;
+    state.metaAudit = { status: ok ? 'ready' : pageOk ? 'limited' : 'blocked', checkedAt: new Date().toISOString() };
+    state.connected = pageOk; persist();
     if (ok) { show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>You’re connected.</h2><div class="nc-msg ok"><span class="robot-avatar"></span><div><b>Green light.</b> Your Page, Instagram and ad account are all set. Next, Resmara builds your brand.</div></div><div class="modal-actions"><span></span><button class="campaign-primary" onclick="onboard(1)">Build my brand</button></div>`); return; }
-    obNeedsSetup(results.map((r, i) => r ? null : i).filter(i => i !== null));
+    obNeedsSetup(issues);
   });
 }
 
 function obNeedsSetup(idx) {
   state.obIssues = idx; persist();
+  const pageOk = !idx.includes(0) && !idx.includes(1);
   const issues = idx.map(i => `<b>${OB_FIX[i][0]}.</b> ${OB_FIX[i][1]}`);
-  show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>Almost there.</h2>
-  <p>Resmara needs a couple more things in place before it can post and run ads for you:</p>
+  show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>${pageOk ? 'You’re connected, with a couple of limits.' : 'Almost there.'}</h2>
+  ${pageOk ? `<div class="nc-msg ok"><span class="robot-avatar"></span><div><b>Your Facebook Page is connected.</b> ${metaLimitLine(idx)}</div></div><p>To get the most from Resmara, fix these when you can:</p>` : '<p>Resmara can’t find a Facebook Page it can post to yet. You can still set up your account and look around while you sort it out:</p>'}
   <ul class="ob-issues">${issues.map(i => `<li>${i}</li>`).join('')}</ul>
-  <p class="ob-retry"><b>Once you’ve done this, come back here and click Check again</b> to try one more time.</p>
-  <div class="notice ob-help"><b>We’ll set it up with you.</b> Most agents need a hand with this part. Book a free setup session and one of our team will get your accounts ready with you, step by step.</div>
-  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="obCheck('ready')">Check again</button><button class="campaign-primary" onclick="obBook()">Book a free setup session</button></div><p class="fine ob-skip">Preview: Check again acts as if you fixed it.</p>
+  <div class="notice ob-help"><b>We’ll set it up with you.</b> Book a free setup call and one of our team will fix it with you, step by step. You’ll also see a reminder at the top of your dashboard until it’s sorted.</div>
+  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="obBook()">Book a free setup call</button><button class="campaign-primary" onclick="onboard(1)">${pageOk ? 'Continue' : 'Continue for now'}</button></div><p class="fine ob-skip"><a href="#" onclick="obCheck('ready');return false">Check again</a> · Preview: Check again acts as if you fixed it.</p>
 `);
-  modal.dataset.gate = 'meta';
+}
+// What a campaign can do with what is connected, in one line.
+function metaLimitLine(idx) {
+  const ig = idx.includes(2), ad = idx.includes(3);
+  if (idx.includes(0) || idx.includes(1)) return 'Your campaigns can’t post until a Facebook Page is connected. Your listing page still works.';
+  return 'Your campaigns can still run, with limited reach: ' + (ig && ad ? 'posts go to your Facebook Page only, and your listing ad is off until it’s fixed.' : ig ? 'posts go to your Facebook Page only, not Instagram, until it’s fixed.' : 'your posts go out, but your listing ad is off until it’s fixed.');
+}
+// A red box at the top of every dashboard page and campaign until the Meta account is sorted.
+const META_ISSUE_SHORT = ['No Facebook business Page is connected', 'You aren’t an admin of your Facebook Page', 'Your Instagram isn’t a business account', 'Your ad account can’t run ads yet'];
+function metaIssueBanner() {
+  const idx = state.metaIssues || [];
+  const box = document.querySelector('#content');
+  if (!box || !idx.length || box.querySelector('.meta-issue')) return;
+  box.insertAdjacentHTML('afterbegin', `<div class="meta-issue" role="alert"><b class="meta-issue-title">There’s an issue with your Meta account.</b><ul>${idx.map(i => `<li>${META_ISSUE_SHORT[i]}.</li>`).join('')}</ul><p>${metaLimitLine(idx)}</p><div class="meta-issue-actions"><button type="button" class="meta-issue-book" onclick="obBook()">Book a call to fix it</button><button type="button" class="meta-issue-check" onclick="onboard(0)">Check again</button></div></div>`);
 }
 
 // Free setup session: the real Calendly booking page, right in the pop-up.
@@ -98,7 +117,7 @@ function obBook() {
   show(`<span class="eyebrow">FREE SETUP SESSION</span><h2>Let’s get you set up.</h2><p>Pick a time for a 30-minute video call. One of our team will connect your Facebook Page, Instagram and ad account with you.</p>
   <div class="cal-embed"><iframe src="${SETUP_CALENDLY}?${q}" title="Book your setup session" loading="lazy"></iframe></div>
   <p class="fine">Calendly not loading? <a href="${SETUP_CALENDLY}" target="_blank" rel="noopener">Open the booking page</a>.</p>
-  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="obNeedsSetup(state.obIssues||[3])">Back</button><span></span></div>`);
+  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="${state.brandBuilt ? 'modal.close()' : 'obNeedsSetup(state.obIssues||[3])'}">Back</button><span></span></div>`);
   modal.classList.add('wide-modal'); modal.dataset.gate = 'meta';
 }
 // When the booking is made inside the embed, Calendly tells the page.
@@ -109,7 +128,7 @@ addEventListener('message', e => {
     // has to survive a new browser the same way the Meta connection does.
     state.setupSession = { booked: new Date().toISOString() }; persist();
     if (window.RM && RM.isLoggedIn()) RM.bookSetupSession({ booked: true }).catch(() => {});
-    show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">YOU’RE BOOKED IN</span><h2>See you soon.</h2><p>Calendly has emailed you the time and a video link. We’ll connect your Meta account together on the call. Until then you can look around and set up your brand, but campaigns can’t run until you’re connected.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Close</button><button class="campaign-primary" onclick="onboard(1)">Build my brand</button></div>`);
+    show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">YOU’RE BOOKED IN</span><h2>See you soon.</h2><p>Calendly has emailed you the time and a video link. We’ll sort out your Meta account together on the call. Until then you can carry on as normal.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Close</button><button class="campaign-primary" onclick="onboard(1)">Build my brand</button></div>`);
   }
 });
 
@@ -295,7 +314,12 @@ let introLastView = null;
     const seen = state.introViews || (state.introViews = {});
     if (v !== introLastView) { seen[v] = (seen[v] || 0) + 1; introLastView = v; persist(); }
     if (seen[v] > 2) document.querySelectorAll('#content .notice.page-intro:not(#connNotice)').forEach(n => n.remove());
+    metaIssueBanner();
   };
+})();
+(function () {
+  const base = details;
+  details = function (i) { const out = base(i); metaIssueBanner(); return out; };
 })();
 
 // ---- Support replies: orange count on Support in the sidebar -----------------------------------
