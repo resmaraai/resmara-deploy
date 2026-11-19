@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from app.api import api_router
 from app.core.config import settings
 import mimetypes
 import os
+import re
 
 app = FastAPI(title="Resmara API", version="0.2.0",
               # relative so the spec resolves both at /docs (direct) and /resmara/docs (behind the router)
@@ -155,17 +156,46 @@ def robots():
 
 # Serve static frontend at root (after API routes)
 if os.path.isdir("static"):
+    # The browser keeps the script it fetched last week unless the URL changes. A fix that is on
+    # the server but not in the page is a fix the customer cannot see: pressing the same dead
+    # button after a deploy is what "still not working" looks like. Every shipped .js/.css is
+    # therefore requested with ?v=<newest asset mtime>, and the HTML itself is sent no-cache so
+    # the new URLs are actually read.
+    _ASSET_REF = re.compile(r'(src|href)="([^":]+?\.(?:js|css))(?:\?[^"]*)?"')
+
+    def _asset_stamp() -> str:
+        newest = 0.0
+        for root, _dirs, files in os.walk("static"):
+            for name in files:
+                if name.endswith((".js", ".css")):
+                    try:
+                        newest = max(newest, os.path.getmtime(os.path.join(root, name)))
+                    except OSError:
+                        pass
+        return str(int(newest))
+
+    def _index_html() -> HTMLResponse:
+        with open(os.path.join("static", "index.html"), encoding="utf-8") as fh:
+            page = fh.read()
+        stamp = _asset_stamp()
+        page = _ASSET_REF.sub(lambda m: '%s="%s?v=%s"' % (m.group(1), m.group(2), stamp), page)
+        return HTMLResponse(page, headers={"Cache-Control": "no-cache"})
+
+    @app.get("/", include_in_schema=False)
+    def index_page():
+        return _index_html()
+
     # The password-reset link is a real page (mail clients mangle fragments). It is the same
     # single-page app; the script reads ?token= and shows the reset form.
     @app.get("/reset", include_in_schema=False)
     def reset_page():
-        return FileResponse(os.path.join("static", "index.html"))
+        return _index_html()
 
     # The confirmation link in the sign-up email lands here, and the script calls the API with
     # ?token= and shows the result (item 8: confirm the address before the first sign-in).
     @app.get("/confirm", include_in_schema=False)
     def confirm_page():
-        return FileResponse(os.path.join("static", "index.html"))
+        return _index_html()
 
     # The legal pages at the clean URLs Meta asks for. They were only reachable as
     # /privacy.html, and "Privacy policy URL: https://www.resmara.com/privacy" is what the app

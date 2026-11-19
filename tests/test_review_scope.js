@@ -96,8 +96,10 @@ function formWith(values) {
 }
 function freshReview(extra) {
   sandbox.state.campaigns = [{ address: '900 Test Reachability Ln', boostId: 6, scopeFirst: true }];
+  // Stored the way details() stores it: a campaign that came from the API has a boost id and no
+  // reviewId in the browser, which is exactly the case that used to leave activeReview() empty.
   sandbox.state.reviews = {
-    'review-0': Object.assign({
+    'review-boost-6': Object.assign({
       v: 5, approved: false, scopeConfirmed: false, items: [], scopeFirst: true,
       scope: {
         address: '900 Test Reachability Ln', listing: '', media: '', facts: '', highlights: '',
@@ -107,7 +109,7 @@ function freshReview(extra) {
     }, extra || {}),
   };
   sandbox.ReviewStudio.active = 0;
-  return sandbox.state.reviews['review-0'];
+  return sandbox.state.reviews['review-boost-6'];
 }
 
 // ---- tests (async: the permission gate is an await) --------------------------
@@ -128,6 +130,11 @@ ok('garbage in the date box becomes a real date', /^\d{4}-\d{2}-\d{2}$/.test(san
 const rendered = sandbox.campaignScopePanel(freshReview());
 ok('the rendered date input carries a valid value', rendered.includes('value="' + sandbox.goLiveDate('2026-11-02') + '"'));
 ok('the form does not lean on browser validation to explain itself', /<form novalidate/.test(rendered));
+
+// ---- 1b. an API-synced campaign has a review the buttons can actually find ----
+let r0 = freshReview();
+ok('activeReview() finds the review of a campaign with no reviewId', sandbox.activeReview() === r0);
+ok('the scope panel still renders for it', sandbox.campaignScopePanel(sandbox.activeReview()).includes('Confirm details'));
 
 // ---- 2. Confirm details confirms even when the stored date has passed -------
 let r = freshReview();

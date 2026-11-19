@@ -150,7 +150,7 @@ async function campaignReport(property,day){
  // plainly that Meta has not returned data. No sample metric is rendered as real.
  if(Number(property.day)<day)return;
  const campaigns=[...state.campaigns,...examples];
- const review=state.reviews&&state.reviews['review-'+(property.reviewId||campaigns.indexOf(property))];
+ const review=state.reviews&&state.reviews[typeof reviewKey==='function'?reviewKey(property,campaigns.indexOf(property)):'review-'+(property.reviewId||campaigns.indexOf(property))];
  const items=(review&&review.items)||[];
  show(`<span class="eyebrow">SELLER REPORT · DAY ${day}</span><h2>${esc(property.address||'')}</h2><p>Local demo campaign · not connected to a backend boost.</p><div class="home-report-metrics">${reportMetricTiles([['People reached',null],['Engagements',null],['Listing clicks',null],['Ad spend',null]])}</div><div class="check">${items.length} posts scheduled · ${items.filter(item=>item.reviewed).length} spot-checked</div><p class="fine">Meta has not returned data yet. Connect a backend boost to see published, organic and paid figures.</p><div class="modal-actions"><button class="alt" onclick="modal.close()">Close</button></div>`);
 }

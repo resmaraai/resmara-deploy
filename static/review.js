@@ -135,7 +135,11 @@ function sampleReviewItems(c){
 }
 // Demo campaigns use the sample home's designed posts, not the illustration.
 function demoItemImage(i){const P=typeof SAMPLE_POSTS!=='undefined'?SAMPLE_POSTS:null;if(!P)return i%3===0?img2:img;return i<2?P[(SAMPLE_AD.creativeDays||[7])[0]-1].img:P[(i-2)%14].img}
-function activeReview(){return state.reviews['review-'+(([...state.campaigns,...examples][ReviewStudio.active]||{}).reviewId||ReviewStudio.active)]}
+/* The review for the open campaign, looked up the same way details() stores it. For a campaign
+ * that came from the API there is no reviewId in the browser, so a reviewId-only lookup returned
+ * undefined and every button in the launch-details step threw before it could do anything -
+ * another way "Confirm details" and "Build content" did nothing at all. */
+function activeReview(){const c=[...state.campaigns,...examples][ReviewStudio.active]||{};return state.reviews[reviewKey(c,ReviewStudio.active)]}
 function reviewCheck(k,v){const r=activeReview();if(r.approved)return;r[k]=v;persist()}
 function editCampaignItem(i){
  const r=activeReview(),it=r.items[i],slot=reviewSlot(r,it),brand=r.brandProfile||campaignBrandProfile();

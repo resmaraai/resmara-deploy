@@ -277,7 +277,7 @@ function untilSoldPanel(i) {
 }
 function untilSoldInfo(i, from) {
   const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);
-  const r = state.reviews && state.reviews['review-' + (c.reviewId || i)];
+  const r = state.reviews && state.reviews[typeof reviewKey === 'function' ? reviewKey(c, i) : 'review-' + (c.reviewId || i)];
   const budget = r && Number(r.scope && r.scope.budget) > 0 ? Number(r.scope.budget) : 50;
   show(`<span class="eyebrow">RUN IT UNTIL IT SELLS</span><h2>Fresh marketing every 2 weeks, until it’s under contract.</h2><ul class="until-sold-list"><li><b>A brand-new campaign every 2 weeks.</b> 14 new posts and a new ad each round. Nothing is repeated.</li><li><b>Every round gets smarter.</b> Resmara looks at which posts and ad reached the most people and got the most clicks, and builds the next round around what worked.</li><li><b>You stay in control.</b> The next round is ready to look over 3 days before it starts. Change anything you like, or leave it and it goes live on its own.</li><li><b>$39 per renewal</b>, charged to your card on file when the new round is built. Your $${budget} ad budget runs again each round and is billed by Meta, as always.</li><li><b>It stops by itself</b> when your listing shows pending or sold. You can turn it off any time.</li></ul><div class="until-sold-quote"><span class="eyebrow">TELL YOUR SELLERS</span><p>“${UNTIL_SOLD_LINE}”</p></div>${from === 'scope'
     ? `<div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Got it</button></div>`
