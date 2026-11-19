@@ -335,7 +335,7 @@
       boost_id: boostId,
       listing_url: opts.listingUrl || null,
       urls: opts.urls || [],
-      limit: opts.limit || 20,
+      limit: opts.limit || 60,
     });
   }
 

@@ -2,9 +2,13 @@ const $=s=>document.querySelector(s),app=$('#app'),modal=$('#modal');const img='
 
 // The two sample listings every account sees. They are the only campaigns a brand-new
 // account opens on, and they are the same for every customer (owner: Oakridge and Willow).
-const examples=[{address:'1248 Oakridge Drive',area:'Austin, TX · $845,000',day:7,status:'Demo · Active',phase:'active',image:'sample/card-1.jpg'},{address:'76 Willow Lane',area:'Austin, TX · $625,000',day:3,status:'Demo · Republished',phase:'republished',image:'sample/card-2.jpg'}];function dashboard(v='campaigns'){if(window.stopResmaraGuide)stopResmaraGuide();view=v;location.hash='dashboard';app.innerHTML=`<div class="shell"><aside class="sidebar">${logo}<span class="eyebrow" style="margin:16px 12px -15px;color:#52778f">YOUR WORKSPACE</span><nav class="side-nav">${[['campaigns','◫','My campaigns'],['brand','✦','My Brand'],['credits','◇','Billing'],['accounts','◎','Accounts'],['support','✉','Support']].map(([id,icon,label])=>`<button class="${v===id?'active':''}" onclick="dashboard('${id}')">${icon} &nbsp; ${label}</button>`).join('')}</nav>${themeToggle()}${state.priorDemos?.length?'<button class="alt" onclick="restorePriorDemo()">Switch to previous demo</button>':''}<button class="alt" onclick="signOutDemo()">Sign out</button><a class="small" onclick="home()">Back to homepage</a><p class="side-legal"><a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="data-deletion.html" target="_blank" rel="noopener">Data deletion</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></p></aside><main class="main workspace-main"><div id="content"></div></main></div>`;if(v==='accounts')accounts();else if(v==='brand')myBrand();else if(v==='credits')myCredits();else if(v==='support')supportPage();else campaignList()}// Pull the campaigns that actually exist in the API and keep them in the same list as local
+const examples=[{address:'1248 Oakridge Drive',area:'Austin, TX · $845,000',day:7,status:'Demo · Active',phase:'active',image:'sample/card-1.jpg'},{address:'76 Willow Lane',area:'Austin, TX · $625,000',day:3,status:'Demo · Republished',phase:'republished',image:'sample/card-2.jpg'}];function dashboard(v='campaigns'){if(window.stopResmaraGuide)stopResmaraGuide();view=v;openCampaignKey=null;location.hash='dashboard';app.innerHTML=`<div class="shell"><aside class="sidebar">${logo}<span class="eyebrow" style="margin:16px 12px -15px;color:#52778f">YOUR WORKSPACE</span><nav class="side-nav">${[['campaigns','◫','My campaigns'],['brand','✦','My Brand'],['credits','◇','Billing'],['accounts','◎','Accounts'],['support','✉','Support']].map(([id,icon,label])=>`<button class="${v===id?'active':''}" onclick="dashboard('${id}')">${icon} &nbsp; ${label}</button>`).join('')}</nav>${themeToggle()}${state.priorDemos?.length?'<button class="alt" onclick="restorePriorDemo()">Switch to previous demo</button>':''}<button class="alt" onclick="signOutDemo()">Sign out</button><a class="small" onclick="home()">Back to homepage</a><p class="side-legal"><a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="data-deletion.html" target="_blank" rel="noopener">Data deletion</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></p></aside><main class="main workspace-main"><div id="content"></div></main></div>`;if(v==='accounts')accounts();else if(v==='brand')myBrand();else if(v==='credits')myCredits();else if(v==='support')supportPage();else campaignList()}// Pull the campaigns that actually exist in the API and keep them in the same list as local
 // drafts, so a client sees their real campaign after a reload or on another device.
 let liveCampaignsSyncedAt=0;
+// Which campaign page is open, if any. The list only repaints itself while the list is the view.
+let openCampaignKey=null;
+function campaignIndexByBoost(id){return [...state.campaigns,...examples].findIndex(c=>campaignBoostId(c)!=null&&String(campaignBoostId(c))===String(id))}
+function openCampaignByBoost(id){const i=campaignIndexByBoost(id);if(id!=null){view='campaign';openCampaignKey='boost:'+id}details(i>=0?i:0)}
 function liveStatusLabel(b){
  const stage=String((b&&b.stage)||'').toUpperCase();
  if(b&&b.meta_campaign_id)return 'Ad campaign created · paused';
@@ -31,7 +35,7 @@ async function syncLiveCampaigns(){
    if(existing)Object.assign(existing,card);else state.campaigns.push(card);
   });
   persist();
-  if(before!==signature(state.campaigns)&&typeof view!=='undefined'&&view==='campaigns')campaignList();
+  if(before!==signature(state.campaigns)&&typeof view!=='undefined'&&view==='campaigns'&&!openCampaignKey)campaignList();
  }catch(e){}
 }
 // --- Hiding and deleting campaigns -----------------------------------------
@@ -192,39 +196,68 @@ function newCampaign(){if(!state.clientSignedIn){clientAccess();return}if(typeof
  show(`<span class="eyebrow">NEW CAMPAIGN</span><h2>Listing details.</h2><form class="nc-form" data-state="empty" onsubmit="event.preventDefault();ncGo(this)"><span class="nc-title">MLS public listing link</span><p class="field-help nc-sub">Paste the public link your MLS makes when you share a listing with a client.</p><details class="nc-help"><summary>How do I get this link?</summary><p>Every MLS does this a little differently, but the idea is the same:</p><ol><li>Open the listing in your MLS.</li><li>Click <b>Share</b>, <b>Email</b> or <b>Send to client</b>. The name depends on your MLS.</li><li>Choose the option to <b>copy the link</b>. Pick the public or client link, not one that needs your MLS login.</li><li>Check it: open the link in a private browser window. If you can see the listing without signing in, it’s the right one.</li><li>Paste it here.</li></ol><p>If your MLS will only email the listing, send it to yourself and copy the link from that email.</p></details><input name="url" type="url" class="nc-url" aria-label="MLS public listing link" placeholder="https://..." oninput="ncReset(this.form)"><div class="nc-result" role="status" aria-live="polite"></div><div class="nc-address"><span class="nc-title">Property address</span><label class="field">Street address<input name="street" autocomplete="address-line1" oninput="ncReady(this.form)"></label><div class="nc-row3"><label class="field">City<input name="city" autocomplete="address-level2" oninput="ncReady(this.form)"></label><label class="field">State<input name="state" autocomplete="address-level1" maxlength="2" oninput="ncReady(this.form)"></label><label class="field">ZIP<input name="zip" inputmode="numeric" autocomplete="postal-code" maxlength="10" oninput="ncReady(this.form)"></label></div></div><div class="nc-upload"><span class="nc-title">Your photos</span>${ncDrop('files')}<p class="field-help">Upload the ones you want to use, or all of them. Minimum 14; Resmara picks the best 14.</p></div><label class="nc-rights"><input type="checkbox" name="rights" onchange="ncReady(this.form)"><span>I have permission to use these photos and listing details to market this property on social media and in ads.</span></label><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Cancel</button><button class="campaign-primary nc-build" disabled>Check my link</button></div></form>`)}
 // Review copy: listing pages give details and photos; Zillow-type sites that block automated
 // reading give details only; login pages give nothing. Dan's listing reader decides this for real.
-function ncReset(form){form.dataset.state='empty';form.querySelector('.nc-result').innerHTML='';ncReady(form)}
+function ncReset(form){ncCheckSeq+=1;form.dataset.state='empty';form.querySelector('.nc-result').innerHTML='';ncReady(form)}
 function ncGo(form){const st=form.dataset.state;if(st==='ok'||st==='details'||st==='manual'){ncBuild(form);return}ncCheck(form)}
 function ncManual(btn){const form=btn.closest('form');form.dataset.state='manual';btn.closest('.nc-msg').querySelector('.nc-manual').remove();ncReady(form);form.street.focus()}
+// A check writes its result later than the person types, so every check carries a sequence
+// number: an answer from an earlier link must never paint over the link on screen. That is how a
+// new listing ended up showing the previous property's address ("it keeps pulling up the same
+// address") - the first paste's timers landed after the second paste.
+let ncCheckSeq=0;
+function ncTypedAddress(form){
+ const [street,city,st,zip]=['street','city','state','zip'].map(k=>((form[k]&&form[k].value)||'').trim());
+ return street&&city&&st&&zip?street+', '+city+', '+st+' '+zip:'';
+}
+function ncFillAddress(form,address){
+ if(!address||ncTypedAddress(form))return;
+ const m=String(address).match(/^\s*(.+?),\s*([^,]+?),\s*([A-Za-z]{2})\s*(\d{5})?\s*$/);
+ if(!m)return;
+ const set=(k,v)=>{if(form[k]&&!form[k].value){form[k].value=v;form[k].dispatchEvent(new Event('input',{bubbles:true}))}};
+ set('street',m[1].trim());set('city',m[2].trim());set('state',m[3].toUpperCase());set('zip',m[4]||'');
+}
 function ncCheck(form){
+ ncCheckSeq+=1;const seq=ncCheckSeq;
  const url=form.url.value.trim(),out=form.querySelector('.nc-result');let host='';try{host=new URL(url).hostname}catch{}
- const fail=why=>{form.dataset.state='none';out.innerHTML=`<div class="nc-msg no"><b>We can’t get what we need from this link.</b>${why} Please use another link, or enter the details yourself and upload your photos.<button type="button" class="nc-manual" onclick="ncManual(this)">Enter it manually</button></div>`;ncReady(form)};
+ const fresh=()=>seq===ncCheckSeq&&form.isConnected&&form.url.value.trim()===url;
+ const fail=why=>{if(!fresh())return;form.dataset.state='none';out.innerHTML=`<div class="nc-msg no"><b>We can’t get what we need from this link.</b>${why} Please use another link, or enter the details yourself and upload your photos.<button type="button" class="nc-manual" onclick="ncManual(this)">Enter it manually</button></div>`;ncReady(form)};
  if(!host||!host.includes('.')){fail(' It doesn’t look like a complete web link.');return}
  form.dataset.state='checking';ncReady(form);
  out.innerHTML=`<div class="nc-msg wait nc-walk"><b>Resmara is checking your link…</b><div class="nc-steps"><span class="robot-avatar nc-bot" aria-hidden="true"></span><ul class="link-checks"><li data-k="open" class="now">Opening the link…</li><li data-k="details">Looking for the home’s details…</li><li data-k="photos">Looking for the photos…</li><li data-k="video">Looking for a video…</li></ul></div></div>`;
  const unreadable=/login|signin|sign-in|my\.flexmls/i.test(url),noPhotos=/zillow|realtor\.com|redfin|trulia|homes\.com/i.test(host);
- const hasVideo=/video|tour/i.test(url),order=['open','details','photos','video'],bot=out.querySelector('.nc-bot');const mark=(k,ok,t)=>{const li=out.querySelector(`[data-k=${k}]`);if(li){li.className=ok?'ok':'no';li.textContent=t}const nx=out.querySelector(`[data-k=${order[order.indexOf(k)+1]}]`);if(nx&&bot){nx.classList.add('now');bot.style.transform=`translateY(${nx.offsetTop}px)`}};
+ const hasVideo=/video|tour/i.test(url),order=['open','details','photos','video'],bot=out.querySelector('.nc-bot');const mark=(k,ok,t)=>{if(!fresh())return;const li=out.querySelector(`[data-k=${k}]`);if(li){li.className=ok?'ok':'no';li.textContent=t}const nx=out.querySelector(`[data-k=${order[order.indexOf(k)+1]}]`);if(nx&&bot){nx.classList.add('now');bot.style.transform=`translateY(${nx.offsetTop}px)`}};
  setTimeout(()=>mark('open',!unreadable,unreadable?'This link needs an MLS sign-in':'Link opened'),800);
  setTimeout(()=>mark('details',!unreadable,unreadable?'Couldn’t read the home’s details':'Found the home’s details'),1600);
  setTimeout(()=>{
-  mark('photos',!(unreadable||noPhotos),unreadable||noPhotos?'Couldn’t get the photos':'Found 24 photos');
+  mark('photos',!(unreadable||noPhotos),unreadable||noPhotos?'Couldn’t get the photos':'Photos will come from this link');
   setTimeout(()=>{
   const vid=hasVideo&&!unreadable&&!noPhotos;
   mark('video',true,vid?'Found a listing video':'No video, so your ad will be a photo carousel');
   setTimeout(()=>{
-   draft={url,address:listingAddressFromLink(url),addressSource:'link',photoSource:'listing',media:url,photos:[],hasVideo:vid};
+   if(!fresh())return;
+   const linkAddress=listingAddressFromLink(url);
+   ncFillAddress(form,linkAddress);
+   // A typed address wins over the one guessed from the link: the agent knows the property,
+   // and the link slug is a guess. This is the field the campaign is created with.
+   draft={url,address:ncTypedAddress(form)||linkAddress,addressSource:ncTypedAddress(form)?'manual':'link',photoSource:'listing',media:url,photos:[],hasVideo:vid};
    if(unreadable){fail(' It needs an MLS sign-in to open.')}
    else if(noPhotos){form.dataset.state='details';out.innerHTML=`<div class="nc-msg part"><b>We have the home’s details, but we can’t get the photos from this link.</b>Upload your photos below and you’re ready to go.</div>`;ncReady(form)}
-   else{form.dataset.state='ok';out.innerHTML=`<div class="nc-msg ok"><span class="robot-avatar" aria-hidden="true"></span><div><b>Green light.</b> We have the home’s details and 24 photos${vid?', plus a listing video. Your video will be your ad and your first post.':'.'} You’re ready to build.</div></div>`;ncReady(form)}
+   else{form.dataset.state='ok';out.innerHTML=`<div class="nc-msg ok"><span class="robot-avatar" aria-hidden="true"></span><div><b>Green light.</b> We have the home’s details. Resmara pulls the photos from this link when it builds, and tells you how many it got${vid?'; the listing video becomes your first post.':'.'} You’re ready to build.</div></div>`;ncReady(form)}
   },500);
   },800);
  },2400);
 }
+
 function ncReady(form){const st=form.dataset.state,n=form.files.files.length,addr=['street','city','state','zip'].every(k=>form[k].value.trim()),btn=form.querySelector('.nc-build');
  const build=st==='ok'||st==='details'||st==='manual';
  btn.textContent=st==='checking'?'Checking…':build?'Build my campaign · $49':'Check my link';
  btn.disabled=(build&&!form.rights.checked)||st==='checking'||(st==='empty'&&!form.url.value.trim())||(st==='none')||(st==='details'&&n<14)||(st==='manual'&&!(n>=14&&addr))}
 function ncBuild(form){const st=form.dataset.state;if(!form.rights.checked)return;draft.photoRightsConfirmed=new Date().toISOString();
- if(st==='manual')Object.assign(draft,{address:[form.street.value.trim(),form.city.value.trim(),form.state.value.trim()+' '+form.zip.value.trim()].join(', '),addressSource:'manual'});
+ // The typed address is the one that gets built, whatever the link slug said: filling those
+ // fields is the agent correcting the listing, and ignoring them is how a campaign kept being
+ // created for the previous property even though a different address was typed.
+ const typedAddress=ncTypedAddress(form);
+ if(typedAddress)Object.assign(draft,{address:typedAddress,addressSource:'manual'});
+ else if(st==='manual')Object.assign(draft,{address:[form.street.value.trim(),form.city.value.trim(),form.state.value.trim()+' '+form.zip.value.trim()].join(', '),addressSource:'manual'});
  if(st!=='ok')Object.assign(draft,{photoSource:'upload',uploadCount:form.files.files.length});
  reviewDraft()}
 // Photos: from the listing link (when the form offers it), a photo link, or an upload.
@@ -278,7 +311,7 @@ function reviewDraft(){
  show(`<h2>Reading your listing…</h2><p role="status">One moment.</p><button hidden id="start-campaign-scope" type="button">Start campaign</button>`);
  startCampaignScope(modal.querySelector('#start-campaign-scope'));
 }
-function saveDraft(paidDraft){if(!paidDraft?.scopeFirst){reviewDraft();return;}state.campaigns.unshift({...paidDraft,reviewId:Date.now().toString(),status:'Draft',day:0});persist();modal.close();dashboard('campaigns');details(0);toast('Your campaign is ready. Confirm your launch details to build it.')}
+function saveDraft(paidDraft){if(!paidDraft?.scopeFirst){reviewDraft();return;}state.campaigns.unshift({...paidDraft,reviewId:Date.now().toString(),status:'Draft',day:0});persist();modal.close();dashboard('campaigns');openCampaignByBoost(paidDraft.boostId);toast('Your campaign is ready. Confirm your launch details to build it.')}
 // The sign-up confirmation link (item 8). It calls the API straight from the URL, so the link
 // works in whatever browser it is opened in - including one that has never seen Resmara.
 function confirmPage(token){
@@ -346,7 +379,7 @@ function demoBuildCampaign(){
  steps.forEach((t,i)=>setTimeout(()=>{if(!status.isConnected)return;status.classList.remove('in');setTimeout(()=>{status.innerHTML='<span class="build-tick">✓</span> '+t;status.classList.add('in')},250);go(Math.round((i+1)/steps.length*100))},per*i+400));
  setTimeout(()=>{if(state===account&&state.clientSignedIn&&modal.open&&status.isConnected)saveBuiltCampaign(paidDraft)},per*steps.length+900);
 }
-function saveBuiltCampaign(c){state.campaigns.unshift({start:typeof nextCampaignDate==='function'?nextCampaignDate():undefined,...c,reviewId:Date.now().toString(),status:'Draft',day:0});persist();modal.close();dashboard('campaigns');details(0);toast('Your campaign is built. Set your go-live date, then review and approve it.')}
+function saveBuiltCampaign(c){state.campaigns.unshift({start:typeof nextCampaignDate==='function'?nextCampaignDate():undefined,...c,reviewId:Date.now().toString(),status:'Draft',day:0});persist();modal.close();dashboard('campaigns');openCampaignByBoost(c&&c.boostId);toast('Your campaign is built. Set your go-live date, then review and approve it.')}
 
 function demoAddressMatches(value){
  const words=value.toLowerCase().match(/[a-z0-9]+/g)||[];
@@ -485,7 +518,7 @@ async function startCampaignScope(button){
   // empty gallery here means a text-only calendar later. A bot-walled listing is not fatal.
   if(progress?.isConnected)progress.textContent='Finding the photos on your listing…';
   try{
-   const pulled=await RM.importPhotos(boost.id,{listingUrl:submitted.url||undefined,urls:[...(submitted.photos||[])].slice(0,20),limit:20});
+   const pulled=await RM.importPhotos(boost.id,{listingUrl:submitted.url||undefined,urls:[...(submitted.photos||[])].slice(0,60),limit:60});
    if(progress?.isConnected&&pulled&&pulled.imported)progress.textContent='Imported '+pulled.imported+' listing photos. Linking your ad account…';
   }catch(photoError){/* keep going: the photos can be added from the campaign page */}
   liveCampaignsSyncedAt=0;

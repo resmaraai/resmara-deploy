@@ -177,6 +177,24 @@ def main() -> int:
     )
     spark = photos.spark_photo_urls(SPARK_PAGE, limit=20)
     check("a Flexmls gallery keeps every photo of the listing", len(spark) == 3, str(spark))
+
+    # --- a 52-photo listing must import 52, not 20 ---------------------------------------
+    # Flexmls' own share link for 892 Coggins St carried 52 photos and the campaign ended up
+    # with exactly 20: the importer's default was 20, the endpoint clamped every request to 20,
+    # and three callers asked for 20 by hand. A gallery is not a sample.
+    LISTING_52 = "".join(
+        f'<img src="https://cdn.resize.sparkplatform.com/sha/1280x1024/true/202606032029'
+        f'{m:06d}0159000000-o.jpg">'
+        for m in range(52)
+    )
+    big = photos.spark_photo_urls(LISTING_52, limit=photos.DEFAULT_LIMIT)
+    check("a 52-photo gallery is read whole", len(big) == 52, str(len(big)))
+    check("the default limit is above one listing's gallery", photos.DEFAULT_LIMIT >= 52,
+          str(photos.DEFAULT_LIMIT))
+    check("the ceiling still guards a page listing a whole office", photos.MAX_LIMIT >= 60,
+          str(photos.MAX_LIMIT))
+    check("an explicit small limit is still honoured",
+          len(photos.spark_photo_urls(LISTING_52, limit=5)) == 5)
     check("the 640px copy of a photo is dropped for the 1280px one",
           all("/1280x1024/" in u for u in spark), str(spark))
     check("the carousel of other listings is not imported",
