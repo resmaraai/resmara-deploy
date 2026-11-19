@@ -59,11 +59,13 @@ def main() -> int:
                "side": "front end", "commit": "", "url": "https://github.com/x/pull/12",
                "deploy": None, "backend_tasks": []}
     pr_live = {"number": 11, "title": "Card on file", "state": "merged",
+               "merged_at": "2026-11-18T15:47:42Z",
                "side": "front end + back end", "commit": "aaaa111", "url": "https://github.com/x/pull/11",
                "deploy": "live", "live_at": "2026-11-19T01:11:31Z",
                "backend_tasks": ["POST /api/billing/card: setup-mode checkout",
                                  "app/services/billing.py: charge the saved card"]}
     pr_waiting = {"number": 13, "title": "Dark mode fixes", "state": "merged",
+                  "merged_at": "2026-11-18T19:18:12Z",
                   "side": "front end", "commit": "bbbb222", "url": "https://github.com/x/pull/13",
                   "deploy": "waiting",
                   "backend_tasks": ["POST /api/billing/card: setup-mode checkout",
@@ -165,6 +167,7 @@ def main() -> int:
         db.commit()
         fourth = sync(db, payload("cccc333", [{
             "number": 14, "title": "Broken build", "state": "merged", "side": "back end",
+            "merged_at": "2026-11-19T08:00:00Z",
             "commit": "eeee555", "url": "https://github.com/x/pull/14", "deploy": "failed",
             "backend_tasks": []}]))
         db.commit()
@@ -177,6 +180,7 @@ def main() -> int:
     print("PR #12 merges")
     with SessionLocal() as db:
         sync(db, payload("eeee555", [{**pr_open, "state": "merged", "commit": "ffff666",
+                                      "merged_at": "2026-11-19T09:30:00Z",
                                       "deploy": "deploying"}]))
         db.commit()
         review = row(db, "Review PR #12")
@@ -184,6 +188,24 @@ def main() -> int:
     check("merged PR closes its review task", review.status == "done", review.status)
     check("and opens a release task", release is not None and release.status == "doing",
           release.status if release else "missing")
+
+    # ── closed without merging: no release row, and the review row says why ─────────
+    print("a pull request is closed without merging")
+    pr15 = {"number": 15, "title": "Abandoned idea", "state": "open", "side": "front end",
+            "commit": "", "url": "https://github.com/x/pull/15", "deploy": None,
+            "backend_tasks": []}
+    with SessionLocal() as db:
+        sync(db, payload("ffff666", [pr15]))
+        db.commit()
+    with SessionLocal() as db:
+        sync(db, payload("ffff666", [{**pr15, "state": "merged", "merged_at": None, "deploy": None}]))
+        db.commit()
+        r15 = row(db, "Review PR #15")
+        rel15 = row(db, "Release #15")
+    check("the review row closes", r15.status == "done", r15.status)
+    check("and says it was closed, not merged", "closed without merging" in (r15.notes or ""),
+          (r15.notes or "")[-60:])
+    check("a closed pull request makes no release row", rel15 is None)
 
     # ── the endpoint is machine-only ────────────────────────────────────────────────
     print("the endpoint")

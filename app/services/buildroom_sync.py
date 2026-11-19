@@ -133,6 +133,10 @@ def sync(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
             continue
         seen_prs.append(pr)
         state = rel.get("state") or "open"
+        # The Releases payload says "merged" for anything not open, which includes a pull request
+        # that was closed without merging. Only ``merged_at`` is evidence of a release; treating
+        # a closed PR as one would put a row on the board that can never go live.
+        merged = bool(rel.get("merged_at"))
         deploy = rel.get("deploy") or ("waiting" if state != "open" else "open")
         area = _area(rel.get("side") or "")
         title = (rel.get("title") or "").strip()
@@ -159,7 +163,8 @@ def sync(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
                     changed["status"].append(f"#{review.id} {review.status}->todo")
                     review.status = "todo"
         elif review is not None and review.status != "done":
-            _append(review, f"merged as {sha}" if sha else "merged")
+            _append(review, f"merged as {sha}" if merged and sha else ("merged" if merged
+                                                                     else "closed without merging"))
             if not review.claimed_by and not (review.tested_by and review.tested_by != SYNC_BY):
                 changed["status"].append(f"#{review.id} {review.status}->done")
                 review.status = "done"
@@ -186,7 +191,7 @@ def sync(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
                 changed["created"].append(existing[key].title)
 
         # --- a merged pull request: a release row that closes when it is really live ----
-        if state == "open":
+        if state == "open" or not merged:
             continue
         key = (pr, "release", 0)
         release = existing.get(key)
