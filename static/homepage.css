@@ -1147,3 +1147,11 @@ html.dark .shell .side-nav button,html.dark .shell .side-nav button.active{color
 html.dark .shell .campaign-step-title>span.fold-chev{border-color:#fff}
 html.dark .shell .live-cal summary.campaign-step-title{color:#fff!important}
 html.dark .shell .review-month-cell:not(.outside-month),html.dark .shell .review-month-date:not(.outside-month){background:transparent!important}
+/* Section headings: one lighter weight everywhere, and the live sections share one frame so the
+   numbers and chevrons line up straight down the page, open or closed */
+h2.campaign-step-title,summary.campaign-step-title,.campaign-step-title{font-family:'Archivo Black','Arial Black',sans-serif!important;font-weight:400!important;font-size:24px!important;letter-spacing:-.4px!important;line-height:1.2!important}
+.fold{padding:22px 26px!important;margin:0 0 20px!important}
+.fold .campaign-step-title{margin:0 0 8px!important;padding:0!important;gap:12px!important}
+.fold.folded .campaign-step-title{margin:0!important}
+.fold .leads-head{margin:0 0 8px}
+.fold .fold-chev{margin:0 6px 0 auto!important}
