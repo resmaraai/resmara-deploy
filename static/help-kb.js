@@ -33,7 +33,7 @@ var HELP_KB = [
     a: 'Resmara posts to your own Page and Instagram and runs ads from your own ad account, so it can’t do anything until they’re connected. You can book a free setup session if you’d like a hand.' },
   { id: 'ig-personal', topic: 'Your Meta account', q: 'It says my Instagram isn’t a business account.',
     keys: ['instagram isn', 'personal account', 'business account', 'professional account', 'creator'],
-    a: 'In the Instagram app go to Settings › Account type and tools › Switch to professional account, then link it to your Facebook Page. Once you’ve done this, come back to Accounts and click Check connection.' },
+    a: 'Click Switch it now in the red box at the top of your dashboard. It opens Facebook’s linked accounts page, where you click Connect account next to Instagram and choose Business when Facebook asks. That switches your account and links it to your Page in about a minute, and you keep all your posts and followers. Then come back and click Check again. Prefer help? Book a free setup call.' },
   { id: 'not-admin', topic: 'Your Meta account', q: 'It says I’m not an admin of the Page.',
     keys: ['admin', 'not an admin', 'page access', 'full control', 'manage the page'],
     a: 'Ask whoever manages the Page to give you full control (admin) in the Page’s settings, then come back here and click Check connection.' },

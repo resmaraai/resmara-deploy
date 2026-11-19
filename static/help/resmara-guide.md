@@ -134,8 +134,9 @@ the calendar updates. If it still fails, the team sees it and replies on Support
   - Instagram must be a Business or Creator (professional) account, linked to that Page.
   - An ad account with a payment method in Meta Ads Manager.
 - Common messages and fixes — after fixing, come back to Accounts and click **Check again**:
-  - "Instagram isn't a business account": in the Instagram app, Settings → Account type and tools →
-    Switch to professional account, then link it to the Page.
+  - "Instagram isn't a business account": click Switch it now (in the red box or the connection
+    check). It opens facebook.com/settings/?tab=linked_instagram; click Connect account, choose
+    Business when asked, and Facebook switches and links it to the Page. Then Check again.
   - "You're not an admin of the Page": ask the Page owner to give you full control in the Page's
     settings.
   - "No ad account ready": open Meta Ads Manager and add a payment method.

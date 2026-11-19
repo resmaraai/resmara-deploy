@@ -1193,3 +1193,22 @@ html.dark #modal .withdrawn-note{color:#fff}
 .meta-issue-check{background:#7f1a14!important;color:#fff!important}
 html.dark .shell .meta-issue,html.dark .shell .meta-issue *{color:#fff}
 html.dark .shell .meta-issue .meta-issue-book{color:#b3261e!important}
+
+/* Instagram switch pop-up */
+.ig-switch-btn{display:inline-block;margin-left:6px;padding:3px 10px;border:0;border-radius:999px;background:#d94c0d;color:#fff;font:600 12px/1.5 inherit;cursor:pointer;vertical-align:1px}
+.ig-switch-btn:hover{background:#b93f09}
+.meta-issue .ig-switch-btn{background:#fff;color:#b3261e}
+.ig-switch-facts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
+.ig-switch-facts>div{background:#eef5f8;border-radius:10px;padding:10px 12px;font-size:14px;color:#12354d}
+.ig-switch-steps{list-style:none;padding:0;margin:14px 0;display:grid;gap:10px}
+.ig-switch-steps li{display:flex;gap:12px;align-items:flex-start;color:#12354d}
+.ig-switch-steps li>span{flex:0 0 26px;height:26px;border-radius:50%;background:#12354d;color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+.ig-switch-go{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+a.ig-switch-open{text-decoration:none;display:inline-flex;align-items:center}
+html.dark .ig-switch-facts>div{background:#143a50;color:#fff}
+html.dark .ig-switch-steps li{color:#fff}
+html.dark .ig-switch-steps li>span{background:#fff;color:#12354d}
+@media(max-width:560px){.ig-switch-facts{grid-template-columns:1fr}}
+#modal a.ig-switch-open{background:#d94c0d;color:#fff!important;border-radius:999px;padding:12px 20px;font-weight:600;font-size:15px}
+#modal a.ig-switch-open:hover{background:#b93f09}
+#modal .modal-actions button.ig-switch-btn,#modal button.ig-switch-btn{padding:3px 12px!important;font-size:12px!important;min-height:0!important;margin:4px 0 0 6px;width:auto}

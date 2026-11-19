@@ -32,7 +32,7 @@ const OB_SCENARIOS = {
 const OB_FIX = [
   ['No Facebook business Page found', 'Resmara posts to a Facebook business Page, not your personal profile. You’ll need a Page for your real estate business.'],
   ['You aren’t an admin of the Page', 'You need full control of the Page. Ask whoever manages it to make you an admin, or have them connect Resmara.'],
-  ['Instagram isn’t a business account', 'Switch your Instagram to a professional (business) account in Instagram’s settings and link it to your Facebook Page.'],
+  ['Instagram isn’t a business account', 'Facebook can switch it to a business account for you while it links it to your Page. It takes about a minute.'],
   ['No ad account ready to run ads', 'Your listing ads run from your own Meta ad account, with a card on file so Meta can bill your ad budget.']
 ];
 
@@ -86,7 +86,7 @@ function obCheck(scenario) {
 function obNeedsSetup(idx) {
   state.obIssues = idx; persist();
   const pageOk = !idx.includes(0) && !idx.includes(1);
-  const issues = idx.map(i => `<b>${OB_FIX[i][0]}.</b> ${OB_FIX[i][1]}`);
+  const issues = idx.map(i => `<b>${OB_FIX[i][0]}.</b> ${OB_FIX[i][1]}${i === 2 ? ' <button type="button" class="ig-switch-btn" onclick="obIgSwitch()">Switch it now</button>' : ''}`);
   show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>${pageOk ? 'You’re connected, with a couple of limits.' : 'Almost there.'}</h2>
   ${pageOk ? `<div class="nc-msg ok"><span class="robot-avatar"></span><div><b>Your Facebook Page is connected.</b> ${metaLimitLine(idx)}</div></div><p>To get the most from Resmara, fix these when you can:</p>` : '<p>Resmara can’t find a Facebook Page it can post to yet. You can still set up your account and look around while you sort it out:</p>'}
   <ul class="ob-issues">${issues.map(i => `<li>${i}</li>`).join('')}</ul>
@@ -106,7 +106,28 @@ function metaIssueBanner() {
   const idx = state.metaIssues || [];
   const box = document.querySelector('#content');
   if (!box || !idx.length || box.querySelector('.meta-issue')) return;
-  box.insertAdjacentHTML('afterbegin', `<div class="meta-issue" role="alert"><b class="meta-issue-title">There’s an issue with your Meta account.</b><ul>${idx.map(i => `<li>${META_ISSUE_SHORT[i]}.</li>`).join('')}</ul><p>${metaLimitLine(idx)}</p><div class="meta-issue-actions"><button type="button" class="meta-issue-book" onclick="obBook()">Book a call to fix it</button><button type="button" class="meta-issue-check" onclick="onboard(0)">Check again</button></div></div>`);
+  box.insertAdjacentHTML('afterbegin', `<div class="meta-issue" role="alert"><b class="meta-issue-title">There’s an issue with your Meta account.</b><ul>${idx.map(i => `<li>${META_ISSUE_SHORT[i]}.${i === 2 ? ' <button type="button" class="ig-switch-btn" onclick="obIgSwitch()">Switch it now</button>' : ''}</li>`).join('')}</ul><p>${metaLimitLine(idx)}</p><div class="meta-issue-actions"><button type="button" class="meta-issue-book" onclick="obBook()">Book a call to fix it</button><button type="button" class="meta-issue-check" onclick="onboard(0)">Check again</button></div></div>`);
+}
+
+// Meta doesn't let apps switch an Instagram to Professional, but Facebook's own "Connect account"
+// flow does it while linking the Instagram to the Page. This explains it, then opens that page.
+const IG_LINK_SETTINGS = 'https://www.facebook.com/settings/?tab=linked_instagram';
+function obIgSwitch() {
+  const back = state.brandBuilt ? 'modal.close()' : 'obNeedsSetup(state.obIssues||[2])';
+  const again = state.brandBuilt ? 'onboard(0)' : "obCheck('ready')";
+  show(`<span class="eyebrow">ABOUT A MINUTE</span><h2>Switch your Instagram to a business account.</h2>
+  <p>Meta only lets apps like Resmara post to business (Professional) Instagram accounts. Facebook can switch yours for you while it links it to your Page.</p>
+  <div class="ig-switch-facts"><div><b>It’s free.</b> It takes about a minute.</div><div><b>Nothing is lost.</b> Your posts and followers stay.</div><div><b>You gain a Contact button</b> and stats on every post.</div><div><b>Your account must be public</b> for business accounts.</div></div>
+  <ol class="ig-switch-steps">
+    <li><span>1</span><div><b>Open Facebook.</b> The button below opens Facebook’s linked accounts page in a new tab.</div></li>
+    <li><span>2</span><div><b>Act as your business Page.</b> If Facebook shows your personal profile, switch to your Page first.</div></li>
+    <li><span>3</span><div><b>Click Connect account</b> next to Instagram and sign in to your Instagram.</div></li>
+    <li><span>4</span><div><b>Follow Facebook’s prompts.</b> When it asks, choose Business. That switches your account and links it to your Page.</div></li>
+    <li><span>5</span><div><b>Come back here</b> and click Check again.</div></li>
+  </ol>
+  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="${back}">Back</button><div class="ig-switch-go"><button type="button" class="nc-cancel" onclick="${again}">Check again</button><a class="campaign-primary ig-switch-open" href="${IG_LINK_SETTINGS}" target="_blank" rel="noopener">Open Facebook to switch</a></div></div>
+  <p class="fine">Stuck? <a href="#" onclick="obBook();return false">Book a free setup call</a> and we’ll do it with you.</p>`);
+  modal.classList.add('wide-modal'); modal.dataset.gate = 'meta';
 }
 
 // Free setup session: the real Calendly booking page, right in the pop-up.
