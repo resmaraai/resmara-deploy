@@ -1,4 +1,5 @@
-// Social leads: comments on the campaign's posts and ad that read like buying interest.
+// Campaign leads: people who asked about the home on its Resmara listing page (the form or the
+// call button) and comments on the campaign's posts and ad that read like buying interest.
 // The server reads Meta and judges the comments (app/services/leads.py); this file shows what it
 // found and writes back the agent's own actions. Until Nov 2026 this panel was a mockup: sample
 // comments for the demo campaigns and a localStorage list for real ones, so a lead seen on a
@@ -18,6 +19,8 @@ function leadsIsServer(c) { return typeof campaignBoostId === 'function' && camp
 
 const DEMO_LEADS = {
   '1248 Oakridge Drive': [
+    { source: 'web', name: 'Emily Carter', where: 'Listing page form', ago: '40m ago', text: 'We’re relocating from Denver in January. Could we tour this Saturday morning?', email: 'emily.carter@example.com', phone: '(512) 555-0193' },
+    { source: 'call', name: 'Call from (512) 555-0127', where: 'Listing page call button', ago: '3h ago', text: 'Tapped Call on your listing page.', phone: '(512) 555-0127' },
     { name: 'Sarah Mitchell', where: 'Instagram', post: 'Where summer actually happens', ago: '2h ago', text: 'Is this still available? We’d love to see it this weekend.' },
     { name: 'James Ortega', where: 'Facebook ad', post: 'The day starts at the threshold', ago: '5h ago', text: 'What’s the asking price? And is the pool heated?' },
     { name: 'Priya Shah', where: 'Facebook', post: 'How much room is enough?', ago: 'Yesterday', text: 'Sending this to my husband. Do you have a virtual tour?' }
@@ -75,7 +78,8 @@ function leadFromServer(row) {
     where: row.channel || (row.platform === 'instagram' ? 'Instagram' : 'Facebook'),
     ago: leadTimeAgo(row.comment_at || row.created_at), text: row.text || '',
     post: row.post_label || '', done: row.status === 'handled', status: row.status || 'new',
-    permalink: row.permalink || null };
+    permalink: row.permalink || null,
+    source: row.source || 'comment', email: row.email || '', phone: row.phone || '' };
 }
 function ensureLeads(c, index) {
   const cache = leadCache(c);
@@ -122,20 +126,24 @@ function leadsPanel(c, index) {
   } else if (server && cache && cache.error) {
     body = `<p class="leads-empty">Could not check for comments just now: ${esc(cache.error)}</p>`;
   } else if (leads.length) {
-    body = `<ul class="leads-list">${leads.map((l, i) => `<li class="${l.done ? 'done' : ''}">
-    <span class="lead-av">${esc(initials(l.name))}</span>
-    <div class="lead-body"><b>${esc(l.name)}</b><span class="lead-where">${esc(l.where)} · ${esc(l.ago)}</span><p>“${esc(l.text)}”</p>${l.post ? `<small>On: ${esc(l.post)}</small>` : ''}</div>
+    const row = (l, i) => `<li class="${l.done ? 'done' : ''}">
+    <span class="lead-av${l.source === 'web' || l.source === 'call' ? ' web' : ''}">${esc(initials(l.name))}</span>
+    <div class="lead-body"><b>${esc(l.name)}</b><span class="lead-where">${esc(l.where)} · ${esc(l.ago)}</span><p>${l.source === 'call' ? esc(l.text) : '“' + esc(l.text) + '”'}</p>${(l.email || l.phone) && l.source !== 'call' ? `<small class="lead-contact">${[l.email, l.phone].filter(Boolean).map(esc).join(' · ')}</small>` : ''}${l.post ? `<small>On: ${esc(l.post)}</small>` : ''}</div>
     <div class="lead-actions"><button type="button" class="lead-tick" title="${l.done ? 'Mark as new' : 'Mark as handled'}" aria-pressed="${l.done}" onclick="toggleLead(${index},${i})">${l.done ? '✓ Handled' : '✓ Mark handled'}</button><button type="button" class="lead-remove" title="Not a lead" aria-label="Remove lead" onclick="removeLead(${index},${i})">✕</button></div>
-  </li>`).join('')}</ul>`;
+  </li>`;
+    const fromPage = leads.map((l, i) => [l, i]).filter(([l]) => l.source === 'web' || l.source === 'call');
+    const fromSocial = leads.map((l, i) => [l, i]).filter(([l]) => !(l.source === 'web' || l.source === 'call'));
+    body = `<h3 class="leads-group">From your listing page</h3>${fromPage.length ? `<ul class="leads-list">${fromPage.map(([l, i]) => row(l, i)).join('')}</ul>` : '<p class="leads-empty">No form or call leads yet.</p>'}
+    <h3 class="leads-group">From your posts and ad</h3>${fromSocial.length ? `<ul class="leads-list">${fromSocial.map(([l, i]) => row(l, i)).join('')}</ul>` : '<p class="leads-empty">No comment leads yet.</p>'}`;
   } else {
-    body = '<p class="leads-empty">No leads yet. When someone comments with interest in the home, they show up here.</p>';
+    body = '<p class="leads-empty">No leads yet. When someone fills in the form or taps Call on your listing page, or comments with interest in the home, they show up here.</p>';
   }
   const scan = server ? (cache && cache.scan) : null;
   const scanLine = server
     ? `<p class="fine">${scan && scan.checked_at ? 'Last checked ' + esc(leadTimeAgo(scan.checked_at)) : 'Not checked yet.'}${scan && scan.note ? ' · ' + esc(scan.note) : ''}</p>`
     : '';
   return `<section class="panel leads-panel" id="leads">
-  <div class="leads-head"><div><h2 class="campaign-step-title"><span>1</span> Social leads ${open ? `<span class="lead-count">${open} new</span>` : ''}</h2><p class="fine">People who commented on your posts or ad and sound interested in the home. Resmara emails you the moment one comes in.</p>${scanLine}</div><div class="leads-head-btns">${server ? `<button type="button" class="leads-email" onclick="checkLeadsNow(${index})">Check now</button>` : ''}<button type="button" class="leads-email" onclick="previewLeadEmail(${index})">See the alert email</button></div></div>
+  <div class="leads-head"><div><h2 class="campaign-step-title"><span>1</span> Campaign leads ${open ? `<span class="lead-count">${open} new</span>` : ''}</h2><p class="fine">People who asked about the home on your listing page, and people who commented on your posts or ad and sound interested. Resmara emails you the moment one comes in.</p>${scanLine}</div><div class="leads-head-btns">${server ? `<button type="button" class="leads-email" onclick="checkLeadsNow(${index})">Check now</button>` : ''}<button type="button" class="leads-email" onclick="previewLeadEmail(${index})">See the alert email</button></div></div>
   ${body}
   <button type="button" class="lead-add" onclick="addLead(${index})">＋ Add a lead</button>
 </section>`;
@@ -175,7 +183,7 @@ function removeLead(index, i) {
 }
 function refreshLeads(index) { const c = [...state.campaigns, ...examples][index], el = document.querySelector('#leads'); if (el) el.outerHTML = leadsPanel(c, index); }
 function addLead(index) {
-  show(`<span class="eyebrow">SOCIAL LEADS</span><h2>Add a lead.</h2><form onsubmit="event.preventDefault();saveLead(${index},this)"><label class="field">Name<input name="name" required placeholder="Who is it?"></label><label class="field">Where<select name="where"><option>Instagram</option><option>Facebook</option><option>Facebook ad</option><option>Phone or text</option><option>Email</option><option>Other</option></select></label><label class="field">What they said<textarea name="text" rows="3" required></textarea></label><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Cancel</button><button class="campaign-primary">Add lead</button></div></form>`);
+  show(`<span class="eyebrow">CAMPAIGN LEADS</span><h2>Add a lead.</h2><form onsubmit="event.preventDefault();saveLead(${index},this)"><label class="field">Name<input name="name" required placeholder="Who is it?"></label><label class="field">Where<select name="where"><option>Instagram</option><option>Facebook</option><option>Facebook ad</option><option>Phone or text</option><option>Email</option><option>Other</option></select></label><label class="field">What they said<textarea name="text" rows="3" required></textarea></label><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Cancel</button><button class="campaign-primary">Add lead</button></div></form>`);
 }
 function saveLead(index, form) {
   const c = [...state.campaigns, ...examples][index];
@@ -266,8 +274,8 @@ function untilSoldButton(c) {
   if (!campaignIsLive(c) || campaignPhase(c) === 'completed') return '';
   const i = [...state.campaigns, ...examples].indexOf(c);
   return untilSoldOn(c)
-    ? `<button type="button" class="card-pause until-sold-on" onclick="untilSoldInfo(${i},'card')">Until it sells · On</button>`
-    : `<button type="button" class="card-pause" onclick="untilSoldInfo(${i},'card')">Until it sells</button>`;
+    ? `<button type="button" class="card-pause until-sold-on" onclick="untilSoldInfo(${i},'card')" title="A fresh campaign every 2 weeks until it’s under contract">✓ Running until sold</button>`
+    : `<button type="button" class="card-pause" onclick="untilSoldInfo(${i},'card')" title="A fresh campaign every 2 weeks until it’s under contract">Run until sold</button>`;
 }
 function untilSoldPanel(i) {
   const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);

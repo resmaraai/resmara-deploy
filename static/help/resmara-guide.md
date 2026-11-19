@@ -90,8 +90,12 @@ Otherwise the ad is a photo carousel and Day 1 is a photo post.
   by itself when the listing shows pending or sold, and can be turned off any time. The line for
   sellers: "We'll market your home with fresh content and ads every 2 weeks until it's under
   contract."
-- **Leads**: people who commented or messaged with interest. Open the campaign to see them, mark
-  them, add notes, or add a lead by hand.
+- **Campaign leads**: people who filled in the form or tapped Call on the listing page, and people
+  who commented with interest. Listing page leads are listed first. Open the campaign to see them,
+  mark them handled, or add a lead by hand. Resmara emails the agent the moment one comes in.
+- **Your listing page**: Resmara builds a simple page for every listing in the agent's brand
+  (photos, details, the agent's phone, a Call button and a form). Every post and the ad send people
+  there. The campaign shows a preview of the page with its visits, form leads and calls.
 - **Reports** — go: reports. Inside the campaign. Shows reach, views, clicks and leads, and makes a
   seller report you can download as a PDF and send to the homeowner.
 - Posts go out once a day at the scheduled time.

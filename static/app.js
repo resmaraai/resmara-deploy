@@ -223,30 +223,47 @@ function ncCheck(form){
  if(!host||!host.includes('.')){fail(' It doesn’t look like a complete web link.');return}
  form.dataset.state='checking';ncReady(form);
  out.innerHTML=`<div class="nc-msg wait nc-walk"><b>Resmara is checking your link…</b><div class="nc-steps"><span class="robot-avatar nc-bot" aria-hidden="true"></span><ul class="link-checks"><li data-k="open" class="now">Opening the link…</li><li data-k="details">Looking for the home’s details…</li><li data-k="photos">Looking for the photos…</li><li data-k="video">Looking for a video…</li></ul></div></div>`;
- const unreadable=/login|signin|sign-in|my\.flexmls/i.test(url),noPhotos=/zillow|realtor\.com|redfin|trulia|homes\.com/i.test(host);
- const hasVideo=/video|tour/i.test(url),order=['open','details','photos','video'],bot=out.querySelector('.nc-bot');const mark=(k,ok,t)=>{if(!fresh())return;const li=out.querySelector(`[data-k=${k}]`);if(li){li.className=ok?'ok':'no';li.textContent=t}const nx=out.querySelector(`[data-k=${order[order.indexOf(k)+1]}]`);if(nx&&bot){nx.classList.add('now');bot.style.transform=`translateY(${nx.offsetTop}px)`}};
- setTimeout(()=>mark('open',!unreadable,unreadable?'This link needs an MLS sign-in':'Link opened'),800);
- setTimeout(()=>mark('details',!unreadable,unreadable?'Couldn’t read the home’s details':'Found the home’s details'),1600);
- setTimeout(()=>{
-  mark('photos',!(unreadable||noPhotos),unreadable||noPhotos?'Couldn’t get the photos':'Photos will come from this link');
-  setTimeout(()=>{
-  const vid=hasVideo&&!unreadable&&!noPhotos;
-  mark('video',true,vid?'Found a listing video':'No video, so your ad will be a photo carousel');
-  setTimeout(()=>{
-   if(!fresh())return;
-   const linkAddress=listingAddressFromLink(url);
-   ncFillAddress(form,linkAddress);
-   // A typed address wins over the one guessed from the link: the agent knows the property,
-   // and the link slug is a guess. This is the field the campaign is created with.
-   draft={url,address:ncTypedAddress(form)||linkAddress,addressSource:ncTypedAddress(form)?'manual':'link',photoSource:'listing',media:url,photos:[],hasVideo:vid};
-   if(unreadable){fail(' It needs an MLS sign-in to open.')}
-   else if(noPhotos){form.dataset.state='details';out.innerHTML=`<div class="nc-msg part"><b>We have the home’s details, but we can’t get the photos from this link.</b>Upload your photos below and you’re ready to go.</div>`;ncReady(form)}
-   else{form.dataset.state='ok';out.innerHTML=`<div class="nc-msg ok"><span class="robot-avatar" aria-hidden="true"></span><div><b>Green light.</b> We have the home’s details. Resmara pulls the photos from this link when it builds, and tells you how many it got${vid?'; the listing video becomes your first post.':'.'} You’re ready to build.</div></div>`;ncReady(form)}
-  },500);
-  },800);
- },2400);
+ const order=['open','details','photos','video'],bot=out.querySelector('.nc-bot');const mark=(k,ok,t)=>{if(!fresh())return;const li=out.querySelector(`[data-k=${k}]`);if(li){li.className=ok?'ok':'no';li.textContent=t}const nx=out.querySelector(`[data-k=${order[order.indexOf(k)+1]}]`);if(nx&&bot){nx.classList.add('now');bot.style.transform=`translateY(${nx.offsetTop}px)`}};
+ // Signed in, the server opens the link for real (POST /api/content/listing/check). The review
+ // copy has no server, so it reads the link the way the server would: a sign-in link fails, a
+ // portal that blocks photos gives details only, and a link with no home in it is turned away.
+ const live=window.RM&&RM.checkListing&&RM.isLoggedIn&&RM.isLoggedIn();
+ const verdict=live?RM.checkListing(url).catch(e=>({ok:false,reason:'error',message:(e&&e.message)||'We couldn’t open that link just now.'})):new Promise(res=>setTimeout(()=>res(ncDemoVerdict(url,host)),2200));
+ const started=Date.now(),wait=ms=>new Promise(r=>setTimeout(r,ms));
+ verdict.then(async v=>{
+  // The steps tick over at a readable pace even when the answer comes back at once.
+  const pace=async()=>{await wait(Math.max(0,700-(Date.now()-started)))};
+  await pace();
+  if(!fresh())return;
+  const opened=v.ok||v.reason==='no_photos'||v.reason==='pending'||v.reason==='sold'||(v.opened&&v.reason!=='no_listing');
+  mark('open',v.reason!=='sign_in'&&v.reason!=='not_a_link'&&v.reason!=='error',v.reason==='sign_in'?'This link needs an MLS sign-in':v.reason==='error'?'Couldn’t open the link':'Link opened');await wait(600);
+  mark('details',!!v.details,v.details?'Found the home’s details':'Couldn’t find a home at this link');await wait(600);
+  if(!v.ok&&v.reason!=='no_photos'){
+   mark('photos',false,'Skipped');mark('video',false,'Skipped');
+   fail(' '+(v.message||'We couldn’t find a home for sale at this link.'));return;
+  }
+  mark('photos',v.reason!=='no_photos',v.reason==='no_photos'?'Couldn’t get the photos':(v.photos?'Found '+v.photos+' photos':'Photos will come from this link'));await wait(600);
+  const vid=!!v.video;
+  mark('video',true,vid?'Found a listing video':'No video, so your ad will be a photo carousel');await wait(400);
+  if(!fresh())return;
+  const linkAddress=v.address||listingAddressFromLink(url);
+  ncFillAddress(form,linkAddress);
+  // A typed address wins over the one guessed from the link: the agent knows the property,
+  // and the link slug is a guess. This is the field the campaign is created with.
+  draft={url,address:ncTypedAddress(form)||linkAddress,addressSource:ncTypedAddress(form)?'manual':'link',photoSource:'listing',media:url,photos:[],hasVideo:vid};
+  if(v.reason==='no_photos'){form.dataset.state='details';out.innerHTML=`<div class="nc-msg part"><b>We have the home’s details, but we can’t get the photos from this link.</b>Upload your photos below and you’re ready to go.</div>`;ncReady(form)}
+  else{form.dataset.state='ok';out.innerHTML=`<div class="nc-msg ok"><span class="robot-avatar" aria-hidden="true"></span><div><b>Green light.</b> We have the home’s details${v.photos?' and '+v.photos+' photos':''}${vid?', plus a listing video. Your video will be your ad and your first post.':'.'} You’re ready to build.</div></div>`;ncReady(form)}
+ });
 }
-
+// What the server would say about a link, for the review copy that has no server.
+function ncDemoVerdict(url,host){
+ if(/login|signin|sign-in|my\.flexmls/i.test(url))return {ok:false,reason:'sign_in',message:'This link needs an MLS sign-in to open.'};
+ let path='';try{path=new URL(url).pathname}catch{}
+ const home=/\d{1,6}[-_ ][a-z]/i.test(decodeURIComponent(path));
+ if(!home)return {ok:false,reason:'no_listing',opened:true,message:'We couldn’t find a home for sale at this link.'};
+ if(/zillow|realtor\.com|redfin|trulia|homes\.com/i.test(host))return {ok:true,reason:'no_photos',details:true,photos:0,video:false};
+ return {ok:true,reason:'ok',details:true,photos:24,video:/video|tour/i.test(url)};
+}
 function ncReady(form){const st=form.dataset.state,n=form.files.files.length,addr=['street','city','state','zip'].every(k=>form[k].value.trim()),btn=form.querySelector('.nc-build');
  const build=st==='ok'||st==='details'||st==='manual';
  btn.textContent=st==='checking'?'Checking…':build?'Build my campaign · $49':'Check my link';
@@ -355,7 +372,7 @@ if(window.RM&&RM.onSessionLost)RM.onSessionLost(()=>{
 });
 
 // Resmara stays available across the workspace and homepage.
-const pipDock=document.createElement('div');pipDock.id='pip-dock';pipDock.innerHTML='<button class="pip-launcher" onclick="togglePip()" aria-label="Ask Resmara for help"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><span>Ask Resmara</span><span class="pip-online"></span></button><section id="pip-chat" class="pip-chat" hidden aria-label="Resmara support chat"><header class="flex"><div class="flex"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><div><b>Resmara</b><small>Real Estate Social Marketing, Analytics & Reporting Assistant</small></div></div><button class="pip-close" onclick="togglePip()" aria-label="Close Resmara chat">×</button></header><div id="pip-messages" class="pip-messages" aria-live="polite"><div class="pip-reply">Hi, I’m Resmara! I’ll help you get settled, build your campaign and find your way around. What can I help with?</div></div><div class="pip-questions"><button onclick="pipAnswer(0)">Start my first campaign</button><button onclick="pipAnswer(1)">Connect social accounts</button><button onclick="pipAnswer(2)">Fees and ad spend</button><button onclick="pipAnswer(3)">Find my reports</button></div><form class="pip-input" onsubmit="event.preventDefault();pipFreeText(this.question.value);this.reset()"><input name="question" aria-label="Message Resmara" required placeholder="Ask Resmara a question…"><button aria-label="Send message">↑</button></form><p class="pip-demo-note">Guided answers · anything else can be sent to the team as a real support request.</p></section>';document.body.append(pipDock);function togglePip(){const panel=document.querySelector('#pip-chat');panel.hidden=!panel.hidden}function pipMessage(t,mine=false){const e=document.createElement('div');e.className=mine?'pip-user':'pip-reply';e.textContent=t;document.querySelector('#pip-messages').append(e);e.scrollIntoView({block:'nearest'})}function pipAnswer(n){const questions=['How do I start my first campaign?','How do I connect my social accounts?','How do fees and ad spend work?','Where are my reports?'];const answers=['Start with My Brand, then add the listing: the address, the MLS or listing link, and your photos and videos. Resmara builds the 14-day calendar and you approve it before anything goes out. A campaign is $49, paid when you build it.','Open Accounts and connect your Facebook Page and Instagram account. Publishing runs through Meta, so the connection has to be yours — Resmara never posts without it.','One property campaign is $49, paid once when you build it. No subscription, no credits, nothing to top up. Meta ad spend is separate and goes to Meta from your own ad account.','Open the campaign’s report for the day 7 and day 14 views. Before a campaign has been running there are no numbers to show; it fills in from your connected accounts.'];pipMessage(questions[n],true);pipMessage(answers[n])}function pipFreeText(q){if(/start|first|campaign|listing/i.test(q))return pipAnswer(0);if(/connect|facebook|instagram|meta account/i.test(q))return pipAnswer(1);if(/cost|fee|price|budget|spend|pay/i.test(q))return pipAnswer(2);if(/report|result|performance/i.test(q))return pipAnswer(3);pipMessage(q,true);pipMessage('I keep to the guided answers above for setup, social connections, fees and reports. For anything else, send it to the team and a person will reply on your Support page.');pipOfferTicket(q)}
+const pipDock=document.createElement('div');pipDock.id='pip-dock';pipDock.innerHTML='<button class="pip-launcher" onclick="togglePip()" aria-label="Ask Resmara for help"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><span>Ask Resmara</span><span class="pip-online"></span></button><section id="pip-chat" class="pip-chat" hidden aria-label="Resmara support chat"><header class="flex"><div class="flex"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><div><b>Resmara</b><small>Real Estate Social Marketing, Analytics & Reporting Assistant</small></div></div><button class="pip-close" onclick="togglePip()" aria-label="Close Resmara chat">×</button></header><div id="pip-messages" class="pip-messages" aria-live="polite"><div class="pip-reply">Hi, I’m Resmara! I’ll help you get settled, build your campaign and find your way around. What can I help with?</div></div><div class="pip-questions"><button onclick="pipAnswer(0)">Start my first campaign</button><button onclick="pipAnswer(1)">Connect social accounts</button><button onclick="pipAnswer(2)">Fees and ad spend</button><button onclick="pipAnswer(3)">Find my reports</button></div><form class="pip-input" onsubmit="event.preventDefault();pipFreeText(this.question.value);this.reset()"><input name="question" aria-label="Message Resmara" required placeholder="Ask Resmara a question…"><button aria-label="Send message">Send</button></form><p class="pip-demo-note">Guided answers · anything else can be sent to the team as a real support request.</p></section>';document.body.append(pipDock);function togglePip(){const panel=document.querySelector('#pip-chat');panel.hidden=!panel.hidden}function pipMessage(t,mine=false){const e=document.createElement('div');e.className=mine?'pip-user':'pip-reply';e.textContent=t;document.querySelector('#pip-messages').append(e);e.scrollIntoView({block:'nearest'})}function pipAnswer(n){const questions=['How do I start my first campaign?','How do I connect my social accounts?','How do fees and ad spend work?','Where are my reports?'];const answers=['Start with My Brand, then add the listing: the address, the MLS or listing link, and your photos and videos. Resmara builds the 14-day calendar and you approve it before anything goes out. A campaign is $49, paid when you build it.','Open Accounts and connect your Facebook Page and Instagram account. Publishing runs through Meta, so the connection has to be yours — Resmara never posts without it.','One property campaign is $49, paid once when you build it. No subscription, no credits, nothing to top up. Meta ad spend is separate and goes to Meta from your own ad account.','Open the campaign’s report for the day 7 and day 14 views. Before a campaign has been running there are no numbers to show; it fills in from your connected accounts.'];pipMessage(questions[n],true);pipMessage(answers[n])}function pipFreeText(q){if(/start|first|campaign|listing/i.test(q))return pipAnswer(0);if(/connect|facebook|instagram|meta account/i.test(q))return pipAnswer(1);if(/cost|fee|price|budget|spend|pay/i.test(q))return pipAnswer(2);if(/report|result|performance/i.test(q))return pipAnswer(3);pipMessage(q,true);pipMessage('I keep to the guided answers above for setup, social connections, fees and reports. For anything else, send it to the team and a person will reply on your Support page.');pipOfferTicket(q)}
 
 
 function confirmDemoCampaignCredit(button){

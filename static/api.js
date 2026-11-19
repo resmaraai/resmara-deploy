@@ -339,6 +339,11 @@
     });
   }
 
+  // Open a listing link before a campaign is built: the home, its photo count and any video.
+  function checkListing(url) {
+    return json('/api/content/listing/check', 'POST', { url: url });
+  }
+
   function tagAssets(boostId) {
     return request('/api/content/assets/' + segment(boostId) + '/tag', { method: 'POST' });
   }
@@ -662,6 +667,7 @@
     photoIndex: photoIndex,
     gallery: gallery,
     importPhotos: importPhotos,
+    checkListing: checkListing,
     tagAssets: tagAssets,
     createTicket: createTicket,
     tickets: tickets,
