@@ -95,25 +95,26 @@ def _new_task(db: Session, *, pr: int, kind: str, bullet: int, title: str, area:
 def _drive(task: BuildroomTask, *, status: str, deploy: str, live_commit: str,
            live_at: Optional[str], changed: Dict[str, Any]) -> None:
     """Move a release task to the status the deploy actually justifies, once."""
-    state_line = _STATE_LINE.search(task.notes or "")
-    seen = state_line.group(1) if state_line else None
+    # The LAST state line is the current one: a row that went waiting -> live -> waiting has
+    # three of them, and reading the first would append the same line on every pass.
+    states = _STATE_LINE.findall(task.notes or "")
+    seen = states[-1] if states else None
     if seen != deploy:
-        _append(task, f"deploy={deploy}" + (f" ({live_commit})" if deploy == "live" and live_commit else ""))
+        _append(task, f"deploy={deploy}")
     if task.claimed_by or (task.tested_by and task.tested_by != SYNC_BY):
         # Somebody is on it, or a person already signed it off: report, never overrule.
         return
     if task.status != status:
         changed["status"].append(f"#{task.id} {task.status}->{status}")
         task.status = status
-    if status == "done":
-        if task.tested_by != SYNC_BY:
-            task.tested_by = SYNC_BY
-            task.tested_at = datetime.now(timezone.utc)
-            changed["tested"].append(task.id)
-        note = f"live as {live_commit or 'the current build'} on resmara.com" + (
-            f", deployed {live_at}" if live_at else "")
-        if task.test_note != note:
-            task.test_note = note
+    if status == "done" and task.tested_by != SYNC_BY:
+        # Stamped once, on the pass that saw it live. Rewriting it on every later deploy would
+        # make an old release claim the newest build's sha and read as if it shipped today.
+        task.tested_by = SYNC_BY
+        task.tested_at = datetime.now(timezone.utc)
+        task.test_note = (f"live as {live_commit or 'the current build'} on resmara.com"
+                          + (f", deployed {live_at}" if live_at else ""))
+        changed["tested"].append(task.id)
 
 
 def sync(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:

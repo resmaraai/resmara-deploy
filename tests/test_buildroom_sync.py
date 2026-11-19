@@ -142,6 +142,19 @@ def main() -> int:
     check("#13 closed once live", waiting.status == "done", waiting.status)
     check("#13 names the new live commit", "dddd444" in (waiting.test_note or ""), waiting.test_note or "")
     check("closing it is reported", any("done" in s for s in third["status"]), str(third["status"]))
+
+    # ── a later deploy does not rewrite history ─────────────────────────────────────
+    print("a new build goes live")
+    with SessionLocal() as db:
+        note_before = row(db, "Release #13").test_note
+        lines_before = (row(db, "Release #13").notes or "").count("\n")
+        sync(db, payload("eeee555", [pr_live, {**pr_waiting, "deploy": "live",
+                                               "live_at": "2026-11-20T09:00:00Z"}]))
+        db.commit()
+        after = row(db, "Release #13")
+    check("an old release keeps the sha it shipped as", after.test_note == note_before, after.test_note or "")
+    check("and gains no note for a deploy it was not part of",
+          (after.notes or "").count("\n") == lines_before, str((after.notes or "").count("\n")))
     check("the still-open PR's review stays open", review.status == "todo", review.status)
 
     # ── the deploy fails ────────────────────────────────────────────────────────────

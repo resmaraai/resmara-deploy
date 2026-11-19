@@ -86,7 +86,8 @@ if [ $((10#$(date -u +%M) % 15)) -lt 5 ]; then
   rm -f /tmp/resmara-sched-br.$$
   case "$code" in
     200) case "$body" in
-           *'"created": []'*'"status": []'*'"tested": []'*) ;;   # nothing to write: stay quiet
+           *'"created":[]'*'"status":[]'*'"tested":[]'*) ;;              # nothing to write
+           *'"created": []'*'"status": []'*'"tested": []'*) ;;           # (pretty-printed)
            *) say "build room sync: $body" ;;
          esac ;;
     *) say "buildroom/sync returned $code: $body" ;;
