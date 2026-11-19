@@ -78,7 +78,8 @@ fi
 
 # Releases reach the build room on the same 15-minute dial: an open pull request shows up as a
 # review task, a merged one as a release task, and the release closes itself only when GitHub
-# says its commit is inside the build Render is serving. Quiet when nothing changed.
+# says its commit is inside the build Render is serving. One compact line per run, because a
+# watcher nobody can see running is a watcher nobody trusts; the full answer only on a change.
 if [ $((10#$(date -u +%M) % 15)) -lt 5 ]; then
   code=$(curl -sS -m 180 -X POST -H "X-Resmara-Token: $TOKEN" -o /tmp/resmara-sched-br.$$ \
               -w "%{http_code}" "$BASE/api/admin/buildroom/sync")
@@ -86,8 +87,8 @@ if [ $((10#$(date -u +%M) % 15)) -lt 5 ]; then
   rm -f /tmp/resmara-sched-br.$$
   case "$code" in
     200) case "$body" in
-           *'"created":[]'*'"status":[]'*'"tested":[]'*) ;;              # nothing to write
-           *'"created": []'*'"status": []'*'"tested": []'*) ;;           # (pretty-printed)
+           *'"created":[]'*'"status":[]'*'"tested":[]'*|*'"created": []'*'"status": []'*'"tested": []'*)
+             say "buildroom: checked, nothing new" ;;
            *) say "build room sync: $body" ;;
          esac ;;
     *) say "buildroom/sync returned $code: $body" ;;
