@@ -72,14 +72,34 @@ function siteNav(active){
 function footerLinks(){
  return `<span style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;font-size:12px"><a href="privacy.html">Privacy</a><a href="data-deletion.html">Data deletion</a><a href="terms.html">Terms</a><a href="mailto:resmaraai@gmail.com" target="_blank" rel="noopener">Contact</a><a href="admin.html">Team room</a></span>`;
 }
-function signOutDemo(){state.clientSignedIn=false;persist();home();window.scrollTo(0,0)}
+// Signing out ends this browser's copy of the workspace too. Two agents can share one machine,
+// and the next account must never open on the last one's listings: a new client signed up here
+// after another account and was shown that account's Coggins campaigns as if they were its own.
+// Everything account-scoped goes; the theme and the API token are handled separately.
+function clearAccountWorkspace(){
+ state.campaigns=[];state.leads={};state.reviews={};state.brand={};state.supportUnread=0;state.hiddenSamples=[];
+ state.priorDemos=[];state.firstRun=false;state.tourDone=false;state.metaRequired=false;state.connected=false;
+ state.company='';state.email='';state.isAdmin=false;
+}
+function signOutDemo(){clearAccountWorkspace();if(window.RM&&RM.logout)RM.logout();state.name='';state.clientSignedIn=false;persist();home();window.scrollTo(0,0)}
+// Show what was typed into a password box. Chrome's own reveal is not available on every
+// browser and does not exist inside the app's modal, so the form carries its own control.
+function togglePw(btn){
+ const wrap=btn.closest('.pw-wrap'),input=wrap&&wrap.querySelector('input');
+ if(!input)return;
+ const show=input.type==='password';
+ input.type=show?'text':'password';
+ btn.textContent=show?'Hide':'Show';
+ btn.setAttribute('aria-label',show?'Hide password':'Show password');
+ btn.setAttribute('aria-pressed',show?'true':'false');
+}
 function clientAccess(mode='signin'){
  // state.clientSignedIn is a browser memory, not a session. Ask the API client whether the
  // token is still alive, or a customer whose session ended can never reach the form to fix it.
  if(state.clientSignedIn&&window.RM&&RM.isLoggedIn()){dashboard();return}
  if(state.clientSignedIn){state.clientSignedIn=false;persist()}
  const creating=mode==='create';
- show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>${creating?'Create an account':'Client Login'}</h2><p>${creating?'Just your name, email and a password. Resmara learns the rest when you connect your Meta account.':'Enter your email and password.'}</p><form onsubmit="event.preventDefault();submitTestClient(this,${creating})">${creating?'<div class="nc-row name-row"><label class="field">First name<input name="firstName" required maxlength="60" autocomplete="given-name"></label><label class="field">Last name<input name="lastName" required maxlength="60" autocomplete="family-name"></label></div>':''}<label class="field">Email address<input name="clientEmail" type="email" required maxlength="254" autocomplete="email"></label><label class="field">Password<input name="clientPassword" type="password" required minlength="${creating?8:1}" autocomplete="${creating?'new-password':'current-password'}"></label>${creating?'<details class="invite-toggle"><summary>Have an invite code?</summary><label class="field">Invite code<input name="inviteCode" maxlength="64" autocomplete="off" spellcheck="false" placeholder="From your invitation"></label></details>':''}<p class="fine" role="status"></p><div class="modal-actions"><button>${creating?'Create account':'Sign in'}</button><button type="button" class="alt" onclick="clientAccess('${creating?'signin':'create'}')">${creating?'Back to sign in':'Create an account'}</button></div></form>${state.name&&!state.email?'<button class="alt" onclick="resumeDemo()">Resume previous demo</button>':''}<p class="fine">${creating?'Passwords need at least 8 characters.':'<a href="#" onclick="forgotPassword();return false">Forgot your password?</a>'}</p>`);
+ show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>${creating?'Create an account':'Client Login'}</h2><p>${creating?'Just your name, email and a password. Resmara learns the rest when you connect your Meta account.':'Enter your email and password.'}</p><form onsubmit="event.preventDefault();submitTestClient(this,${creating})">${creating?'<div class="nc-row name-row"><label class="field">First name<input name="firstName" required maxlength="60" autocomplete="given-name"></label><label class="field">Last name<input name="lastName" required maxlength="60" autocomplete="family-name"></label></div>':''}<label class="field">Email address<input name="clientEmail" type="email" required maxlength="254" autocomplete="email"></label><label class="field">Password<span class="pw-wrap"><input name="clientPassword" type="password" required minlength="${creating?8:1}" autocomplete="${creating?'new-password':'current-password'}"><button type="button" class="pw-eye" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false">Show</button></span></label>${creating?'<details class="invite-toggle"><summary>Have an invite code?</summary><label class="field">Invite code<input name="inviteCode" maxlength="64" autocomplete="off" spellcheck="false" placeholder="From your invitation"></label></details>':''}<p class="fine" role="status"></p><div class="modal-actions"><button>${creating?'Create account':'Sign in'}</button><button type="button" class="alt" onclick="clientAccess('${creating?'signin':'create'}')">${creating?'Back to sign in':'Create an account'}</button></div></form>${state.name&&!state.email?'<button class="alt" onclick="resumeDemo()">Resume previous demo</button>':''}<p class="fine">${creating?'Passwords need at least 8 characters.':'<a href="#" onclick="forgotPassword();return false">Forgot your password?</a>'}</p>`);
 }
 function forgotPassword(){
  show(`<span class="eyebrow">PASSWORD HELP</span><h2>Reset your password</h2><p>Enter the email address on your account and we will send a link to choose a new password.</p><form onsubmit="event.preventDefault();requestResetLink(this)"><label class="field">Email address<input name="email" type="email" required maxlength="254" autocomplete="email" value="${esc(state.email||'')}"></label><p class="fine" role="status"></p><div class="modal-actions"><button>Send reset link</button><button type="button" class="alt" onclick="clientAccess()">Back to sign in</button></div></form><p class="fine">The link works once and expires in an hour.</p>`);
@@ -120,7 +140,7 @@ function resetPasswordPage(token){
  // Same pop-up card as Client Login, over the homepage, so a reset looks like the rest of the client area.
  document.title='Choose a new password — Resmara';
  if(typeof home==='function')home();
- show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>Choose a new password</h2>${token?'<p>Type it twice. This link works once.</p>':'<p>This link is missing its reset code. Ask for a new one from Client Login.</p>'}<form onsubmit="event.preventDefault();submitNewPassword(this)" data-token="${esc(token)}"><label class="field">New password<input name="password" type="password" required minlength="8" autocomplete="new-password"></label><label class="field">Type it again<input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label><p class="fine" role="status"></p><div class="modal-actions"><button${token?'':' disabled'}>Save new password</button><button type="button" class="alt" onclick="clientAccess()">Back to sign in</button></div></form>`);
+ show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>Choose a new password</h2>${token?'<p>Type it twice. This link works once.</p>':'<p>This link is missing its reset code. Ask for a new one from Client Login.</p>'}<form onsubmit="event.preventDefault();submitNewPassword(this)" data-token="${esc(token)}"><label class="field">New password<span class="pw-wrap"><input name="password" type="password" required minlength="8" autocomplete="new-password"><button type="button" class="pw-eye" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false">Show</button></span></label><label class="field">Type it again<span class="pw-wrap"><input name="confirm" type="password" required minlength="8" autocomplete="new-password"><button type="button" class="pw-eye" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false">Show</button></span></label><p class="fine" role="status"></p><div class="modal-actions"><button${token?'':' disabled'}>Save new password</button><button type="button" class="alt" onclick="clientAccess()">Back to sign in</button></div></form>`);
 }
 async function submitNewPassword(form){
  const status=form.querySelector('[role="status"]');
@@ -143,6 +163,10 @@ function submitTestClient(form,creating){
  const name=creating?[form.elements.firstName.value.trim(),form.elements.lastName.value.trim()].filter(Boolean).join(' '):'';
  const invite=creating&&form.elements.inviteCode?form.elements.inviteCode.value.trim():'';
  const status=form.querySelector('[role="status"]');
+ // Who this browser was last signed in as. A different address signing in here is a different
+ // person: they get their own empty workspace and the two samples, never the last account's.
+ const priorOwner=String(state.email||'').trim().toLowerCase();
+ if(priorOwner&&priorOwner!==email)clearAccountWorkspace();
  if(creating&&!name){status.textContent='Enter your name.';return}
  if(!window.RM){status.textContent='The API client is unavailable in this browser.';return}
  status.textContent=creating?'Creating your account…':'Signing in…';
@@ -161,10 +185,11 @@ function submitTestClient(form,creating){
    account=await RM.login(email,password);
    if(account&&account.access_token)RM.setToken(account.access_token);
   }
-  // A sign-in is an identity change, not an erasure. This used to be `state = {...blank}`,
-  // which threw away the brand profile, uploaded logo/headshot and any campaign the customer
-  // had just built while signed out - the work vanished the moment they signed in.
-  state={...state,name:(account&&account.name)||state.name||name,email,clientSignedIn:true,campaigns:state.campaigns||[],connected:!!state.connected};
+  // The same person signing back in keeps the browser's copy: this used to be `state={...blank}`
+  // and it threw away the brand profile, logo/headshot and a campaign built while signed out.
+  // A different person keeps nothing (clearAccountWorkspace ran above); their own campaigns come
+  // back from /api/boosts, so an empty local list here is never a lost listing.
+  state={...state,name:(account&&account.name)||state.name||name,email,clientSignedIn:true,campaigns:priorOwner&&priorOwner!==email?[]:(state.campaigns||[]),connected:!!state.connected};
   try{localStorage.setItem('resmara',JSON.stringify(state))}catch{}
   modal.close();if(creating){state.firstRun=true;state.metaRequired=true;persist();dashboard();setTimeout(()=>onboard(0),400)}else if(typeof metaNagging==='function'&&metaNagging()){dashboard('accounts');setTimeout(()=>onboard(0),400)}else{dashboard();if(state.firstRun&&!state.tourDone)setTimeout(()=>onboard(0),400);else toast('Signed in as '+email);}
   if(window.RM&&RM.brandProfile){RM.brandProfile().then(remote=>{

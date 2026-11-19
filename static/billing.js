@@ -271,7 +271,7 @@ function closeAccount() {
     Purchases stay on record for accounting.</p>
     <form onsubmit="event.preventDefault();submitCloseAccount(this)">
       <label class="field">Type your email to confirm<input name="email" type="email" required autocomplete="off" placeholder="${esc(state.email || '')}"></label>
-      <label class="field">Your password<input name="password" type="password" required autocomplete="current-password"></label>
+      <label class="field">Your password<span class="pw-wrap"><input name="password" type="password" required autocomplete="current-password"><button type="button" class="pw-eye" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false">Show</button></span></label>
       <p class="fine" role="status"></p>
       <div class="modal-actions"><button type="submit">Close my account</button>
       <button type="button" class="alt" onclick="modal.close()">Keep my account</button></div>

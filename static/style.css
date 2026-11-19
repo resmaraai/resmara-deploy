@@ -219,3 +219,12 @@ input,select{border-radius:999px}
 .hidden-list{display:grid;gap:8px;margin-top:14px}
 .hidden-list .flex{padding:8px 0;border-top:1px solid var(--line)}
 .hidden-list button{padding:7px 12px;font-size:12px}
+
+/* Password reveal: the control the customer asked for, so what they typed is visible. */
+.pw-wrap{position:relative;display:block}
+.pw-wrap input{padding-right:74px}
+.pw-eye{position:absolute;right:8px;bottom:9px;background:none;color:#52778f;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:5px 8px;border-radius:6px;line-height:1}
+.pw-eye:hover{filter:none;background:#e5f4fd;color:#102c40}
+.pw-eye:focus-visible{outline:2px solid #315773;outline-offset:1px}
+.dark .pw-eye{color:#a2c9de}
+.dark .pw-eye:hover{background:#1d3a4d;color:#fff}
