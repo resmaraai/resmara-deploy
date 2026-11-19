@@ -133,6 +133,7 @@ function closeListingPage() {
 function refreshListingPanel(index) {
   const c = [...state.campaigns, ...examples][index], el = document.querySelector('#listing-page');
   if (el) el.outerHTML = listingPagePanel(c, index);
+  if (typeof setupFolds === 'function') setupFolds();
 }
 
 // In the review copy the form and the Call button add a lead right here, so the whole loop can be

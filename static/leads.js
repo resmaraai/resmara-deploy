@@ -143,7 +143,7 @@ function leadsPanel(c, index) {
     ? `<p class="fine">${scan && scan.checked_at ? 'Last checked ' + esc(leadTimeAgo(scan.checked_at)) : 'Not checked yet.'}${scan && scan.note ? ' · ' + esc(scan.note) : ''}</p>`
     : '';
   return `<section class="panel leads-panel" id="leads">
-  <div class="leads-head"><div><h2 class="campaign-step-title"><span>1</span> Campaign leads ${open ? `<span class="lead-count">${open} new</span>` : ''}</h2><p class="fine">People who asked about the home on your listing page, and people who commented on your posts or ad and sound interested. Resmara emails you the moment one comes in.</p>${scanLine}</div><div class="leads-head-btns">${server ? `<button type="button" class="leads-email" onclick="checkLeadsNow(${index})">Check now</button>` : ''}<button type="button" class="leads-email" onclick="previewLeadEmail(${index})">See the alert email</button></div></div>
+  <div class="leads-head"><div><h2 class="campaign-step-title"><span>1</span> Campaign leads ${open ? `<span class="lead-count">${open} new</span>` : ''}</h2><p class="fine">People who asked about the home on your listing page, and people who commented on your posts or ad and sound interested. Resmara emails you the moment one comes in.</p>${scanLine}</div>${server ? `<div class="leads-head-btns"><button type="button" class="leads-email" onclick="checkLeadsNow(${index})">Check now</button></div>` : ''}</div>
   ${body}
   <button type="button" class="lead-add" onclick="addLead(${index})">＋ Add a lead</button>
 </section>`;
@@ -181,7 +181,7 @@ function removeLead(index, i) {
   }
   campaignLeads(c).splice(i, 1); persist(); refreshLeads(index); toast('Removed. Resmara won’t flag that comment again.');
 }
-function refreshLeads(index) { const c = [...state.campaigns, ...examples][index], el = document.querySelector('#leads'); if (el) el.outerHTML = leadsPanel(c, index); }
+function refreshLeads(index) { const c = [...state.campaigns, ...examples][index], el = document.querySelector('#leads'); if (el) el.outerHTML = leadsPanel(c, index); setupFolds(); }
 function addLead(index) {
   show(`<span class="eyebrow">CAMPAIGN LEADS</span><h2>Add a lead.</h2><form onsubmit="event.preventDefault();saveLead(${index},this)"><label class="field">Name<input name="name" required placeholder="Who is it?"></label><label class="field">Where<select name="where"><option>Instagram</option><option>Facebook</option><option>Facebook ad</option><option>Phone or text</option><option>Email</option><option>Other</option></select></label><label class="field">What they said<textarea name="text" rows="3" required></textarea></label><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Cancel</button><button class="campaign-primary">Add lead</button></div></form>`);
 }
@@ -331,4 +331,27 @@ function setCampaignPaused(i, on) {
   if (modal.open) modal.close();
   dashboard('campaigns');
   toast(on ? 'Campaign paused. Posts and your ad are on hold.' : 'Campaign resumed. Posts and your ad are running again.');
+}
+
+// ---- Open and close the sections of a live campaign ---------------------------------------
+// Each section (leads, calendar, listing page, reports) folds up to its heading, so an agent can
+// work through one at a time. A chevron on the right of the heading shows which way it goes, and
+// the choice is remembered on this device.
+const FOLDS = [['#leads', 'leads', '.leads-head h2'], ['.live-cal .review-calendar', 'calendar', 'summary'],
+  ['#listing-page', 'page', 'h2.campaign-step-title'], ['.live-reports', 'reports', 'h2.campaign-step-title']];
+function setupFolds() {
+  state.folds = state.folds || {};
+  FOLDS.forEach(([sel, key, h]) => {
+    const sec = document.querySelector(sel), head = sec && sec.querySelector(h);
+    if (!head) return;
+    const closed = !!state.folds[key];
+    sec.classList.add('fold'); sec.classList.toggle('folded', closed);
+    head.setAttribute('aria-expanded', String(!closed));
+    if (head.dataset.fold) return;
+    head.dataset.fold = key; head.classList.add('fold-head'); head.setAttribute('role', 'button'); head.tabIndex = 0;
+    head.insertAdjacentHTML('beforeend', '<span class="fold-chev" aria-hidden="true"></span>');
+    const flip = e => { if (e.target.closest('button,a')) return; e.preventDefault(); state.folds[key] = !state.folds[key]; persist(); setupFolds(); };
+    head.addEventListener('click', flip);
+    head.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') flip(e); });
+  });
 }

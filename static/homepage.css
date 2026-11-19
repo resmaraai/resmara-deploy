@@ -924,7 +924,7 @@ html.dark .shell .side-nav button{color:#9db6c8!important}
 html.dark .shell .side-nav button.active{background:#13283a!important;color:#fff!important}
 html.dark .shell button.alt,html.dark .shell .theme-toggle{background:#13283a!important;color:#d6e6f1!important;border-color:#23425a!important}
 html.dark .shell h1,html.dark .shell h2,html.dark .shell h3,html.dark .shell b,html.dark .shell strong,html.dark .shell label{color:#f2f8fc!important}
-html.dark .shell p,html.dark .shell .fine,html.dark .shell .small,html.dark .shell span:not(.nav-badge):not(.pill):not(.eyebrow){color:#9db6c8}
+html.dark .shell p,html.dark .shell .fine,html.dark .shell .small,html.dark .shell span:not(.nav-badge):not(.pill):not(.eyebrow){color:#fff}
 html.dark .shell .card,html.dark .shell .panel,html.dark .shell .stat,html.dark .shell article,html.dark .shell .day,html.dark .shell .ticket,html.dark .shell .meta-card,html.dark .shell [class*="-card"]:not(.theme-toggle){background:#13283a!important;border-color:#23425a!important;color:#d6e6f1}
 html.dark .shell .card-body,html.dark .shell .tabs,html.dark .shell .welcome+div{background:transparent}
 html.dark .shell input,html.dark .shell select,html.dark .shell textarea{background:#0f2231!important;border-color:#2a4a63!important;color:#eef6fb!important}
@@ -1103,3 +1103,47 @@ html.dark .shell .lsite span:not(.ls-price){color:inherit!important}
 html.dark .shell .lsite input,html.dark .shell .lsite textarea{background:#fff!important;color:#222!important;border-color:rgba(0,0,0,.15)!important}
 html.dark .shell .lsite .ls-initials{color:#fff!important}
 html.dark .shell .lsite .ls-hero-text p{color:#fff!important}
+
+/* ===== Live campaign sections open and close ===== */
+.fold-head{cursor:pointer;width:100%;user-select:none}
+.fold-head:focus-visible{outline:2px solid #d94c0d;outline-offset:4px;border-radius:8px}
+.leads-head>div{flex:1;min-width:0}
+.live-cal summary.fold-head{pointer-events:auto!important}
+.fold-chev{margin-left:auto;flex:none;width:11px;height:11px;border-right:3px solid #12354d;border-bottom:3px solid #12354d;transform:translateY(3px) rotate(-135deg);transition:transform .2s;margin-right:6px}
+.fold.folded .fold-chev{transform:translateY(-3px) rotate(45deg)}
+.fold.folded>*:not(.leads-head):not(summary):not(.fold-head){display:none!important}
+.fold.folded .leads-head .fine,.fold.folded .leads-head-btns{display:none!important}
+.fold.folded .leads-head{margin-bottom:0}
+.fold.folded h2.campaign-step-title{margin-bottom:0!important}
+html.dark .shell .fold-chev{border-color:#fff}
+
+/* ===== Text colour standard: text is dark blue or white, never light blue ===== */
+/* Light mode */
+.camp-tabs button{color:#12354d!important}
+.camp-tabs button.on{color:#fff!important}
+.pill.phase-active{color:#12354d}
+.review-month-ad,.review-calendar .review-month-ad{color:#12354d!important}
+/* Dark mode */
+html.dark .shell .camp-tabs button,html.dark .shell .camp-tabs button.on{color:#fff!important}
+html.dark .shell .camp-tabs button span{background:#cfe3ef!important;color:#12354d!important}
+html.dark .shell .camp-tabs button.on span{background:#d94c0d!important;color:#fff!important}
+html.dark .shell .pill.phase-active{background:#e2f0f8!important;color:#12354d!important}
+html.dark .shell .side-nav button{color:#fff!important}
+html.dark .shell .campaign-step-title>span:not(.lead-count):not(.fold-chev){background:#2d6a92!important;color:#fff!important}
+html.dark .shell .campaign-step-title>span.lead-count{color:#fff!important}
+html.dark .shell .leads-group,html.dark .shell .lead-body small,html.dark .shell .lead-body small.lead-contact,html.dark .shell .lead-add,html.dark .shell .lead-where{color:#fff!important}
+html.dark .shell .lp-stats small,html.dark .shell .lp-bar{color:#fff!important}
+html.dark .shell .pr-pick small,html.dark .shell .pr-pick:not(.off) small{color:#fff!important}
+html.dark .shell .video-note,html.dark .shell .review-calendar p{color:#fff!important}
+html.dark .shell .review-month-weekdays,html.dark .shell .review-month-weekdays span,html.dark .shell .review-month-date{color:#fff!important}
+html.dark .shell .review-month-grid{border-color:#fff!important}
+html.dark .shell .review-month-week{border-top-color:#fff!important;background:repeating-linear-gradient(to right,#13283a 0 calc(100% / 7 - 1px),#fff calc(100% / 7 - 1px) calc(100% / 7))!important}
+html.dark .shell .review-month-ad{background:#d8effd!important;color:#12354d!important}
+/* Left menu: Resmara dark blue in light mode, white in dark mode */
+.shell .side-nav button,.shell .side-nav button.active{color:#12354d!important}
+html.dark .shell .side-nav button,html.dark .shell .side-nav button.active{color:#fff!important}
+/* The chevron is a plain mark, not a numbered bubble */
+.campaign-step-title>span.fold-chev,html.dark .shell .campaign-step-title>span.fold-chev{display:block;width:11px;height:11px;background:none!important;border-radius:0;border-right:3px solid #12354d;border-bottom:3px solid #12354d;place-items:initial}
+html.dark .shell .campaign-step-title>span.fold-chev{border-color:#fff}
+html.dark .shell .live-cal summary.campaign-step-title{color:#fff!important}
+html.dark .shell .review-month-cell:not(.outside-month),html.dark .shell .review-month-date:not(.outside-month){background:transparent!important}
