@@ -110,6 +110,9 @@ def main() -> int:
     check("hand-written task untouched", human.status == "todo" and human.created_by == "dan@example.com")
     check("notes carry the machine marker", "[auto:pr #11 release]" in (live.notes or ""))
     check("first run reports what it created", len(first["created"]) == 5, str(first["created"]))
+    check("the report names real rows, not #None",
+          bool(first["status"]) and all(s.startswith("#") and s[1:2].isdigit() for s in first["status"]),
+          str(first["status"]))
     check("six rows on the board", count == 6, str(count))
 
     # ── second run: nothing to do ───────────────────────────────────────────────────
