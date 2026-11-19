@@ -992,6 +992,12 @@ input.photos-file{display:none!important}
 .photo-permission{display:flex!important;align-items:center;gap:12px;margin-top:18px;padding:14px 16px;border:1px solid #dcebf4;border-radius:12px;background:#f7fbff;font-size:14px;font-weight:600;color:#143a50;cursor:pointer}
 .photo-permission input{width:20px!important;height:20px!important;flex:none;margin:0!important;accent-color:#d94c0d;cursor:pointer}
 html.dark .shell .photo-permission{background:#0f2231;border-color:#23425a}
+/* The build button brings this box into view when it is not ticked, so say so loudly: a toast
+ * three screens above the checkbox is what made the button look dead. */
+.photo-permission.needs-attention{border-color:#d94c0d!important;background:#fff3ec!important;box-shadow:0 0 0 3px rgba(217,76,13,.18)}
+.photo-permission.granted{border-color:#2f8a4a!important;background:#f2fbf5!important}
+html.dark .shell .photo-permission.needs-attention{background:#2a1508!important;border-color:#d94c0d!important}
+html.dark .shell .photo-permission.granted{background:#0d2417!important;border-color:#2f8a4a!important}
 html.dark .shell .photo-permission span{color:#f2f8fc}
 html.dark .shell .campaign-photos .photos-status{color:#d6e6f1!important}
 .photo-thumbs:empty{display:none}

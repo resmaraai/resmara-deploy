@@ -43,6 +43,8 @@ if ! command -v node >/dev/null 2>&1; then
   echo "skip node suites (node not installed)"
 else
   run test_frontend_api node tests/test_frontend_api.js
+  run test_client_workspace node tests/test_client_workspace.js
+  run test_review_scope node tests/test_review_scope.js
   if [ -n "${CI_SKIP_DEPLOYED_UI:-}" ]; then
     echo "skip test_deployed_ui (CI_SKIP_DEPLOYED_UI set: it reads a deployment's public URL)"
   else

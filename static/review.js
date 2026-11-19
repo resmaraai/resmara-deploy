@@ -123,7 +123,7 @@ async function hydrateReviewItems(r){
 // moves as campaigns are added, so a live campaign at index 0 was opening with a demo
 // campaign's saved address at the top of the page.
 function reviewKey(c,index){const id=campaignBoostId(c);return 'review-'+(id!=null?'boost-'+id:(c.reviewId||index));}
-function details(index){document.querySelector('#content')?.classList.remove('rerun-locked');if(ReviewStudio.active!==index)ReviewStudio.month=null;ReviewStudio.active=index;const c=[...state.campaigns,...examples][index];if(!c)return;const key=reviewKey(c,index);state.reviews=state.reviews||{};if(!state.reviews[key]||(examples.includes(c)&&state.reviews[key].v!==5))state.reviews[key]={v:5,approved:false,items:(c.scopeFirst||campaignBoostId(c)!=null)?[]:sampleReviewItems(c)};const r=state.reviews[key];if(r.videoUrl===undefined)r.videoUrl='';if(examples.includes(c)&&typeof SAMPLE_POSTS!=='undefined')(r.items||[]).forEach(it=>{if(it.image===img||it.image===img2||!it.image)it.image=demoItemImage(it.id)});r.scopeFirst=Boolean(c.scopeFirst)||(campaignBoostId(c)!=null&&!Number(c.posts_total||0)&&!r.approved);r.liveGeneration=Boolean(c.liveGeneration)||campaignBoostId(c)!=null;r.scope ||= initialCampaignScope(c);if(examples.includes(c)&&!r.scope.demoBrief&&!r.scopeConfirmed&&!r.approved){r.scope.highlights ||= demoPropertyHighlights(c);r.scope.demoBrief=true;}const live=typeof campaignIsLive==='function'&&campaignIsLive(c);if(live&&examples.includes(c)){r.scopeConfirmed=true;r.calendarApproved=true;r.approved=true}$('#content').innerHTML=`<div class="review-heading"><h1>${esc(campaignBoostId(c)!=null?c.address:(r.scope.address||c.address))}</h1></div>${live?leadsPanel(c,index)+'<div class="live-cal">'+liveCalendar(reviewCalendar(r,c))+'</div>':campaignScopePanel(r)+photosPanel(r)+reviewCalendar(r,c)}${live?'':`<div class="review-approval"><div><h2 class="campaign-step-title"><span>3</span> ${r.approved?'Campaign approved':'Approve the campaign'}</h2><p>Approve the full calendar when you’re happy with the creative.</p><p class="fine">${r.approved?'Approval saved. Nothing has been published.':!r.items.length?'Confirm your launch details to build the calendar.':r.items.filter(i=>i.reviewed).length+' of '+r.items.length+' items spot-checked · Individual review is optional. Confirm your launch details and approve the calendar first.'}</p></div>${r.approved?'<button onclick="launchOrder()">Review launch</button>'+(reviewCampaignBoostId()!=null?' <button class="alt" onclick="publishApprovedPosts()">Publish approved posts</button>':''):`<button class="campaign-primary scope-approval-button" onclick="approveReview()" ${r.scopeConfirmed&&r.calendarApproved&&r.items.length?'':'disabled'}>Approve entire campaign</button>`}</div>`}<section class="panel${live?' live-reports':''}">${live?'<h2 class="campaign-step-title"><span>3</span> Reports for this property</h2>':'<h3>Reports for this property</h3>'}<div class="pr-picks">${[7,14].map(day=>Number(c.day)>=day?`<button type="button" class="pr-pick" onclick="openPropertyReport(${index},${day},this)"><b>Day ${day} report</b><small>Ready · click to open</small></button>`:`<div class="pr-pick off"><b>Day ${day} report</b><small>${c.day?'Ready on day '+day:'Ready after launch'}</small></div>`).join('')}</div><div id="pr-view"></div></section>`;refreshPhotoAssets();hydrateReviewItems(r);persist();if(typeof campaignPhase==='function'&&campaignPhase(c)==='completed'&&!c.rerunPaid)showRerunOffer(index)}
+function details(index){document.querySelector('#content')?.classList.remove('rerun-locked');if(ReviewStudio.active!==index)ReviewStudio.month=null;ReviewStudio.active=index;const c=[...state.campaigns,...examples][index];if(!c)return;const key=reviewKey(c,index);state.reviews=state.reviews||{};if(!state.reviews[key]||(examples.includes(c)&&state.reviews[key].v!==5))state.reviews[key]={v:5,approved:false,items:(c.scopeFirst||campaignBoostId(c)!=null)?[]:sampleReviewItems(c)};const r=state.reviews[key];if(r.videoUrl===undefined)r.videoUrl='';if(examples.includes(c)&&typeof SAMPLE_POSTS!=='undefined')(r.items||[]).forEach(it=>{if(it.image===img||it.image===img2||!it.image)it.image=demoItemImage(it.id)});r.scopeFirst=Boolean(c.scopeFirst)||(campaignBoostId(c)!=null&&!Number(c.posts_total||0)&&!r.approved);r.liveGeneration=Boolean(c.liveGeneration)||campaignBoostId(c)!=null;r.scope ||= initialCampaignScope(c);if(r.scope&&!r.scopeConfirmed&&!r.approved)r.scope.start=goLiveDate(r.scope.start);if(examples.includes(c)&&!r.scope.demoBrief&&!r.scopeConfirmed&&!r.approved){r.scope.highlights ||= demoPropertyHighlights(c);r.scope.demoBrief=true;}const live=typeof campaignIsLive==='function'&&campaignIsLive(c);if(live&&examples.includes(c)){r.scopeConfirmed=true;r.calendarApproved=true;r.approved=true}$('#content').innerHTML=`<div class="review-heading"><h1>${esc(campaignBoostId(c)!=null?c.address:(r.scope.address||c.address))}</h1></div>${live?leadsPanel(c,index)+'<div class="live-cal">'+liveCalendar(reviewCalendar(r,c))+'</div>':campaignScopePanel(r)+photosPanel(r)+reviewCalendar(r,c)}${live?'':`<div class="review-approval"><div><h2 class="campaign-step-title"><span>3</span> ${r.approved?'Campaign approved':'Approve the campaign'}</h2><p>Approve the full calendar when you’re happy with the creative.</p><p class="fine">${r.approved?'Approval saved. Nothing has been published.':!r.items.length?'Confirm your launch details to build the calendar.':r.items.filter(i=>i.reviewed).length+' of '+r.items.length+' items spot-checked · Individual review is optional. Confirm your launch details and approve the calendar first.'}</p></div>${r.approved?'<button onclick="launchOrder()">Review launch</button>'+(reviewCampaignBoostId()!=null?' <button class="alt" onclick="publishApprovedPosts()">Publish approved posts</button>':''):`<button class="campaign-primary scope-approval-button" onclick="approveReview()" ${r.scopeConfirmed&&r.calendarApproved&&r.items.length?'':'disabled'}>Approve entire campaign</button>`}</div>`}<section class="panel${live?' live-reports':''}">${live?'<h2 class="campaign-step-title"><span>3</span> Reports for this property</h2>':'<h3>Reports for this property</h3>'}<div class="pr-picks">${[7,14].map(day=>Number(c.day)>=day?`<button type="button" class="pr-pick" onclick="openPropertyReport(${index},${day},this)"><b>Day ${day} report</b><small>Ready · click to open</small></button>`:`<div class="pr-pick off"><b>Day ${day} report</b><small>${c.day?'Ready on day '+day:'Ready after launch'}</small></div>`).join('')}</div><div id="pr-view"></div></section>`;refreshPhotoAssets();hydrateReviewItems(r);persist();if(typeof campaignPhase==='function'&&campaignPhase(c)==='completed'&&!c.rerunPaid)showRerunOffer(index)}
 function sampleReviewItems(c){
  // One ad for the whole campaign. If the listing link had a video, the ad is a video ad and
  // the video is also the first post (day 1). Otherwise the ad is a photo ad and every post is a photo.
@@ -207,8 +207,25 @@ function nextCampaignDate(){
  const date=new Date();date.setDate(date.getDate()+1);
  return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
 }
+function todayDate(){
+ const date=new Date();
+ return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
+}
+/* A go-live date that has already passed is not a launch, it is a dead button. The date input
+ * carries min=today, so a scope holding last week's date makes the whole form invalid and the
+ * browser refuses the submit: pressing "Confirm details" then does nothing at all - no toast,
+ * no request, no error. A draft that outlives its own go-live date rolls forward to the next
+ * free day instead of becoming unclickable. */
+function goLiveDate(value){
+ const date=String(value||'').slice(0,10);
+ return /^\d{4}-\d{2}-\d{2}$/.test(date)&&date>=todayDate()?date:nextCampaignDate();
+}
+function dateLabel(value){
+ const d=new Date(String(value||'')+'T12:00:00');
+ return Number.isNaN(d.getTime())?String(value||''):d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+}
 function initialCampaignScope(c){
- return {address:c.address,listing:c.url||'',media:c.media||'',facts:c.research?.facts||c.area||'',highlights:c.research?.highlights||'',photoPlan:c.research?.photoPlan||'Prioritize front and rear exterior, kitchen, living room and standout features. Include a pool, waterfront or land when present. Skip routine toilet and closet photos.',start:c.start||(c.scopeFirst?nextCampaignDate():'2026-11-02'),time:'10:00',zone:c.research?.zone||(examples.includes(c)?'America/Chicago':Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'),budget:'50',destination:c.destination||''};
+ return {address:c.address,listing:c.url||'',media:c.media||'',facts:c.research?.facts||c.area||'',highlights:c.research?.highlights||'',photoPlan:c.research?.photoPlan||'Prioritize front and rear exterior, kitchen, living room and standout features. Include a pool, waterfront or land when present. Skip routine toilet and closet photos.',start:goLiveDate(c.start),time:'10:00',zone:c.research?.zone||(examples.includes(c)?'America/Chicago':Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'),budget:'50',destination:c.destination||''};
 }
 const scopeFields=[
  ['address','Property address','text'],['listing','Public listing or MLS URL','url'],['media','Photo and video gallery URL','url'],['facts','Property facts (price, beds, baths, size)','textarea'],['start','Go-live date','date'],['highlights','Standout features and location','textarea'],['photoPlan','Photo priorities and exclusions','textarea'],['budget','Meta ad budget','text'],['destination','Send clicks to','url']
@@ -222,9 +239,10 @@ function campaignScopePanel(r){
  const shown=['budget','start','destination'];
  const hidden=scopeFields.filter(f=>!shown.includes(f[0])).map(([key])=>`<input type="hidden" name="${key}" value="${esc(s[key]||'')}">`).join('');
  const amounts=[...new Set([50,75,100,150,200,budget])].sort((a,b)=>a-b);
- const when=s.start?new Date(s.start+'T12:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}):'';
+ const start=goLiveDate(s.start);
+ const when=new Date(start+'T12:00').toLocaleDateString(undefined,{month:'short',day:'numeric'});
  const today=new Date().toISOString().slice(0,10);
- return `<details class="panel campaign-scope" ${locked?'':'open'}><summary class="campaign-step-title"><span>1</span> Confirm your launch details ${locked?`<small>✓ Goes live ${esc(when)} · $${budget} budget</small>`:''}</summary><form onsubmit="event.preventDefault();saveCampaignScope(this)">${hidden}<fieldset ${locked?'disabled':''} class="budget-step"><legend class="sr-only">Launch details</legend><div class="ls-grid"><div class="ls-col"><label class="scope-field">Go-live date<input name="start" type="date" required value="${esc(s.start||'')}" min="${today}"></label><p class="budget-note">The day your posts and listing ad start going out.</p></div><div class="ls-col"><label class="scope-field">Send clicks to (optional)<input name="destination" type="text" inputmode="url" placeholder="https://..." value="${esc(s.destination||'')}"></label><p class="budget-note">The page people land on when they click your posts or ad. Left blank, it uses your listing link.</p></div><div class="ls-col"><label class="scope-field">Ad budget<select name="budget">${amounts.map(a=>`<option value="${a}" ${a===budget?'selected':''}>$${a}${a===50?' · Default':''}</option>`).join('')}</select></label><p class="budget-note">Meta bills your ad spend separately from your Resmara campaign. Our default budget is $50.</p></div></div></fieldset>${untilSoldPanel(ReviewStudio.active)}<div class="scope-form-actions">${locked?`<div class="scope-locked"><strong>✓ Goes live ${esc(when)} · $${budget} budget</strong>${r.approved?'':'<button type="button" class="alt" onclick="unlockCampaignScope()">Change details</button>'}</div>`:'<button class="campaign-primary scope-approval-button">Confirm details</button>'}${reviewCampaignBoostId()==null?'':(r.items&&r.items.length?'':'<button type="button" class="alt" onclick="rebuildLiveCampaign()">Build content with Resmara</button>')}</div></form></details>`;
+ return `<details class="panel campaign-scope" ${locked?'':'open'}><summary class="campaign-step-title"><span>1</span> Confirm your launch details ${locked?`<small>✓ Goes live ${esc(when)} · $${budget} budget</small>`:''}</summary><form novalidate onsubmit="event.preventDefault();saveCampaignScope(this)">${hidden}<fieldset ${locked?'disabled':''} class="budget-step"><legend class="sr-only">Launch details</legend><div class="ls-grid"><div class="ls-col"><label class="scope-field">Go-live date<input name="start" type="date" required value="${esc(start)}" min="${today}"></label><p class="budget-note">The day your posts and listing ad start going out.</p></div><div class="ls-col"><label class="scope-field">Send clicks to (optional)<input name="destination" type="text" inputmode="url" placeholder="https://..." value="${esc(s.destination||'')}"></label><p class="budget-note">The page people land on when they click your posts or ad. Left blank, it uses your listing link.</p></div><div class="ls-col"><label class="scope-field">Ad budget<select name="budget">${amounts.map(a=>`<option value="${a}" ${a===budget?'selected':''}>$${a}${a===50?' · Default':''}</option>`).join('')}</select></label><p class="budget-note">Meta bills your ad spend separately from your Resmara campaign. Our default budget is $50.</p></div></div></fieldset>${untilSoldPanel(ReviewStudio.active)}<div class="scope-form-actions">${locked?`<div class="scope-locked"><strong>✓ Goes live ${esc(when)} · $${budget} budget</strong>${r.approved?'':'<button type="button" class="alt" onclick="unlockCampaignScope()">Change details</button>'}</div>`:'<button class="campaign-primary scope-approval-button">Confirm details</button>'}${reviewCampaignBoostId()==null?'':(r.items&&r.items.length?'':'<button type="button" class="alt" onclick="rebuildLiveCampaign()">Build content with Resmara</button>')}</div></form></details>`;
 }
 function unlockCampaignScope(){
  const r=activeReview();if(r.approved||ReviewStudio.building.has(r))return;
@@ -232,15 +250,24 @@ function unlockCampaignScope(){
 }
 function saveCampaignScope(form){
  const r=activeReview();if(r.approved||r.scopeConfirmed)return;
- const next={};
+ const next={},rolled=[];
  for(const [key,,type] of scopeFields){
   const field=form.elements[key];
-  const value=field.value.trim();
+  if(!field)continue;
+  let value=String(field.value||'').trim();
+  // A date that slipped into the past is moved, not refused: refusing it here is what made the
+  // button look broken, because the browser's own validation message never reached the page.
+  if(key==='start'){const fixed=goLiveDate(value);if(fixed!==value)rolled.push([value,fixed]);value=fixed;if(field.value!==fixed)field.value=fixed}
   next[key]=type==='url'?normalizeWebLink(value):value;
-  if(next[key]===null||(['address','start'].includes(key)&&!value)){toast('Check the '+field.closest('label').firstChild.textContent.toLowerCase()+' field.');field.focus();return}
+  if(next[key]===null||(['address','start'].includes(key)&&!value)){
+   const label=field.closest('label');
+   const name=label&&label.firstChild&&label.firstChild.textContent?label.firstChild.textContent.trim().toLowerCase():key;
+   toast('Check the '+name+' field.');if(field.focus)field.focus();return;
+  }
  }
  if(next.start!==r.scope.start)ReviewStudio.month=null;
  r.scope={...r.scope,...next};r.brandProfile=campaignBrandProfile();r.scopeConfirmed=true;r.calendarApproved=false;r.needsBuild=r.scopeFirst;
+ if(rolled.length)toast('Go-live date moved to '+dateLabel(rolled[0][1])+' — '+dateLabel(rolled[0][0])+' has already passed.');
  // The scope form already collects the photo gallery URL. Use it: a scope that names a
  // gallery but leaves the campaign with no photos is exactly the "why is my calendar blank"
  // case. Failing here must not block approval — the photos panel can still import by hand.
@@ -365,9 +392,12 @@ function buildApprovedScope(){
 // Build the calendar from the real content engine (POST /api/boosts/{id}/build + GET .../posts).
 function photoPermissionChanged(){
  const box=document.querySelector('#photoPermission');
- const build=document.querySelector('.campaign-scope .scope-form-actions .alt');
- if(build&&/Build content/.test(build.textContent||''))build.disabled=!(box&&box.checked);
- if(box&&box.checked)RM.setPhotoPermission(reviewCampaignBoostId(),true).catch(()=>{});
+ if(!box)return;
+ // Never disable the build button: a disabled button cannot say why, and clicking it read as
+ // broken. Un-ticking is recorded here, and Build points at this box when it is not ticked.
+ const panel=box.closest('.photo-permission');
+ if(panel)panel.classList.toggle('granted',box.checked);
+ if(box.checked&&reviewCampaignBoostId()!=null&&window.RM&&RM.setPhotoPermission)RM.setPhotoPermission(reviewCampaignBoostId(),true).catch(()=>{});
 }
 async function buildCampaignFromBackend(){
  const r=activeReview(),boostId=reviewCampaignBoostId();
@@ -377,8 +407,19 @@ async function buildCampaignFromBackend(){
  // server refuses, so ask for it here rather than failing after the engine has started.
  const permissionBox=document.querySelector('#photoPermission');
  if(permissionBox&&!permissionBox.checked){
-  permissionBox.focus();
-  toast('Please confirm you have permission to use these photos first.');
+  // The box sits in the photos panel below this button, so a toast alone looked like nothing
+  // happened — and the "building" dialog stayed on screen with no build behind it. Close it and
+  // bring the box to the front instead.
+  if(modal&&modal.open)modal.close();
+  details(ReviewStudio.active);
+  const box=document.querySelector('#photoPermission');
+  if(box){
+   const panel=box.closest('.photo-permission');
+   if(panel){panel.classList.add('needs-attention');setTimeout(()=>panel.classList.remove('needs-attention'),5000)}
+   try{box.scrollIntoView({block:'center'})}catch(e){}
+   try{box.focus({preventScroll:true})}catch(e){if(box.focus)box.focus()}
+  }
+  toast('One tick before Resmara can build: “I have permission to use these photos”.');
   return;
  }
  ReviewStudio.building.add(r);
@@ -428,8 +469,19 @@ async function buildCampaignFromBackend(){
 // otherwise return without doing anything.
 async function rebuildLiveCampaign(){
  const r=activeReview(),boostId=reviewCampaignBoostId();
- if(boostId==null||!window.RM)return;
- const approved=r.approved;r.approved=false;r.scopeConfirmed=true;r.scopeFirst=true;
+ // One click must either start the build or say what is missing. Returning silently is exactly
+ // what "Build content with Resmara isn't working" looked like from the outside.
+ if(boostId==null||!window.RM){toast('This campaign isn’t linked to a backend boost yet.');return}
+ if(ReviewStudio.building.has(r)){toast('Resmara is already building this campaign.');return}
+ if(!r.scopeConfirmed){
+  // A build needs an approved scope. Confirming it here is the same thing "Confirm details"
+  // does, so this button can never be a no-op on a fresh draft.
+  const form=document.querySelector('.campaign-scope form');
+  if(!form){toast('Confirm your launch details first.');return}
+  saveCampaignScope(form);
+  return;
+ }
+ const approved=r.approved;r.approved=false;r.scopeFirst=true;
  try{await buildCampaignFromBackend()}finally{r.approved=approved;persist()}
 }
 
