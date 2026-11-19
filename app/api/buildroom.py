@@ -24,10 +24,11 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.security import get_admin_user
 from app.db.session import BuildroomTask, get_db
 from app.services import team_access
@@ -206,6 +207,33 @@ class TestedIn(BaseModel):
 
 
 # ── routes ───────────────────────────────────────────────────────────────────────────
+def _require_system_token(x_resmara_token: str = Header(default="")) -> None:
+    """The release watcher is machine-called, so it carries the shared scheduler token."""
+    if not settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=503, detail="RESMARA_PUBLISH_TOKEN is not configured")
+    if x_resmara_token != settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=403, detail="Bad publish token")
+
+
+@router.post("/admin/buildroom/sync")
+def sync_from_releases(limit: int = 20, _tok=Depends(_require_system_token),
+                       db: Session = Depends(get_db)):
+    """Turn the Releases list into build room rows, and close them when the release is live.
+
+    Called by the scheduler (``scripts/resmara_clock.sh``) every 15 minutes, so the board is
+    never more than a quarter of an hour behind GitHub and Render. Idempotent: a second run
+    with the same releases reports nothing to do.
+    """
+    from app.api import system as system_api
+    from app.services.buildroom_sync import sync
+
+    payload = system_api.releases(limit=max(1, min(limit, 20)), user=None)
+    result = sync(db, payload)
+    result["releases_connected"] = bool(payload.get("connected"))
+    result["release_problems"] = payload.get("problems") or []
+    return result
+
+
 @router.get("/admin/buildroom")
 def list_tasks(db: Session = Depends(get_db), _admin=Depends(team_access.needs("build"))):
     rows = db.query(BuildroomTask).order_by(
