@@ -344,7 +344,8 @@ function setupFolds() {
   FOLDS.forEach(([sel, key, h]) => {
     const sec = document.querySelector(sel), head = sec && sec.querySelector(h);
     if (!head) return;
-    const closed = !!state.folds[key];
+    // state.folds[key] true = opened. Every section starts closed each time a campaign is opened.
+    const closed = !state.folds[key];
     sec.classList.add('fold'); sec.classList.toggle('folded', closed);
     head.setAttribute('aria-expanded', String(!closed));
     if (head.dataset.fold) return;

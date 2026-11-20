@@ -263,11 +263,15 @@ function addPaymentCard() {
 }
 
 // ===== Review copy: start over as a brand-new client =====
-if (state.freshClient && typeof examples !== 'undefined') examples.splice(0);
+// New clients start with one sample campaign, 1248 Oakridge Drive, so they can open it and see what
+// a campaign looks like. (The sales demo keeps both samples.)
+function clientView() { return !!state.freshClient || !!(window.RM && RM.isLoggedIn && RM.isLoggedIn()); }
+function trimSamples() { if (typeof examples !== 'undefined' && clientView() && examples.length > 1) examples.splice(1); }
+trimSamples();
 function newClientDemo() {
   try { localStorage.clear(); } catch (e) {}
   state = { campaigns: [], freshClient: true, connected: false };
-  examples.splice(0); persist();
+  examples.splice(1); persist();
   location.hash = ''; home(); window.scrollTo(0, 0);
   obPickScenario(false);
 }
@@ -360,6 +364,7 @@ let introLastView = null;
 (function () {
   const base = dashboard;
   dashboard = function (v = 'campaigns') {
+    trimSamples();
     base(v);
     const seen = state.introViews || (state.introViews = {});
     if (v !== introLastView) { seen[v] = (seen[v] || 0) + 1; introLastView = v; persist(); }
@@ -369,7 +374,13 @@ let introLastView = null;
 })();
 (function () {
   const base = details;
-  details = function (i) { const out = base(i); metaIssueBanner(); return out; };
+  details = function (i) {
+    const out = base(i); metaIssueBanner();
+    const c = [...state.campaigns, ...examples][i], box = document.querySelector('#content');
+    if (clientView() && examples.includes(c) && box && !box.querySelector('.sample-note'))
+      box.insertAdjacentHTML('afterbegin', '<div class="notice page-intro sample-note"><b>This is a sample campaign.</b> It shows what you’ll get for every listing: your leads, the posts and ad calendar, the listing website and your seller reports. Open each section to look around. Your own campaigns appear next to it when you click + Campaign.</div>');
+    return out;
+  };
 })();
 
 // ---- Support replies: orange count on Support in the sidebar -----------------------------------
@@ -405,6 +416,7 @@ function paintSupportBadge() {
 (function () {
   const base = dashboard;
   dashboard = function (v = 'campaigns') {
+    trimSamples();
     base(v); paintSupportBadge();
     // Live app: ask the API how many team replies the agent hasn't seen yet.
     if (supportSignedIn() && window.RM && RM.tickets) RM.tickets().then(rows => {

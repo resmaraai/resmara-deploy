@@ -541,7 +541,7 @@ function setupGuides(open) {
 
 // Section C on the homepage: the sample listing website, the same page agents get, read-only.
 function homeSitePreview(){
- const box=document.getElementById('home-site-view');if(!box||typeof listingSiteHTML!=='function')return;
+ const box=document.querySelector('#home-site-view');if(!box||typeof listingSiteHTML!=='function')return;
  const c=examples.find(e=>e.address==='1248 Oakridge Drive')||{address:'1248 Oakridge Drive',area:'Austin, TX · $845,000',image:'sample/card-1.jpg'};
  box.innerHTML=`<div inert>${listingSiteHTML(c,0)}</div>${scrollHint('Scroll to see the whole website')}`;
  if(typeof loadListingFonts==='function'&&typeof listingSiteData==='function')loadListingFonts(listingSiteData(c).fonts||[]);

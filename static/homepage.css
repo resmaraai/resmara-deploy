@@ -1263,3 +1263,4 @@ html.dark .marketing-home .home-nav nav a{color:#fff!important}
 .home-site-preview .lp-frame{margin:0;border-radius:22px}
 .home-site-preview .lp-view{max-height:520px;position:relative}
 #modal .ig-switch-actions{justify-content:flex-start;gap:10px}
+.card{position:relative}.card-sample{position:absolute;top:14px;left:14px;z-index:2;background:#12354d;color:#fff;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700}

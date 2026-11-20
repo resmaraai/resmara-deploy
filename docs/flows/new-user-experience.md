@@ -201,7 +201,12 @@ are Dan's.
   - With no card, the agent sees "Add a card to build your campaign" first and goes to Stripe's
     page.
   - Ad spend is billed by Meta, separately.
-- **Live campaign page.** Four sections, in this order, each collapsible:
+- **The sample campaign.** Every new client starts with one sample, **1248 Oakridge Drive**, so
+  they can open a full campaign and see what to expect. Its card has a **Sample** tag on the photo,
+  and its page opens with a note: "This is a sample campaign…". (The sales demo keeps both samples
+  and shows no tag.) `trimSamples()` and `clientView()` in `static/onboarding.js`.
+- **Live campaign page.** Four sections, in this order, each collapsible. **Every section starts
+  closed each time a campaign is opened**; the agent opens the ones they want:
   1. Campaign leads (website leads above comment leads)
   2. Campaign calendar
   3. Your listing page
