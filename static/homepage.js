@@ -66,11 +66,11 @@ function homeSellerReport(day){const target=document.querySelector('#home-report
  target.innerHTML=`<div class="pr-home">${propertyReportHTML(demoReportData({address:'The Oakridge House',area:'Austin, TX',image:'sample/post-01.jpg'},day))}</div>${scrollHint('Scroll to see the full report')}`;target.scrollTop=0;target.classList.remove('scrolled');armScrollHint(target)}
 
 function siteNav(active){
- const links=[];
+ const links=[['home','Home','home'],['setup-guides','Setup','setupGuides']];
  return `<header class="home-nav shared-nav">${logo}<nav aria-label="Main navigation">${links.map(([id,label,fn])=>`<a href="#${id==='home'?'':id}" ${active===id?'aria-current="page"':''} onclick="${fn}();return false">${label}</a>`).join('')}</nav><button class="alt" onclick="clientAccess()">${state.clientSignedIn?'My Dashboard':'Client Login'}</button></header>`;
 }
 function footerLinks(){
- return `<span style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;font-size:12px"><a href="privacy.html">Privacy</a><a href="data-deletion.html">Data deletion</a><a href="terms.html">Terms</a><a href="#setup-guides" onclick="setupGuides();return false">Setup guides</a><a href="mailto:resmaraai@gmail.com" target="_blank" rel="noopener">Contact</a><a href="admin.html">Team room</a></span>`;
+ return `<span style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;font-size:12px"><a href="privacy.html">Privacy</a><a href="data-deletion.html">Data deletion</a><a href="terms.html">Terms</a><a href="mailto:resmaraai@gmail.com" target="_blank" rel="noopener">Contact</a><a href="admin.html">Team room</a></span>`;
 }
 // Signing out ends this browser's copy of the workspace too. Two agents can share one machine,
 // and the next account must never open on the last one's listings: a new client signed up here
@@ -518,14 +518,21 @@ const SETUP_GUIDES = [
 function setupGuides(open) {
  if (typeof stopResmaraGuide === 'function') stopResmaraGuide();
  if (typeof modal !== 'undefined' && modal.open) modal.close();
- location.hash = 'setup-guides'; document.title = 'Setup guides — Resmara';
- const card = g => `<details class="sg-guide" id="sg-${g.id}" ${g.id === open ? 'open' : ''}><summary><span class="sg-title">${g.title}</span><span class="sg-tag${g.need === 'Required' ? ' req' : ''}">${g.need}</span><span class="sg-time">${g.time}</span><span class="fold-chev" aria-hidden="true"></span></summary>
-  <div class="sg-body"><p>${g.why}</p><ol class="ig-switch-steps">${g.steps.map((s, i) => `<li><span>${i + 1}</span><div>${s}</div></li>`).join('')}</ol>${g.note ? `<p class="fine">${g.note}</p>` : ''}${g.link ? `<a class="sg-open" href="${g.link[1]}" target="_blank" rel="noopener">${g.link[0]}</a>` : ''}</div></details>`;
- app.innerHTML = `<div class="marketing-home">${siteNav('setup-guides')}<main><section class="home-section sg-page"><div class="sg-head"><span class="home-kicker">SETUP GUIDES</span><h1>Get your accounts<br><span>ready for Resmara.</span></h1>
-  <p>Resmara works best when you have a Facebook business Page, a business Instagram linked to it, and a Meta ad account. Then Resmara posts, advertises and reports for you from day one. Here’s how to set up each one.</p>
-  <ul class="sg-check"><li><b>Facebook business Page</b> you fully control <span class="sg-tag req">Required</span></li><li><b>Business Instagram</b> linked to the Page <span class="sg-tag">Recommended</span></li><li><b>Meta ad account</b> with a payment method <span class="sg-tag">Recommended</span></li></ul></div>
-  <div class="sg-list">${SETUP_GUIDES.map(card).join('')}</div>
-  <div class="sg-help"><b>Rather do it together?</b> Book a free 30-minute setup call and one of our team will set it all up with you.<button type="button" class="home-primary" onclick="obBook(true)">Book a free setup call</button></div></section></main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
+ location.hash = 'setup-guides'; document.title = 'Setup — Resmara';
+ const jump = id => `document.getElementById('sg-${id}').scrollIntoView({behavior:'smooth',block:'start'});return false`;
+ const card = (g, n) => `<li class="sg-card" id="sg-${g.id}"><span class="home-step-num">${n + 1}</span><small>${g.need.toUpperCase()} · ${g.time.toUpperCase()}</small><h3>${g.title}</h3><p>${g.why}</p>
+  <ol class="sg-steps">${g.steps.map(t => `<li>${t}</li>`).join('')}</ol>${g.note ? `<p class="sg-note">${g.note}</p>` : ''}${g.link ? `<a class="home-primary sg-btn" href="${g.link[1]}" target="_blank" rel="noopener">${g.link[0]}</a>` : ''}</li>`;
+ app.innerHTML = `<div class="marketing-home">${siteNav('setup-guides')}<main>
+  <section class="home-section sg-hero"><div class="home-section-heading"><div><span class="home-kicker">SETUP</span><h2>Set up once.<br><span>Resmara does the rest.</span></h2></div><p>Resmara posts, advertises and reports through your own Facebook Page, Instagram and Meta ad account. Get these three ready and your campaigns run in full from day one. Each step below takes a few minutes.</p></div>
+   <ol class="home-steps sg-need">
+    <li><span class="home-step-num">1</span><small>REQUIRED</small><h3>A Facebook business Page</h3><p>That you fully control. Resmara posts your listings here.</p><a href="#sg-page" onclick="${jump('page')}">See how</a></li>
+    <li><span class="home-step-num">2</span><small>RECOMMENDED</small><h3>A business Instagram</h3><p>Linked to your Page. Without it, posts go to Facebook only.</p><a href="#sg-instagram" onclick="${jump('instagram')}">See how</a></li>
+    <li><span class="home-step-num">3</span><small>RECOMMENDED</small><h3>A Meta ad account</h3><p>With a payment method. Without it, your posts run but your listing ad is off.</p><a href="#sg-ads" onclick="${jump('ads')}">See how</a></li>
+   </ol></section>
+  <section class="home-section sg-guides"><div class="home-section-heading"><div><span class="home-kicker">STEP BY STEP</span><h2>Seven quick steps.<br><span>About 25 minutes in all.</span></h2></div><p>Already have some of these? Skip to the ones you need. When you’re done, connect in your Resmara dashboard and it checks everything for you.</p></div>
+   <ol class="sg-grid">${SETUP_GUIDES.map(card).join('')}</ol></section>
+  <section class="home-finish"><span class="home-mini-robot" aria-hidden="true"></span><h2>Rather do it together?</h2><p>Book a free 30-minute setup call and one of our team will set it all up with you.</p><button type="button" class="home-primary" onclick="obBook(true)">Book a free setup call</button></section>
+ </main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
  const el = open && document.getElementById('sg-' + open);
  if (el) setTimeout(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50); else window.scrollTo(0, 0);
 }

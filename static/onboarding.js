@@ -87,15 +87,21 @@ function obCheck(scenario) {
 function obNeedsSetup(idx) {
   state.obIssues = idx; persist();
   const pageOk = !idx.includes(0) && !idx.includes(1);
-  const issues = metaShownIssues(idx).map(i => `<b>${OB_FIX[i][0]}.</b> ${OB_FIX[i][1]}${i === 2 && pageOk ? ' <button type="button" class="ig-switch-btn" onclick="obIgSwitch()">Switch it now</button>' : ''}`);
+  const issues = metaShownIssues(idx).map(i => `<b>${OB_FIX[i][0]}.</b> ${OB_FIX[i][1]}`);
   show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>${pageOk ? 'You’re connected, with a couple of limits.' : 'You’re in, with one thing to fix.'}</h2>
   ${pageOk ? `<div class="nc-msg ok"><span class="robot-avatar"></span><div><b>Your Facebook Page is connected.</b> ${metaLimitLine(idx)}</div></div><p>To get the most from Resmara, fix these when you can:</p>` : `<div class="nc-msg ok"><span class="robot-avatar"></span><div><b>You can still run campaigns.</b> ${metaLimitLine(idx)}</div></div><p>Resmara can’t find a Facebook Page it can post to yet. Fix this when you can:</p>`}
   <ul class="ob-issues">${issues.map(i => `<li>${i}</li>`).join('')}</ul>
   <div class="notice ob-help"><b>We’ll set it up with you.</b> Book a free setup call and one of our team will fix it with you, step by step, or follow our <a href="#setup-guides" onclick="setupGuides('${META_GUIDE[metaShownIssues(idx)[0]]}');return false">setup guides</a>. You’ll also see a reminder at the top of your dashboard until it’s sorted.</div>
-  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="obBook()">Book a free setup call</button><button class="campaign-primary" onclick="onboard(1)">Continue</button></div><p class="fine ob-skip"><a href="#" onclick="obCheck('ready');return false">Check again</a> · Preview: Check again acts as if you fixed it.</p>
+  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="obBook()">Book a free setup call</button><div class="ig-switch-go"><button type="button" class="nc-cancel" onclick="${metaFixAction(idx)}">Fix it now</button><button class="campaign-primary" onclick="onboard(1)">Continue</button></div></div><p class="fine ob-skip"><a href="#" onclick="obCheck('ready');return false">Check again</a> · Preview: Check again acts as if you fixed it.</p>
 `);
 }
 // With no Page there's nothing to be an admin of, so that line would only repeat the first.
+// What "Fix it now" opens: the Instagram switch when that's the only thing Facebook can fix in
+// place (a Page is connected), otherwise the Setup guide for the first issue.
+function metaFixAction(idx) {
+  const shown = metaShownIssues(idx);
+  return shown[0] === 2 && !idx.includes(0) && !idx.includes(1) ? 'obIgSwitch()' : `setupGuides('${META_GUIDE[shown[0]]}')`;
+}
 // Which setup guide fixes each issue.
 const META_GUIDE = ['page', 'admin', 'instagram', 'ads'];
 function metaShownIssues(idx) { return idx.includes(0) ? idx.filter(i => i !== 1) : idx; }
@@ -111,7 +117,7 @@ function metaIssueBanner() {
   const idx = state.metaIssues || [];
   const box = document.querySelector('#content');
   if (!box || !idx.length || box.querySelector('.meta-issue')) return;
-  box.insertAdjacentHTML('afterbegin', `<div class="meta-issue" role="alert"><b class="meta-issue-title">There’s an issue with your Meta account.</b><ul>${metaShownIssues(idx).map(i => `<li>${META_ISSUE_SHORT[i]}.${i === 2 && !idx.includes(0) && !idx.includes(1) ? ' <button type="button" class="ig-switch-btn" onclick="obIgSwitch()">Switch it now</button>' : ''}</li>`).join('')}</ul><p>${metaLimitLine(idx)} <a href="#setup-guides" onclick="setupGuides('${META_GUIDE[metaShownIssues(idx)[0]]}');return false">See how to fix it</a></p><div class="meta-issue-actions"><button type="button" class="meta-issue-book" onclick="obBook()">Book a call to fix it</button><button type="button" class="meta-issue-check" onclick="onboard(0)">Check again</button></div></div>`);
+  box.insertAdjacentHTML('afterbegin', `<div class="meta-issue" role="alert"><b class="meta-issue-title">There’s an issue with your Meta account.</b><ul>${metaShownIssues(idx).map(i => `<li>${META_ISSUE_SHORT[i]}.</li>`).join('')}</ul><p>${metaLimitLine(idx)}</p><div class="meta-issue-actions"><button type="button" class="mi-btn mi-main" onclick="${metaFixAction(idx)}">Fix it now</button><button type="button" class="mi-btn" onclick="obBook()">Book a call to fix it</button><button type="button" class="mi-btn" onclick="onboard(0)">Check again</button></div></div>`);
 }
 
 // No Facebook account at all: the one hard stop. Resmara learns the brand from Facebook and posts

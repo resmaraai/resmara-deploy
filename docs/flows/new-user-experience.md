@@ -94,7 +94,7 @@ To test these in the preview, pick one in the **What should we test?** list afte
 |----------|---------------|-------------|--------------------|---------|
 | Everything set up | "You're connected." (green) | **Build my brand** | Yes, full: Facebook, Instagram and the ad | None |
 | No ad account | "You're connected, with a couple of limits." | **Continue** | Yes: Facebook and Instagram posts, **no ad** | Yes |
-| Instagram is personal | "You're connected, with a couple of limits." | **Continue** | Yes: **Facebook posts only**, plus the ad | Yes, with **Switch it now** |
+| Instagram is personal | "You're connected, with a couple of limits." | **Continue** | Yes: **Facebook posts only**, plus the ad | Yes |
 | Not an admin of the Page | "You're in, with one thing to fix." | **Continue** | Yes, but posts are **downloaded** until the Page is connected; no ad | Yes |
 | No Facebook business Page | "You're in, with one thing to fix." | **Continue** | Yes, but posts are **downloaded** until the Page is connected; no ad | Yes |
 | No Facebook account at all | "You'll need a Facebook account first." | **Open Facebook** (new tab) and **I've set it up** | **No.** They can look around; + Campaign is blocked | None. Accounts shows the connect prompt |
@@ -126,7 +126,7 @@ are Dan's.
 | Ad account exists but has no card, or Meta disabled it | Same as no ad account: "Your ad account can't run ads yet". Posts still go out. |
 | **server:** connection breaks later (Facebook password changed, access removed, token expired) | Red box "Your Meta connection needs refreshing", with **Reconnect**. Scheduled posts are held, not lost, and go out after reconnecting. |
 | **server:** Page connected after a campaign has started | From then on, posts go out on schedule. Posts whose time has already passed are **not** sent late; the agent had them to download. |
-| Agent doesn't know how to fix something | Every screen links to the matching **Setup guide** (section 8) and to **Book a free setup call**. |
+| Agent doesn't know how to fix something | Every screen links to the matching **Setup** step (section 8) and to **Book a free setup call**. |
 
 ---
 
@@ -142,9 +142,10 @@ are Dan's.
 - **Buttons:**
   - **Book a call to fix it** opens the setup-call booking.
   - **Check again** re-runs Step 1.
-  - **Switch it now** sits next to the Instagram bullet only, and only when a Page is connected. It
-    opens the pop-up in section 5.
-  - **See how to fix it** opens the Setup guide for the first issue.
+  - Three buttons in one row, all the same size: **Fix it now** (orange), **Book a call to fix it**
+    and **Check again** (dark blue).
+  - **Fix it now** opens the Instagram pop-up (section 5) when that's the issue and a Page is
+    connected. Otherwise it opens the Setup step for the first issue (`metaFixAction()`).
 - With no Page, the "not an admin" bullet is hidden, because it would only repeat the first one.
 - **When it goes away:** the next check passes all four items. The check runs on every sign-in
   and every time **Check again** is clicked.
@@ -157,8 +158,8 @@ are Dan's.
   account. Facebook's own **Connect account** flow does convert it, while it links the Instagram
   to the Page. This pop-up explains that and then sends the agent there.
 - **Opened from:**
-  - **Switch it now** in the red box;
-  - **Switch it now** on the Step 1 result screen.
+  - **Fix it now** in the red box;
+  - **Fix it now** on the Step 1 result screen (it sits next to **Continue**).
 - **Content:**
   - Title: "Switch your Instagram to a business account."
   - Four facts: it's free and takes about a minute; posts and followers stay; they gain a
@@ -246,17 +247,19 @@ The front end in PR #10 depends on these. The items marked **check** may not be 
 
 ---
 
-## 8. Setup guides (website)
+## 8. Setup page (website)
 
-- **Where:** `#setup-guides` on the website. It's linked from:
-  - the footer of every page;
+- **Where:** **Setup** in the top menu of the website, next to **Home** (`#setup-guides`). It's
+  also linked from:
   - the "Before your first campaign" band on the homepage;
   - the no-Facebook screen;
   - the Step 1 result;
-  - the red box (**See how to fix it**);
+  - **Fix it now** in the red box;
   - the Instagram pop-up;
   - the help chat.
-- **The seven guides:**
+- **The page:** a "what you need" row (Page, Instagram, ad account) and then seven step cards,
+  in the homepage's own card, number-bubble and button style.
+- **The seven steps:**
   1. Facebook account
   2. Business Page
   3. Full control of the Page
@@ -277,9 +280,9 @@ Preview copy: https://claude.ai/artifact/Lip2AN9HQZuLf4J5AsP8Vy
 
 - **`#new`:** start as a brand-new client. Click **Client Login** and pick a Meta scenario from
   section 3. Then go through sign-up, the confirm email, sign-in and Step 1.
-- **`#setup-guides`:** the Setup guides page.
+- **`#setup-guides`:** the Setup page.
 - **`#instagram`:** jumps straight to a signed-in agent with a personal Instagram. The red box and
-  **Switch it now** are showing.
+  **Fix it now** are showing.
 - **No hash:** the normal demo agent, everything connected.
 - In the hosted preview, **reload the page after changing the `#` part of the address**. The
   preview only reads it when the page loads.

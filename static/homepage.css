@@ -1188,9 +1188,9 @@ html.dark #modal .withdrawn-note{color:#fff}
 .meta-issue li,.meta-issue p{color:#fff!important;font-size:14px;line-height:1.55}
 .meta-issue p{margin:6px 0 14px}
 .meta-issue-actions{display:flex;gap:10px;flex-wrap:wrap}
-.meta-issue-actions button{border:0!important;border-radius:999px!important;font-weight:700;font-size:14px!important;padding:10px 18px!important;min-height:0!important;width:auto!important}
-.meta-issue-book{background:#fff!important;color:#b3261e!important}
-.meta-issue-check{background:#7f1a14!important;color:#fff!important}
+.meta-issue-actions .mi-btn{border:0!important;border-radius:999px!important;font-weight:700;font-size:15px!important;height:46px;padding:0 24px!important;min-height:0!important;min-width:180px;width:auto!important;background:#12354d!important;color:#fff!important;cursor:pointer}
+.meta-issue-actions .mi-btn.mi-main{background:#d94c0d!important}
+.meta-issue-actions .mi-btn:hover{filter:brightness(1.12)}
 html.dark .shell .meta-issue,html.dark .shell .meta-issue *{color:#fff}
 html.dark .shell .meta-issue .meta-issue-book{color:#b3261e!important}
 
@@ -1213,32 +1213,30 @@ html.dark .ig-switch-steps li>span{background:#fff;color:#12354d}
 #modal a.ig-switch-open:hover{background:#b93f09}
 #modal .modal-actions button.ig-switch-btn,#modal button.ig-switch-btn{padding:3px 12px!important;font-size:12px!important;min-height:0!important;margin:4px 0 0 6px;width:auto}
 
-/* Setup guides */
-.sg-page{display:grid;gap:28px;max-width:900px;margin:0 auto}
-.sg-check{list-style:none;padding:0;margin:16px 0;display:grid;gap:8px}
+/* Setup page: the homepage's own step cards, number bubbles and buttons */
+.home-setup{display:grid;grid-template-columns:1.2fr 1fr;gap:40px;align-items:center}
+@media(max-width:760px){.home-setup{grid-template-columns:1fr}}
+.sg-check{list-style:none;padding:0;margin:16px 0 24px;display:grid;gap:8px}
 .sg-check li{display:flex;align-items:center;gap:10px;color:#12354d}
 .sg-tag{display:inline-block;padding:2px 10px;border-radius:999px;background:#12354d;color:#fff;font-size:12px;font-weight:600}
 .sg-tag.req{background:#d94c0d}
-.sg-list{display:grid;gap:12px}
-.sg-guide{background:#fff;border:1px solid #d6e6ef;border-radius:16px;padding:0 22px}
-.sg-guide summary{list-style:none;display:flex;align-items:center;gap:12px;padding:18px 0;cursor:pointer}
-.sg-guide summary::-webkit-details-marker{display:none}
-.sg-title{flex:1;font-size:18px;font-weight:600;color:#12354d}
-.sg-time{font-size:13px;color:#12354d}
-.sg-guide .fold-chev{width:10px;height:10px;border-right:2px solid #12354d;border-bottom:2px solid #12354d;transform:rotate(45deg);margin:0 4px 4px 6px;transition:transform .2s}
-.sg-guide[open] .fold-chev{transform:rotate(-135deg);margin-bottom:-4px}
-.sg-body{padding:0 0 20px;color:#12354d}
-.sg-open{display:inline-block;background:#d94c0d;color:#fff!important;border-radius:999px;padding:11px 20px;font-weight:600;text-decoration:none}
-.sg-open:hover{background:#b93f09}
-.sg-help{background:#143a50;color:#fff;border-radius:16px;padding:22px 26px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:space-between}
-.home-setup{display:grid;grid-template-columns:1.2fr 1fr;gap:40px;align-items:center}
-@media(max-width:760px){.home-setup{grid-template-columns:1fr}.sg-time{display:none}}
-html.dark .sg-guide{background:#143a50;border-color:#1f4d68}
-html.dark .sg-title,html.dark .sg-time,html.dark .sg-body,html.dark .sg-check li{color:#fff}
-html.dark .sg-guide .fold-chev{border-color:#fff}
-html.dark .sg-tag{background:#fff;color:#12354d}
-html.dark .sg-tag.req{background:#d94c0d;color:#fff}
-.meta-issue p a{color:#fff;text-decoration:underline}
+html.dark .sg-check li{color:#fff}
+.sg-need{grid-template-columns:repeat(3,minmax(0,1fr))!important;margin-top:34px}
+.sg-need li:not(:last-child)::after{display:none}
+.sg-need a,.sg-card a:not(.home-primary){color:#087db6;font-size:13px;font-weight:700;margin-top:auto}
+.sg-grid{list-style:none;margin:34px 0 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.sg-card{background:#fff;border:1px solid #cfe3ef;border-radius:28px;padding:30px 28px 28px;display:flex;flex-direction:column;scroll-margin-top:24px}
+.sg-card small{display:block;margin-top:18px;font-size:9px;letter-spacing:1.5px;font-weight:800;color:#648096}
+.sg-card h3{font-family:'DM Sans',sans-serif!important;font-weight:800!important;font-size:21px;letter-spacing:-.6px;margin:8px 0 10px;color:#12354d}
+.sg-card>p{font-size:14px!important;line-height:1.65!important;margin:0 0 14px}
+.sg-steps{margin:0 0 14px;padding-left:20px;color:#12354d;font-size:14px;line-height:1.6}
+.sg-steps li{margin:0 0 6px;padding-left:4px}
+.sg-note{font-size:13px!important;color:#12354d;background:#eef5f8;border-radius:14px;padding:10px 14px;margin:0 0 16px!important}
+.sg-btn{align-self:flex-start;margin-top:auto;display:inline-flex;align-items:center;border-radius:999px;text-decoration:none}
+@media(max-width:900px){.sg-need,.sg-grid{grid-template-columns:1fr!important}}
+html.dark .sg-card{background:#143a50;border-color:#1f4d68}
+html.dark .sg-card h3,html.dark .sg-steps,html.dark .sg-card small{color:#fff}
+html.dark .sg-note{background:#0f2f42;color:#fff}
 
 /* One side edge down the whole homepage: nothing (text, coloured boxes, cards) goes closer than
    48px (about half an inch) to the window edge, and on wide screens everything sits in the same
@@ -1250,8 +1248,12 @@ html.dark .sg-tag.req{background:#d94c0d;color:#fff}
 .marketing-home .home-workload>.home-section,.marketing-home .home-results>.home-section,.marketing-home .home-learn>.home-section{max-width:none!important;padding-left:var(--inner)!important;padding-right:var(--inner)!important}
 .marketing-home .home-finish{padding-left:var(--inner)!important;padding-right:var(--inner)!important}
 @media(max-width:760px){.marketing-home{--gutter:24px;--inner:24px}}
-.sg-help{flex-direction:column;align-items:flex-start}
 
 /* Phones: the link demo's long URL was stretching its grid column past the screen. */
 .home-link-layout>*{min-width:0}
 .home-link-demo input{min-width:0;width:100%;text-overflow:ellipsis}
+/* Top menu: dark blue text; the page you're on is underlined in orange. */
+.marketing-home .home-nav nav a{color:#12354d!important;text-decoration:none;font-size:14px;padding:6px 0;border-bottom:2px solid transparent}
+.marketing-home .home-nav nav a[aria-current]{border-bottom-color:#d94c0d}
+html.dark .marketing-home .home-nav nav a{color:#fff!important}
+.sg-grid>.sg-card:last-child:nth-child(odd){grid-column:1/-1}
