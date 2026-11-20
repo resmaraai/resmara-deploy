@@ -1240,14 +1240,16 @@ html.dark .sg-tag{background:#fff;color:#12354d}
 html.dark .sg-tag.req{background:#d94c0d;color:#fff}
 .meta-issue p a{color:#fff;text-decoration:underline}
 
-/* One side edge down the whole homepage: every block's content sits 48px (about half an inch) from
-   the window edge, or lines up with the 1248px content column on wide screens. Coloured bands are
-   inset 24px, so their inner padding makes up the rest. Phones use 24px. */
-.marketing-home{--gutter:48px;--band:24px}
-.marketing-home>header.home-nav,.marketing-home .home-hero,.marketing-home>main>section.home-section,.marketing-home>footer.home-footer{max-width:none!important;padding-left:max(var(--gutter),calc((100% - 1248px)/2))!important;padding-right:max(var(--gutter),calc((100% - 1248px)/2))!important}
-.marketing-home .home-workload,.marketing-home .home-results,.marketing-home .home-learn,.marketing-home .home-finish{margin-left:var(--band)!important;margin-right:var(--band)!important}
-.marketing-home .home-workload>.home-section,.marketing-home .home-results>.home-section,.marketing-home .home-learn>.home-section{max-width:none!important;padding-left:max(calc(var(--gutter) - var(--band)),calc((100% - 1248px)/2))!important;padding-right:max(calc(var(--gutter) - var(--band)),calc((100% - 1248px)/2))!important}
-@media(max-width:760px){.marketing-home{--gutter:24px;--band:12px}}
+/* One side edge down the whole homepage: nothing (text, coloured boxes, cards) goes closer than
+   48px (about half an inch) to the window edge, and on wide screens everything sits in the same
+   1248px column. Coloured boxes sit on that edge and pad their own content 48px inside it.
+   Phones use 24px for both. */
+.marketing-home{--gutter:48px;--inner:48px;--edge:max(var(--gutter),calc((100% - 1248px)/2))}
+.marketing-home>header.home-nav,.marketing-home .home-hero,.marketing-home>main>section.home-section,.marketing-home>footer.home-footer{max-width:none!important;padding-left:var(--edge)!important;padding-right:var(--edge)!important}
+.marketing-home .home-workload,.marketing-home .home-results,.marketing-home .home-learn,.marketing-home .home-finish{margin-left:var(--edge)!important;margin-right:var(--edge)!important;max-width:none!important}
+.marketing-home .home-workload>.home-section,.marketing-home .home-results>.home-section,.marketing-home .home-learn>.home-section{max-width:none!important;padding-left:var(--inner)!important;padding-right:var(--inner)!important}
+.marketing-home .home-finish{padding-left:var(--inner)!important;padding-right:var(--inner)!important}
+@media(max-width:760px){.marketing-home{--gutter:24px;--inner:24px}}
 .sg-help{flex-direction:column;align-items:flex-start}
 
 /* Phones: the link demo's long URL was stretching its grid column past the screen. */
