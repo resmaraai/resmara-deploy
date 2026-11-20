@@ -191,7 +191,7 @@ function submitTestClient(form,creating){
   // back from /api/boosts, so an empty local list here is never a lost listing.
   state={...state,name:(account&&account.name)||state.name||name,email,clientSignedIn:true,campaigns:priorOwner&&priorOwner!==email?[]:(state.campaigns||[]),connected:!!state.connected};
   try{localStorage.setItem('resmara',JSON.stringify(state))}catch{}
-  modal.close();if(creating){state.firstRun=true;state.metaRequired=true;persist();dashboard();setTimeout(()=>onboard(0),400)}else if(typeof metaNagging==='function'&&metaNagging()){dashboard('accounts');setTimeout(()=>onboard(0),400)}else{dashboard();if(state.firstRun&&!state.tourDone)setTimeout(()=>onboard(0),400);else toast('Signed in as '+email);}
+  modal.close();if(creating){state.firstRun=true;state.metaRequired=true;persist();dashboard();setTimeout(()=>onboard(0),400)}else if(typeof metaGateOnLogin==='function'){metaGateOnLogin();toast('Signed in as '+email)}else{dashboard();if(state.firstRun&&!state.tourDone)setTimeout(()=>onboard(0),400);else toast('Signed in as '+email);}
   if(window.RM&&RM.brandProfile){RM.brandProfile().then(remote=>{
     if(!remote||typeof remote!=='object')return;
     // The account's own profile, if it has one, is the copy to keep - it is the one that

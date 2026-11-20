@@ -292,7 +292,7 @@ function metaRequiredPrompt() {
   show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">META ACCOUNT NEEDED</span><h2>Please connect your Meta account.</h2><p>Resmara posts and runs ads through your Facebook Page, Instagram and ad account, so we can’t run campaigns for you until they’re connected.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="obBook()">Book a free setup session</button><button class="campaign-primary" onclick="onboard(0)">Connect your Meta account</button></div>`);
 }
 function metaGateOnLogin() {
-  hydrateOnboarding().then(() => {
+  hydrateOnboarding().then(() => (state.connected && window.RM && RM.onboardingAudit ? RM.onboardingAudit().then(applyMetaChecks).catch(() => {}) : null)).then(() => {
     if (metaNagging()) { dashboard('accounts'); setTimeout(() => onboard(0), 400); return; }
     dashboard('campaigns');
     if (state.firstRun && !state.tourDone) setTimeout(() => onboard(state.connected ? 1 : 0), 400);
@@ -433,6 +433,19 @@ function paintSupportBadge() {
 // Four things have to be true before Resmara can post and spend: a Page, admin rights on it, an
 // Instagram professional account linked to it, and a way to pay. Each line is Meta's answer,
 // and anything Meta does not answer says so instead of showing a tick.
+// The server's four checks, in the order the red box and the setup screens use:
+// 0 page, 1 page_admin, 2 instagram, 3 ad_account. Only the Page is required; the other two limit
+// the campaign (no Instagram posts, no ad) and keep the red box up until they pass.
+const META_CHECK_KEYS = ['page', 'page_admin', 'instagram', 'ad_account'];
+function applyMetaChecks(r) {
+  const checks = r.checks || [];
+  const issues = META_CHECK_KEYS.map((k, i) => { const c = checks.find(x => x.key === k); return c && !c.ok ? i : null; }).filter(i => i !== null);
+  const pageOk = !issues.includes(0) && !issues.includes(1) && !!r.connected;
+  state.metaIssues = r.connected ? issues : [];
+  state.connected = pageOk;
+  state.metaAudit = { status: pageOk ? (issues.length ? 'limited' : 'ready') : 'blocked', checkedAt: new Date().toISOString() };
+  persist();
+}
 function runMetaAudit() {
   const box = document.querySelector('#connDetail');
   const btn = document.querySelector('#metaAuditBtn');
@@ -447,8 +460,7 @@ function runMetaAudit() {
         `<p class="fine">Once you've done this, come back here and click Check connection.</p>` +
         (r.connected ? '' : `<div class="btn-pair"><button class="campaign-primary" onclick="connectMeta()">Connect Meta</button><button class="alt" onclick="obBook()">Book a free setup session</button></div>`);
     }
-    state.metaAudit = { status: r.connected && (r.checks || []).every(c => c.ok) ? 'ready' : 'blocked', checkedAt: new Date().toISOString() };
-    state.connected = !!r.connected;
+    applyMetaChecks(r);
     persist();
     const bad = (r.checks || []).filter(c => !c.ok);
     toast(r.connected ? (bad.length ? `${bad.length} thing(s) still to fix` : 'You\'re ready to run campaigns.') : 'Meta is not connected yet.');
