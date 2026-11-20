@@ -287,8 +287,8 @@ Preview copy: https://claude.ai/artifact/Lip2AN9HQZuLf4J5AsP8Vy
   section 3. Then go through sign-up, the confirm email, sign-in and Step 1.
 - **`#setup-guides`:** the Setup page.
 - **`#instagram`:** jumps straight to a signed-in agent with a personal Instagram. The Meta notice and
-  **Fix it now** are showing.
-- **No hash:** the normal demo agent, everything connected.
+  **Fix it now** are showing. It stays on through reloads until you open `#demo`.
+- **`#demo`:** the normal demo agent, everything connected, both samples.
 - In the hosted preview, **reload the page after changing the `#` part of the address**. The
   preview only reads it when the page loads.
 - Preview only: **Check again** acts as if the agent fixed everything.
