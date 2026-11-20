@@ -90,7 +90,7 @@ We'll revisit only if agents ask for one.
 To test these in the preview, pick one in the **What should we test?** list after **Client Login**
 (section 9).
 
-| Scenario | Result screen | Main button | Can run campaigns? | Red box |
+| Scenario | Result screen | Main button | Can run campaigns? | Meta notice |
 |----------|---------------|-------------|--------------------|---------|
 | Everything set up | "You're connected." (green) | **Build my brand** | Yes, full: Facebook, Instagram and the ad | None |
 | No ad account | "You're connected, with a couple of limits." | **Continue** | Yes: Facebook and Instagram posts, **no ad** | Yes |
@@ -124,7 +124,7 @@ are Dan's.
 | Agent has several Pages and picked the wrong one | Accounts, **Reconnect**, then choose the right Page. |
 | Instagram is linked to a different Page (an old one, or the brokerage's) | Same as Instagram not connected. The guide says to disconnect it from the old Page first. |
 | Ad account exists but has no card, or Meta disabled it | Same as no ad account: "Your ad account can't run ads yet". Posts still go out. |
-| **server:** connection breaks later (Facebook password changed, access removed, token expired) | Red box "Your Meta connection needs refreshing", with **Reconnect**. Scheduled posts are held, not lost, and go out after reconnecting. |
+| **server:** connection breaks later (Facebook password changed, access removed, token expired) | Meta notice "Your Meta connection needs refreshing", with **Reconnect**. Scheduled posts are held, not lost, and go out after reconnecting. |
 | **server:** Page connected after a campaign has started | From then on, posts go out on schedule. Posts whose time has already passed are **not** sent late; the agent had them to download. |
 | Agent doesn't know how to fix something | Every screen links to the matching **Setup** step (section 8) and to **Book a free setup call**. |
 
@@ -220,8 +220,8 @@ are Dan's.
 The front end in PR #10 depends on these. The items marked **check** may not be true yet.
 
 1. **`GET /api/onboarding/meta-audit`** returns `checks` with keys `page`, `page_admin`,
-   `instagram`, `ad_account`. It already does. The front end now maps these straight into the red
-   box (`applyMetaChecks()`).
+   `instagram`, `ad_account`. It already does. The front end now maps these straight into the Meta
+   notice (`applyMetaChecks()`).
 2. **check: "connected" must mean the Page only.** `meta_connected()` currently needs an
    active `AdAccount` row with a token. An agent with a Page but **no ad account** has to come out
    as connected. Otherwise they're sent back to Accounts on every sign-in, and + Campaign stays
