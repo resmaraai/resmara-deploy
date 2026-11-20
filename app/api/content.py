@@ -163,6 +163,21 @@ async def upload_many(boost_id: int = Form(None), kind: str = Form("photo"),
     return {"count": len(out), "assets": out}
 
 
+class ListingCheckRequest(BaseModel):
+    url: str
+
+
+@router.post("/listing/check")
+async def listing_check_endpoint(payload: ListingCheckRequest, current_user: User = Depends(get_current_user)):
+    """Open a listing link and say what is there: the home, how many photos, a video.
+
+    New campaign calls this before Build my campaign, so a link with no home on it is caught
+    before the agent pays, instead of after the build comes back empty.
+    """
+    from app.services import listing_check
+    return await listing_check.check(payload.url)
+
+
 @router.post("/import/photos", status_code=201)
 async def import_photos_endpoint(payload: PhotoImportRequest, current_user: User = Depends(get_current_user),
                                 db: Session = Depends(get_db)):

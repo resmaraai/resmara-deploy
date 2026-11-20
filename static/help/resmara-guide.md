@@ -90,8 +90,14 @@ Otherwise the ad is a photo carousel and Day 1 is a photo post.
   by itself when the listing shows pending or sold, and can be turned off any time. The line for
   sellers: "We'll market your home with fresh content and ads every 2 weeks until it's under
   contract."
-- **Leads**: people who commented or messaged with interest. Open the campaign to see them, mark
-  them, add notes, or add a lead by hand.
+- **Campaign leads**: people who filled in the form or tapped Call on the listing page, and people
+  who commented with interest. Listing page leads are listed first. Open the campaign to see them,
+  mark them handled, or add a lead by hand. Resmara emails the agent the moment one comes in.
+- **Withdraw a post**: after approval nothing can be edited, but any post that hasn't gone out yet
+  can be pulled from the calendar (open it, then Withdraw post). The rest of the campaign keeps running.
+- **Your listing page**: Resmara builds a simple page for every listing in the agent's brand
+  (photos, details, the agent's phone, a Call button and a form). Every post and the ad send people
+  there. The campaign shows a preview of the page with its visits, form leads and calls.
 - **Reports** — go: reports. Inside the campaign. Shows reach, views, clicks and leads, and makes a
   seller report you can download as a PDF and send to the homeowner.
 - Posts go out once a day at the scheduled time.
@@ -128,8 +134,9 @@ the calendar updates. If it still fails, the team sees it and replies on Support
   - Instagram must be a Business or Creator (professional) account, linked to that Page.
   - An ad account with a payment method in Meta Ads Manager.
 - Common messages and fixes — after fixing, come back to Accounts and click **Check again**:
-  - "Instagram isn't a business account": in the Instagram app, Settings → Account type and tools →
-    Switch to professional account, then link it to the Page.
+  - "Instagram isn't a business account": click Switch it now (in the red box or the connection
+    check). It opens facebook.com/settings/?tab=linked_instagram; click Connect account, choose
+    Business when asked, and Facebook switches and links it to the Page. Then Check again.
   - "You're not an admin of the Page": ask the Page owner to give you full control in the Page's
     settings.
   - "No ad account ready": open Meta Ads Manager and add a payment method.
