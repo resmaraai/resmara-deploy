@@ -1262,3 +1262,4 @@ html.dark .marketing-home .home-nav nav a{color:#fff!important}
 .home-site-preview{position:relative;background:#fff;border-radius:22px;box-shadow:0 20px 50px rgba(18,53,77,.10)}
 .home-site-preview .lp-frame{margin:0;border-radius:22px}
 .home-site-preview .lp-view{max-height:520px;position:relative}
+#modal .ig-switch-actions{justify-content:flex-start;gap:10px}

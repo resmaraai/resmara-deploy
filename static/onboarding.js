@@ -141,7 +141,6 @@ function obNoFacebook() {
 // flow does it while linking the Instagram to the Page. This explains it, then opens that page.
 const IG_LINK_SETTINGS = 'https://www.facebook.com/settings/?tab=linked_instagram';
 function obIgSwitch() {
-  const back = state.brandBuilt ? 'modal.close()' : 'obNeedsSetup(state.obIssues||[2])';
   const again = state.brandBuilt ? 'onboard(0)' : "obCheck('ready')";
   show(`<span class="eyebrow">ABOUT A MINUTE</span><h2>Switch your Instagram to a business account.</h2>
   <p>Meta only lets apps like Resmara post to business (Professional) Instagram accounts. Facebook can switch yours for you while it links it to your Page.</p>
@@ -153,7 +152,7 @@ function obIgSwitch() {
     <li><span>4</span><div><b>Follow Facebook’s prompts.</b> When it asks, choose Business. That switches your account and links it to your Page.</div></li>
     <li><span>5</span><div><b>Come back here</b> and click Check again.</div></li>
   </ol>
-  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="${back}">Back</button><div class="ig-switch-go"><button type="button" class="nc-cancel" onclick="${again}">Check again</button><a class="campaign-primary ig-switch-open" href="${IG_LINK_SETTINGS}" target="_blank" rel="noopener">Open Facebook to switch</a></div></div>
+  <div class="modal-actions ig-switch-actions"><button type="button" class="nc-cancel" onclick="${again}">Check again</button><a class="campaign-primary ig-switch-open" href="${IG_LINK_SETTINGS}" target="_blank" rel="noopener">Open Facebook to switch</a></div>
   <p class="fine">Stuck? <a href="#setup-guides" onclick="setupGuides('instagram');return false">See the full guide</a> or <a href="#" onclick="obBook();return false">book a free setup call</a> and we’ll do it with you.</p>`);
   modal.classList.add('wide-modal'); modal.dataset.gate = 'meta';
 }

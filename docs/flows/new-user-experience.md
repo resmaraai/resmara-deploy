@@ -166,8 +166,7 @@ are Dan's.
   - Four facts: it's free and takes about a minute; posts and followers stay; they gain a
     Contact button and post stats; the account must be public.
   - Five numbered steps.
-- **Buttons:**
-  - **Back:** returns to the Step 1 result, or closes the pop-up if onboarding is done.
+- **Buttons:** two, side by side on the left. There's no Back button; the × closes it.
   - **Check again:** re-runs the check.
   - **Open Facebook to switch** (orange): opens
     `https://www.facebook.com/settings/?tab=linked_instagram` in a new tab.
