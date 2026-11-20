@@ -1182,16 +1182,16 @@ html.dark #modal .withdrawn-note{color:#fff}
 .hpv-play[hidden]{display:none}
 
 /* Meta account issue: red box at the top of the dashboard and campaign pages */
-.meta-issue{background:#b3261e;color:#fff;border-radius:12px;padding:18px 22px;margin:0 0 20px}
-.meta-issue .meta-issue-title{display:block;font-size:17px;color:#fff!important}
+.meta-issue{background:#fde9df;color:#12354d;border:1px solid #f6cdb8;border-radius:16px;padding:20px 24px;margin:0 0 20px}
+.meta-issue .meta-issue-title{display:block;font-size:17px;color:#b9420b!important}
 .meta-issue ul{margin:8px 0 6px;padding-left:20px}
-.meta-issue li,.meta-issue p{color:#fff!important;font-size:14px;line-height:1.55}
+.meta-issue li,.meta-issue p{color:#12354d!important;font-size:14px;line-height:1.55}
 .meta-issue p{margin:6px 0 14px}
 .meta-issue-actions{display:flex;gap:10px;flex-wrap:wrap}
 .meta-issue-actions .mi-btn{border:0!important;border-radius:999px!important;font-weight:700;font-size:15px!important;height:46px;padding:0 24px!important;min-height:0!important;min-width:180px;width:auto!important;background:#12354d!important;color:#fff!important;cursor:pointer}
 .meta-issue-actions .mi-btn.mi-main{background:#d94c0d!important}
 .meta-issue-actions .mi-btn:hover{filter:brightness(1.12)}
-html.dark .shell .meta-issue,html.dark .shell .meta-issue *{color:#fff}
+html.dark .shell .meta-issue{background:#3a2520;border-color:#6b3a2a}html.dark .shell .meta-issue li,html.dark .shell .meta-issue p{color:#fff!important}html.dark .shell .meta-issue .meta-issue-title{color:#ffb38f!important}
 html.dark .shell .meta-issue .meta-issue-book{color:#b3261e!important}
 
 /* Instagram switch pop-up */
@@ -1257,3 +1257,8 @@ html.dark .sg-note{background:#0f2f42;color:#fff}
 .marketing-home .home-nav nav a[aria-current]{border-bottom-color:#d94c0d}
 html.dark .marketing-home .home-nav nav a{color:#fff!important}
 .sg-grid>.sg-card:last-child:nth-child(odd){grid-column:1/-1}
+/* Homepage C: the sample listing website in a browser frame */
+.home-site{margin-top:90px}
+.home-site-preview{position:relative;background:#fff;border-radius:22px;box-shadow:0 20px 50px rgba(18,53,77,.10)}
+.home-site-preview .lp-frame{margin:0;border-radius:22px}
+.home-site-preview .lp-view{max-height:520px;position:relative}

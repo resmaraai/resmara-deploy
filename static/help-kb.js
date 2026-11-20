@@ -42,7 +42,7 @@ var HELP_KB = [
     a: 'Yes. Resmara still builds your 14 posts, your ad and your listing page. Until your Page is connected, open each post in your campaign calendar and click Download post to save the photo and copy the caption to share yourself. Once your Page is connected, the rest go out on schedule automatically. The campaign is $49 either way.' },
   { id: 'ig-personal', topic: 'Your Meta account', q: 'It says my Instagram isn’t a business account.',
     keys: ['instagram isn', 'personal account', 'business account', 'professional account', 'creator'],
-    a: 'Click Fix it now in the red box at the top of your dashboard. It opens Facebook’s linked accounts page, where you click Connect account next to Instagram and choose Business when Facebook asks. That switches your account and links it to your Page in about a minute, and you keep all your posts and followers. Then come back and click Check again. Prefer help? Book a free setup call.' },
+    a: 'Click Fix it now in the Meta notice at the top of your dashboard. It opens Facebook’s linked accounts page, where you click Connect account next to Instagram and choose Business when Facebook asks. That switches your account and links it to your Page in about a minute, and you keep all your posts and followers. Then come back and click Check again. Prefer help? Book a free setup call.' },
   { id: 'not-admin', topic: 'Your Meta account', q: 'It says I’m not an admin of the Page.',
     keys: ['admin', 'not an admin', 'page access', 'full control', 'manage the page'],
     a: 'Ask whoever manages the Page to give you full control (admin) in the Page’s settings, then come back here and click Check connection.' },

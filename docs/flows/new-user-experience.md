@@ -41,9 +41,9 @@ The step bubbles on the pop-ups read **1 Connect Meta · 2 Your brand · 3 Quick
 | New account created and email not confirmed yet | Homepage | "Confirm your address", with **Send it again** |
 | First sign-in after confirming | **Accounts** | Step 1: Connect Meta |
 | Sign-in when the Meta Page is still **not** connected and no setup call is booked | **Accounts** | Step 1: Connect Meta |
-| Sign-in after the Facebook login worked but no Page was found | My campaigns | None. The **red box** shows at the top, and campaigns can be built |
+| Sign-in after the Facebook login worked but no Page was found | My campaigns | None. The **Meta notice** shows at the top, and campaigns can be built |
 | Sign-in when Facebook was never connected but a setup call **is** booked | My campaigns | None. **+ Campaign** shows "Connect your Meta account first" |
-| Sign-in when the Page is connected but Instagram or the ad account isn't | My campaigns | None. The **red box** shows at the top |
+| Sign-in when the Page is connected but Instagram or the ad account isn't | My campaigns | None. The **Meta notice** shows at the top |
 | Sign-in with everything connected, tour not done | My campaigns | Step 2 (or Step 1 if not connected) |
 | Sign-in with everything done | My campaigns | None. A "Signed in as…" toast |
 | Agent closes Step 1 without connecting | **Accounts** | "Please connect your Meta account" (unless a call is booked) |
@@ -120,7 +120,7 @@ are Dan's.
 | Situation | What should happen |
 |-----------|--------------------|
 | Agent closes or cancels the Facebook login window | Back to Step 1, still not connected. Closing Step 1 lands on Accounts with the connect prompt. |
-| Agent unticks Instagram or the ad account in Facebook's permission screen | Shows as that check failing (same as no Instagram or no ad account). The red box explains it, and reconnecting fixes it. |
+| Agent unticks Instagram or the ad account in Facebook's permission screen | Shows as that check failing (same as no Instagram or no ad account). The Meta notice explains it, and reconnecting fixes it. |
 | Agent has several Pages and picked the wrong one | Accounts, **Reconnect**, then choose the right Page. |
 | Instagram is linked to a different Page (an old one, or the brokerage's) | Same as Instagram not connected. The guide says to disconnect it from the old Page first. |
 | Ad account exists but has no card, or Meta disabled it | Same as no ad account: "Your ad account can't run ads yet". Posts still go out. |
@@ -130,11 +130,13 @@ are Dan's.
 
 ---
 
-## 4. The red box (every dashboard page and campaign)
+## 4. The Meta notice (every dashboard page and campaign)
 
 - **When it shows:** the last Meta check found any issue (`state.metaIssues` is not empty).
 - **Where:** the top of every dashboard page (My campaigns, My Brand, Billing, Accounts, Support)
   and every campaign page.
+- **Look:** light pink with a rust title and dark blue text, the same colours as the Republished
+  tag on campaign cards. Calm rather than alarming.
 - **What it says:**
   - Title: "There's an issue with your Meta account."
   - One bullet per issue, for example "Your Instagram isn't connected as a business account."
@@ -157,7 +159,7 @@ are Dan's.
   account. Facebook's own **Connect account** flow does convert it, while it links the Instagram
   to the Page. This pop-up explains that and then sends the agent there.
 - **Opened from:**
-  - **Fix it now** in the red box;
+  - **Fix it now** in the Meta notice;
   - **Fix it now** on the Step 1 result screen (it sits next to **Continue**).
 - **Content:**
   - Title: "Switch your Instagram to a business account."
@@ -253,7 +255,7 @@ The front end in PR #10 depends on these. The items marked **check** may not be 
   - the "Before your first campaign" band on the homepage;
   - the no-Facebook screen;
   - the Step 1 result;
-  - **Fix it now** in the red box;
+  - **Fix it now** in the Meta notice;
   - the Instagram pop-up;
   - the help chat.
 - **The page:** a "what you need" row (Page, Instagram, ad account) and then seven step cards,
@@ -266,7 +268,7 @@ The front end in PR #10 depends on these. The items marked **check** may not be 
   5. Link Instagram to the Page
   6. Ad account with a payment method
   7. Connect it all to Resmara
-- **How they open:** `setupGuides('instagram')` opens one guide directly. The red box opens the
+- **How they open:** `setupGuides('instagram')` opens one guide directly. The Meta notice opens the
   guide for the first issue: `page`, `admin`, `instagram` or `ads`.
 - **Keeping them current:** Meta renames menus from time to time. If an agent says a step doesn't
   match, update `SETUP_GUIDES` in `static/homepage.js`.
@@ -280,7 +282,7 @@ Preview copy: https://claude.ai/artifact/Lip2AN9HQZuLf4J5AsP8Vy
 - **`#new`:** start as a brand-new client. Click **Client Login** and pick a Meta scenario from
   section 3. Then go through sign-up, the confirm email, sign-in and Step 1.
 - **`#setup-guides`:** the Setup page.
-- **`#instagram`:** jumps straight to a signed-in agent with a personal Instagram. The red box and
+- **`#instagram`:** jumps straight to a signed-in agent with a personal Instagram. The Meta notice and
   **Fix it now** are showing.
 - **No hash:** the normal demo agent, everything connected.
 - In the hosted preview, **reload the page after changing the `#` part of the address**. The
