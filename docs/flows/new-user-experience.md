@@ -23,7 +23,7 @@ If the app and this doc disagree, one of them is wrong. Flag it rather than gues
 |---|-------|---------------------|---------------|
 | 1 | Sign up | Clicks **Client Login**, then **Create an account**. Enters first name, last name, email and password. | Confirm-email screen |
 | 2 | Confirm email | Clicks the link in the email, then signs in. | Accounts page, with Step 1 open on top |
-| 3 | Step 1: Connect Meta | Logs in with Facebook. Resmara checks 4 things (section 3). | Green light, or "connected, with limits", or "Almost there" |
+| 3 | Step 1: Connect Meta | Logs in with Facebook. Resmara checks 4 things (section 3). | Green light, or "connected, with limits", or "You're in, with one thing to fix" (no Page), or the no-Facebook stop |
 | 4 | Step 2: Your brand | Nothing. Resmara builds the brand kit on its own. | "Your brand kit is ready", with **Next** |
 | 5 | Step 3: Quick tour | Clicks through 7 tips, or **Skip the tour**. | My campaigns, with the **+ Campaign** button pulsing |
 | 6 | First campaign | Clicks **+ Campaign** and pastes the listing link. Resmara checks the link. | Campaign page (draft) |
@@ -137,7 +137,7 @@ are Dan's.
   and every campaign page.
 - **What it says:**
   - Title: "There's an issue with your Meta account."
-  - One bullet per issue, for example "Your Instagram isn't a business account."
+  - One bullet per issue, for example "Your Instagram isn't connected as a business account."
   - The limits line from section 3.
 - **Buttons:**
   - **Book a call to fix it** opens the setup-call booking.
@@ -169,7 +169,7 @@ are Dan's.
   - **Check again:** re-runs the check.
   - **Open Facebook to switch** (orange): opens
     `https://www.facebook.com/settings/?tab=linked_instagram` in a new tab.
-  - "Stuck? Book a free setup call" link at the bottom.
+  - "Stuck? See the full guide or book a free setup call" links at the bottom.
 
 ---
 
@@ -239,8 +239,7 @@ The front end in PR #10 depends on these. The items marked **check** may not be 
    - Neither case fails the campaign or marks it failed.
    - When a Page is connected mid-campaign, only posts still in the future go out.
 5. **check: no ad account means no ad.** The campaign's posts still run, and the ad step is
-   skipped, not errored. Whether the $49 price changes in that case is Adam's and Dan's call
-   (still open).
+   skipped, not errored. The price stays $49 (section 3).
 6. **New in PR #10:**
    - `POST /api/content/listing/check` (the real link check);
    - `PATCH /api/posts/{id}/withdraw` (refuses with 409 if the post has already gone out).
