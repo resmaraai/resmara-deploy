@@ -140,12 +140,11 @@ are Dan's.
   - One bullet per issue, for example "Your Instagram isn't connected as a business account."
   - The limits line from section 3.
 - **Buttons:**
-  - **Book a call to fix it** opens the setup-call booking.
-  - **Check again** re-runs Step 1.
   - Three buttons in one row, all the same size: **Fix it now** (orange), **Book a call to fix it**
     and **Check again** (dark blue).
   - **Fix it now** opens the Instagram pop-up (section 5) when that's the issue and a Page is
     connected. Otherwise it opens the Setup step for the first issue (`metaFixAction()`).
+  - **Book a call to fix it** opens the setup-call booking. **Check again** re-runs Step 1.
 - With no Page, the "not an admin" bullet is hidden, because it would only repeat the first one.
 - **When it goes away:** the next check passes all four items. The check runs on every sign-in
   and every time **Check again** is clicked.
