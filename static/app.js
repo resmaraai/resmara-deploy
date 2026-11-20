@@ -344,7 +344,7 @@ function confirmPage(token){
 if(state.clientSignedIn&&window.RM&&!RM.isLoggedIn()){state.clientSignedIn=false;persist();}
 if(/\/confirm\/?$/.test(location.pathname)){confirmPage(new URLSearchParams(location.search).get('token')||'')}
 else if(/\/reset\/?$/.test(location.pathname)){resetPasswordPage(new URLSearchParams(location.search).get('token')||'')}
-else if(location.hash==='#pricing'||(!location.hash&&document.body.dataset.page==='pricing'))pricing();else if(location.hash==='#dashboard'&&state.clientSignedIn)dashboard();else if(document.body.dataset.page==='how-it-works'||location.hash==='#how-it-works')howItWorks();else home();
+else if(location.hash==='#setup-guides')setupGuides();else if(location.hash==='#pricing'||(!location.hash&&document.body.dataset.page==='pricing'))pricing();else if(location.hash==='#dashboard'&&state.clientSignedIn)dashboard();else if(document.body.dataset.page==='how-it-works'||location.hash==='#how-it-works')howItWorks();else home();
 // If a bearer token is stored, refresh the session from the backend (best effort).
 // A token that has already passed its expiry is dropped by RM.isLoggedIn(), so this only
 // asks when there is a real session to ask about.

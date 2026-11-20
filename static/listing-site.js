@@ -84,6 +84,7 @@ function listingSiteHTML(c, index) {
         <input name="phone" type="tel" placeholder="Phone (optional)" aria-label="Phone">
         <textarea name="message" rows="3" placeholder="I’d like to see this home." aria-label="Message"></textarea>
         <button class="ls-btn">Send to ${esc(first)}</button>
+        <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px" value="">
         <p class="ls-fine">Your details go only to ${esc(d.agent)}.</p>
       </form>
     </aside>
@@ -139,7 +140,19 @@ function refreshListingPanel(index) {
 // In the review copy the form and the Call button add a lead right here, so the whole loop can be
 // seen: the page, the lead under Campaign leads and the count above. On the live site the page
 // posts to Resmara, which stores the lead and emails the agent.
+// Live: the public page (homes.resmara.com/<slug>) sets window.LISTING_PUBLIC = { slug } and draws
+// itself with listingSiteHTML(). The form and the Call button then report to these two endpoints
+// (docs/flows/listing-page.md); the server stores the lead and emails the agent.
+function listingPublic() { return window.LISTING_PUBLIC && window.LISTING_PUBLIC.slug; }
 function listingFormSent(form, index) {
+  if (listingPublic()) {
+    const body = { name: form.name.value.trim(), email: form.email.value.trim(), phone: form.phone.value.trim(), message: form.message.value.trim(), website: (form.website || {}).value || '' };
+    const btn = form.querySelector('button'); if (btn) btn.disabled = true;
+    fetch('/api/public/listing/' + encodeURIComponent(listingPublic()) + '/lead', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(r => { if (!r.ok) throw new Error(); form.innerHTML = `<h3>Thanks, ${esc(body.name.split(' ')[0])}.</h3><p class="ls-fine">Your message is on its way. Expect a reply soon.</p>`; })
+      .catch(() => { if (btn) btn.disabled = false; const f = form.querySelector('.ls-fine'); if (f) f.textContent = 'That didn’t send. Please try again, or call instead.'; });
+    return;
+  }
   const c = [...state.campaigns, ...examples][index];
   const name = form.name.value.trim(), email = form.email.value.trim(), phone = form.phone.value.trim();
   const text = form.message.value.trim() || 'I’d like to see this home.';
@@ -153,6 +166,8 @@ function listingFormSent(form, index) {
   toast('New lead from your listing page. In the live version, you’d get an email now.');
 }
 function listingCallTap(event, index) {
+  // Live: count the tap and let the phone open its dialer as normal.
+  if (listingPublic()) { try { navigator.sendBeacon('/api/public/listing/' + encodeURIComponent(listingPublic()) + '/call'); } catch (e) {} return; }
   event.preventDefault();
   const c = [...state.campaigns, ...examples][index];
   if (typeof campaignLeads === 'function' && !(typeof leadsIsServer === 'function' && leadsIsServer(c))) {

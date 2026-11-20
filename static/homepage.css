@@ -1212,3 +1212,44 @@ html.dark .ig-switch-steps li>span{background:#fff;color:#12354d}
 #modal a.ig-switch-open{background:#d94c0d;color:#fff!important;border-radius:999px;padding:12px 20px;font-weight:600;font-size:15px}
 #modal a.ig-switch-open:hover{background:#b93f09}
 #modal .modal-actions button.ig-switch-btn,#modal button.ig-switch-btn{padding:3px 12px!important;font-size:12px!important;min-height:0!important;margin:4px 0 0 6px;width:auto}
+
+/* Setup guides */
+.sg-page{display:grid;gap:28px;max-width:900px;margin:0 auto}
+.sg-check{list-style:none;padding:0;margin:16px 0;display:grid;gap:8px}
+.sg-check li{display:flex;align-items:center;gap:10px;color:#12354d}
+.sg-tag{display:inline-block;padding:2px 10px;border-radius:999px;background:#12354d;color:#fff;font-size:12px;font-weight:600}
+.sg-tag.req{background:#d94c0d}
+.sg-list{display:grid;gap:12px}
+.sg-guide{background:#fff;border:1px solid #d6e6ef;border-radius:16px;padding:0 22px}
+.sg-guide summary{list-style:none;display:flex;align-items:center;gap:12px;padding:18px 0;cursor:pointer}
+.sg-guide summary::-webkit-details-marker{display:none}
+.sg-title{flex:1;font-size:18px;font-weight:600;color:#12354d}
+.sg-time{font-size:13px;color:#12354d}
+.sg-guide .fold-chev{width:10px;height:10px;border-right:2px solid #12354d;border-bottom:2px solid #12354d;transform:rotate(45deg);margin:0 4px 4px 6px;transition:transform .2s}
+.sg-guide[open] .fold-chev{transform:rotate(-135deg);margin-bottom:-4px}
+.sg-body{padding:0 0 20px;color:#12354d}
+.sg-open{display:inline-block;background:#d94c0d;color:#fff!important;border-radius:999px;padding:11px 20px;font-weight:600;text-decoration:none}
+.sg-open:hover{background:#b93f09}
+.sg-help{background:#143a50;color:#fff;border-radius:16px;padding:22px 26px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.home-setup{display:grid;grid-template-columns:1.2fr 1fr;gap:40px;align-items:center}
+@media(max-width:760px){.home-setup{grid-template-columns:1fr}.sg-time{display:none}}
+html.dark .sg-guide{background:#143a50;border-color:#1f4d68}
+html.dark .sg-title,html.dark .sg-time,html.dark .sg-body,html.dark .sg-check li{color:#fff}
+html.dark .sg-guide .fold-chev{border-color:#fff}
+html.dark .sg-tag{background:#fff;color:#12354d}
+html.dark .sg-tag.req{background:#d94c0d;color:#fff}
+.meta-issue p a{color:#fff;text-decoration:underline}
+
+/* One side edge down the whole homepage: every block's content sits 48px (about half an inch) from
+   the window edge, or lines up with the 1248px content column on wide screens. Coloured bands are
+   inset 24px, so their inner padding makes up the rest. Phones use 24px. */
+.marketing-home{--gutter:48px;--band:24px}
+.marketing-home>header.home-nav,.marketing-home .home-hero,.marketing-home>main>section.home-section,.marketing-home>footer.home-footer{max-width:none!important;padding-left:max(var(--gutter),calc((100% - 1248px)/2))!important;padding-right:max(var(--gutter),calc((100% - 1248px)/2))!important}
+.marketing-home .home-workload,.marketing-home .home-results,.marketing-home .home-learn,.marketing-home .home-finish{margin-left:var(--band)!important;margin-right:var(--band)!important}
+.marketing-home .home-workload>.home-section,.marketing-home .home-results>.home-section,.marketing-home .home-learn>.home-section{max-width:none!important;padding-left:max(calc(var(--gutter) - var(--band)),calc((100% - 1248px)/2))!important;padding-right:max(calc(var(--gutter) - var(--band)),calc((100% - 1248px)/2))!important}
+@media(max-width:760px){.marketing-home{--gutter:24px;--band:12px}}
+.sg-help{flex-direction:column;align-items:flex-start}
+
+/* Phones: the link demo's long URL was stretching its grid column past the screen. */
+.home-link-layout>*{min-width:0}
+.home-link-demo input{min-width:0;width:100%;text-overflow:ellipsis}
