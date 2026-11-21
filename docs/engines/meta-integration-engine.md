@@ -36,7 +36,7 @@ CONNECT ─► SAVE ─► CHECK ─► DECIDE ─► TELL
                      │                  ▼
                   RE-CHECK ◄──── FIX (Fix it now · Setup guide · setup call · Reconnect)
                      ▲
-                   WATCH  (every sign-in · every 15 min token sweep · daily full check ·
+                   WATCH  (every sign-in · 6-hourly token sweep · daily full check ·
                            before every publish and every ad launch)
 ```
 
@@ -205,7 +205,7 @@ Several issues at once:
 | Connect (the callback) | C1–C7 | Then the Page picker if `several_pages` |
 | Every sign-in | C1–C7, unless checked in the last 10 minutes | Keeps the Meta notice true |
 | **Check again** (any screen) | C1–C7, forced, ignores the cache | Re-queries Instagram; this is the fix for a stale `ig_user_id` |
-| Every 15 minutes | C1 only (token health; exists in `token_health`) | Silent refresh when within 7 days of expiry |
+| Every 6 hours (scheduler, `DEPLOY.md`) | C1 only (token health; exists in `token_health`) | Silent refresh when within 7 days of expiry |
 | Daily, overnight | C1–C7 for every agent with an active campaign | Catches a disabled ad account or a removed Page before the next post |
 | Before each publish batch | C1, plus C4 and C6 for the posts' targets | A failure marks posts held, then a full check |
 | Before an ad launch | C7, plus the existing `spend_readiness` | Refuses to launch on an account that can't spend (exists) |

@@ -27,7 +27,7 @@ confirm.
 |-------|--------|-----|
 | Facebook login and storing the connection | Built | No |
 | The four checks (Page, admin, Instagram, ad account) via Meta's API | Built (`/api/onboarding/meta-audit`) | No. Facts from Meta, which is right |
-| Connection health sweep every 15 minutes (expired or revoked logins) | Built (`token_health`) | No |
+| Connection health sweep every 6 hours (expired or revoked logins) | Built (`token_health`) | No |
 | Front end for every outcome: limited setup, Meta notice, Fix it now, Setup page | Built in PR #17 | No |
 | "Connected" means Page-only; Instagram re-read on Check again; login recorded with no Page | **Not yet** (Dan, PR #17 notes) | No |
 | A "reconnect" warning on the dashboard when the sweep finds a broken login | **Not yet** | No |
