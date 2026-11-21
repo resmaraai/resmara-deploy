@@ -81,7 +81,7 @@ function leadFromServer(row) {
     ago: leadTimeAgo(row.comment_at || row.created_at), text: row.text || '',
     post: row.post_label || '', done: row.status === 'handled', status: row.status || 'new',
     permalink: row.permalink || null,
-    source: row.source || 'comment', email: row.email || '', phone: row.phone || '' };
+    source: row.source || 'comment', email: row.email || '', phone: row.phone || '', note: row.note || '' };
 }
 function ensureLeads(c, index) {
   const cache = leadCache(c);
@@ -92,6 +92,7 @@ function ensureLeads(c, index) {
     setLeadCache(c, {
       loading: false,
       rows: (data.leads || []).map(leadFromServer),
+      totals: data.totals || null,
       scan: data.scan || null
     });
     refreshLeads(index);
@@ -130,8 +131,8 @@ function leadsPanel(c, index) {
   } else if (leads.length) {
     const row = (l, i) => `<li class="${l.done ? 'done' : ''}">
     <span class="lead-av${l.source === 'web' || l.source === 'call' ? ' web' : ''}">${esc(initials(l.name))}</span>
-    <div class="lead-body"><b>${esc(l.name)}</b><span class="lead-where">${esc(l.where)} · ${esc(l.ago)}</span><p>${l.source === 'call' ? esc(l.text) : '“' + esc(l.text) + '”'}</p>${(l.email || l.phone) && l.source !== 'call' ? `<small class="lead-contact">${[l.email, l.phone].filter(Boolean).map(esc).join(' · ')}</small>` : ''}${l.post ? `<small>On: ${esc(l.post)}</small>` : ''}</div>
-    <div class="lead-actions"><button type="button" class="lead-tick" title="${l.done ? 'Mark as new' : 'Mark as handled'}" aria-pressed="${l.done}" onclick="toggleLead(${index},${i})">${l.done ? '✓ Handled' : '✓ Mark handled'}</button><button type="button" class="lead-remove" title="Not a lead" aria-label="Remove lead" onclick="removeLead(${index},${i})">✕</button></div>
+    <div class="lead-body"><b>${esc(l.name)}</b><span class="lead-where">${esc(l.where)} · ${esc(l.ago)}</span><p>${l.source === 'call' ? esc(l.text) : '“' + esc(l.text) + '”'}</p>${(l.email || l.phone) && l.source !== 'call' ? `<small class="lead-contact">${[l.email, l.phone].filter(Boolean).map(esc).join(' · ')}</small>` : ''}${l.post ? `<small>On: ${esc(l.post)}</small>` : ''}${leadNoteBlock(l, index, i)}</div>
+    <div class="lead-actions"><button type="button" class="lead-tick" title="${l.done ? 'Mark as not contacted yet' : 'Mark that you’ve contacted them'}" aria-pressed="${l.done}" onclick="toggleLead(${index},${i})">${l.done ? '✓ Contacted' : 'Mark as contacted'}</button><button type="button" class="lead-note-btn" onclick="openLeadNote(${index},${i})">${l.note ? 'Edit note' : 'Add note'}</button><button type="button" class="lead-remove" title="Not a lead" aria-label="Remove lead" onclick="removeLead(${index},${i})">✕</button></div>
   </li>`;
     const fromPage = leads.map((l, i) => [l, i]).filter(([l]) => l.source === 'web' || l.source === 'call');
     const fromSocial = leads.map((l, i) => [l, i]).filter(([l]) => !(l.source === 'web' || l.source === 'call'));
@@ -146,9 +147,50 @@ function leadsPanel(c, index) {
     : '';
   return `<section class="panel leads-panel" id="leads">
   <div class="leads-head"><div><h2 class="campaign-step-title"><span>1</span> Campaign leads ${open ? `<span class="lead-count">${open} new</span>` : ''}</h2><p class="fine">People who asked about the home on your listing page, and people who commented on your posts or ad and sound interested. Resmara emails you the moment one comes in.</p>${scanLine}</div>${server ? `<div class="leads-head-btns"><button type="button" class="leads-email" onclick="checkLeadsNow(${index})">Check now</button></div>` : ''}</div>
+  ${leadTotalsBox(c, leads, server ? cache : null)}
   ${body}
   <button type="button" class="lead-add" onclick="addLead(${index})">＋ Add a lead</button>
 </section>`;
+}
+
+// Where a lead came from, the same three buckets the server counts (app/services/lead_counts.py).
+function leadBucket(l) {
+  const src = String(l.source || '').toLowerCase(), where = String(l.where || '').toLowerCase();
+  if (src === 'web' || src === 'call' || src === 'form' || where.includes('listing page') || where.includes('website')) return 'website';
+  if (src === 'ad_comment' || /\bad$/.test(where) || where.includes(' ad ')) return 'ad';
+  return 'posts';
+}
+// Every lead ever flagged on the campaign, by source. Removing one from the list doesn't lower it.
+function leadTotals(c, leads, cache) {
+  if (cache && cache.totals) return cache.totals;
+  const t = { ad: 0, posts: 0, website: 0, total: 0 };
+  const removed = ((state.leadsRemoved || {})[leadsKey(c)] || []);
+  leads.map(leadBucket).concat(removed).forEach(b => { t[b] = (t[b] || 0) + 1; t.total++; });
+  return t;
+}
+function leadTotalsBox(c, leads, cache) {
+  if (cache && cache.loading) return '';
+  const t = leadTotals(c, leads, cache);
+  const tile = (n, label) => `<div><b>${Number(n || 0)}</b><span>${label}</span></div>`;
+  return `<div class="lead-totals">${tile(t.total, 'Total leads')}${tile(t.ad, 'From your ad')}${tile(t.posts, 'From your posts')}${tile(t.website, 'From your listing page')}</div><p class="fine lead-totals-note">Every lead this campaign has generated. Removing one from the list doesn’t lower these numbers.</p>`;
+}
+// A note per lead: Add note opens a small box under the lead, Save closes it.
+function leadNoteBlock(l, index, i) {
+  if (l.noteOpen) return `<div class="lead-note-edit"><textarea rows="2" maxlength="2000" placeholder="e.g. Called back, showing Saturday at 10">${esc(l.note || '')}</textarea><div class="lead-note-btns"><button type="button" class="campaign-primary" onclick="saveLeadNote(${index},${i},this)">Save note</button><button type="button" class="lead-note-cancel" onclick="closeLeadNote(${index},${i})">Cancel</button></div></div>`;
+  return l.note ? `<p class="lead-note"><b>Note</b> ${esc(l.note)}</p>` : '';
+}
+function leadRowAt(c, i) {
+  if (leadsIsServer(c)) { const cache = leadCache(c); return cache && cache.rows && cache.rows[i]; }
+  return campaignLeads(c)[i];
+}
+function openLeadNote(index, i) { const c = [...state.campaigns, ...examples][index], l = leadRowAt(c, i); if (!l) return; l.noteOpen = true; refreshLeads(index); setTimeout(() => document.querySelector('.lead-note-edit textarea')?.focus(), 0); }
+function closeLeadNote(index, i) { const c = [...state.campaigns, ...examples][index], l = leadRowAt(c, i); if (!l) return; l.noteOpen = false; refreshLeads(index); }
+function saveLeadNote(index, i, btn) {
+  const c = [...state.campaigns, ...examples][index], l = leadRowAt(c, i); if (!l) return;
+  const note = (btn.closest('.lead-note-edit').querySelector('textarea').value || '').trim();
+  const done = () => { l.note = note; l.noteOpen = false; persist(); refreshLeads(index); toast(note ? 'Note saved.' : 'Note removed.'); };
+  if (leadsIsServer(c) && window.RM && RM.setLeadNote) { RM.setLeadNote(l.remoteId, note).then(done).catch(leadActionFailed); return; }
+  done();
 }
 
 function leadActionFailed(err) { toast((err && err.message) || 'Could not save that just now. Try again.'); }
@@ -177,11 +219,14 @@ function removeLead(index, i) {
       cache.rows.splice(i, 1);
       if (!l.done) c.new_leads = Math.max(0, Number(c.new_leads || 0) - 1);
       persist(); refreshLeads(index);
-      toast('Removed. Resmara won’t flag that comment again.');
+      toast('Removed from the list. It still counts in this campaign’s lead totals.');
     }).catch(leadActionFailed);
     return;
   }
-  campaignLeads(c).splice(i, 1); persist(); refreshLeads(index); toast('Removed. Resmara won’t flag that comment again.');
+  const gone = campaignLeads(c).splice(i, 1)[0];
+  state.leadsRemoved = state.leadsRemoved || {}; const k = leadsKey(c);
+  (state.leadsRemoved[k] = state.leadsRemoved[k] || []).push(leadBucket(gone || {}));
+  persist(); refreshLeads(index); toast('Removed from the list. It still counts in this campaign’s lead totals.');
 }
 function refreshLeads(index) { const c = [...state.campaigns, ...examples][index], el = document.querySelector('#leads'); if (el) el.outerHTML = leadsPanel(c, index); setupFolds(); }
 function addLead(index) {
@@ -194,7 +239,8 @@ function saveLead(index, form) {
     RM.addLead(campaignBoostId(c), { name: name, text: text, where: where }).then(function (row) {
       const cache = leadCache(c) || (setLeadCache(c, { loading: false, rows: [] }), leadCache(c));
       cache.rows = cache.rows || [];
-      cache.rows.unshift(leadFromServer(row));
+      const added = leadFromServer(row); cache.rows.unshift(added);
+      if (cache.totals) { cache.totals[leadBucket(added)] = (cache.totals[leadBucket(added)] || 0) + 1; cache.totals.total = (cache.totals.total || 0) + 1; }
       c.new_leads = Number(c.new_leads || 0) + 1;
       persist(); modal.close(); refreshLeads(index);
     }).catch(leadActionFailed);

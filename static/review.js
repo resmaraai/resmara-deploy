@@ -615,7 +615,9 @@ function campaignStamp(c,r){
  let start=campaignGoLive(c);
  if(!start&&Number(c.day)>0){const d=new Date();d.setDate(d.getDate()-(Number(c.day)-1));start=d.toLocaleDateString('en-CA')}
  const later=typeof campaignStartsLater==='function'&&campaignStartsLater(c);
- const approved=r.approvedAt||c.launched_at;
+ let approved=r.approvedAt||c.launched_at;
+ // Sample campaigns have no real approval: show the afternoon before they went live.
+ if(!approved&&start&&examples.includes(c)){const d=new Date(start+'T16:12:00');d.setDate(d.getDate()-1);approved=d.toISOString()}
  return `<div class="campaign-stamp">${start?`<b>${later?'Goes live':'Live since'} ${esc(goLiveLabel(start))}</b>`:''}${approved?`<span>Approved ${esc(stampTime(approved))}</span>`:''}</div>`;
 }
 // "Nov 21 at 1:52 PM": when a step was approved, kept on the campaign as a record.

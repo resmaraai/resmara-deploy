@@ -16,6 +16,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.session import AdAccount, Asset, Boost, Event, Post, User, get_db
+from app.services.lead_counts import lead_totals
 from app.services import team_access
 
 log = logging.getLogger("resmara.console")
@@ -105,8 +106,22 @@ def _photo_index(db: Session, boost_ids: List[int]) -> tuple:
     return covers, counts
 
 
+def _ends_on(boost: Boost) -> Optional[str]:
+    """The campaign's last day: go-live date plus its length, less one."""
+    from datetime import date, timedelta
+    start = boost.go_live_date
+    if not start:
+        return None
+    try:
+        d = start if isinstance(start, date) else date.fromisoformat(str(start)[:10])
+    except ValueError:
+        return None
+    return (d + timedelta(days=int(boost.campaign_days or 14) - 1)).isoformat()
+
+
 def _campaign_row(boost: Boost, owner: Optional[User], counts: Dict[str, int],
-                  cover: Optional[str] = None, photos: int = 0) -> Dict[str, Any]:
+                  cover: Optional[str] = None, photos: int = 0,
+                  leads: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
     return {
         "id": boost.id,
         "user_id": boost.user_id,
@@ -123,6 +138,9 @@ def _campaign_row(boost: Boost, owner: Optional[User], counts: Dict[str, int],
         "posts_published": counts.get("published", 0),
         "posts_failed": counts.get("failed", 0),
         "go_live_date": boost.go_live_date,
+        "ends_on": _ends_on(boost),
+        # Leads this campaign generated, by source. Removed ones still count (lead_counts).
+        "leads": leads or {"ad": 0, "posts": 0, "website": 0, "total": 0, "removed": 0},
         "created_at": _iso(boost.created_at),
         "paid_at": _iso(boost.paid_at),
         "paid_amount_cents": boost.paid_amount_cents,
@@ -149,8 +167,9 @@ def list_campaigns(include_hidden: bool = False, limit: int = 200,
         u.id: u
         for u in db.query(User).filter(User.id.in_({b.user_id for b in boosts} or {0})).all()
     }
+    leads = lead_totals(db, [b.id for b in boosts])
     return [_campaign_row(b, owners.get(b.user_id), counts.get(b.id, {}),
-                          covers.get(b.id), photo_counts.get(b.id, 0)) for b in boosts]
+                          covers.get(b.id), photo_counts.get(b.id, 0), leads.get(b.id)) for b in boosts]
 
 
 @router.get("/admin/campaigns/{campaign_id}")
@@ -163,7 +182,8 @@ def campaign_detail(campaign_id: int, user=Depends(team_access.needs("campaigns"
     owner = db.query(User).filter(User.id == boost.user_id).first()
     counts = _post_counts(db, [boost.id]).get(boost.id, {})
     covers, photo_counts = _photo_index(db, [boost.id])
-    row = _campaign_row(boost, owner, counts, covers.get(boost.id), photo_counts.get(boost.id, 0))
+    row = _campaign_row(boost, owner, counts, covers.get(boost.id), photo_counts.get(boost.id, 0),
+                        lead_totals(db, [boost.id]).get(boost.id))
     # The campaign's own library, in the order the calendar will use it. A campaign with no
     # photos says so with an empty list — never a stand-in image from somewhere else.
     assets = (db.query(Asset).filter(Asset.boost_id == boost.id).order_by(Asset.id).all())

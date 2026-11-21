@@ -130,6 +130,10 @@ ADDITIONS = {
         ("leads_scan_note", "TEXT"),
         ("reboost_offer_sent_at", "TIMESTAMP"),
     ],
+    # The agent's note on a lead (added 21 Nov 2026).
+    "leads": [
+        ("note", "TEXT"),
+    ],
     "orders": [
         ("user_id", "INTEGER"),
         ("boost_id", "INTEGER"),

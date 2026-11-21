@@ -608,6 +608,10 @@
     return json('/api/leads/' + segment(leadId), 'PATCH', { status: status });
   }
 
+  function setLeadNote(leadId, note) {
+    return json('/api/leads/' + segment(leadId), 'PATCH', { note: note || '' });
+  }
+
   function removeLead(leadId) {
     return request('/api/leads/' + segment(leadId), { method: 'DELETE' });
   }
@@ -667,6 +671,7 @@
     leads: leads,
     addLead: addLead,
     setLeadStatus: setLeadStatus,
+    setLeadNote: setLeadNote,
     removeLead: removeLead,
     scanLeads: scanLeads,
     photoIndex: photoIndex,

@@ -276,6 +276,8 @@ class Lead(Base):
     classified_by = Column(String, nullable=True)
     confidence = Column(Float, nullable=True)
     reason = Column(String, nullable=True)
+    # The agent's own note on this lead ("called back, showing Saturday"), editable any time.
+    note = Column(Text, nullable=True)
     notified_at = Column(DateTime(timezone=True), nullable=True)   # the alert email actually went
     email_error = Column(Text, nullable=True)                      # why it did not
     created_at = Column(DateTime(timezone=True), server_default=func.now())

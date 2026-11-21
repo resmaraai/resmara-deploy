@@ -1336,3 +1336,32 @@ html.dark .shell .pill.phase-ready{background:#fff!important;color:#12354d!impor
 .campaign-stamp span{font-size:13px;color:#12354d}
 html.dark .shell .campaign-stamp b,html.dark .shell .campaign-stamp span{color:#fff!important}
 @media(max-width:700px){.campaign-stamp{align-items:flex-start;text-align:left}}
+/* PR #17 (Adam, 21 Nov): campaign leads. Lead totals by source at the top (they never go down),
+   dark blue group labels, "Mark as contacted", and a note per lead. */
+.lead-totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:6px 0 4px}
+.lead-totals>div{background:#e2f0f8;border-radius:12px;padding:12px 14px}
+.lead-totals>div:first-child{background:#12354d}
+.lead-totals b{display:block;font:800 26px/1.1 'Archivo Black','DM Sans',sans-serif;color:#12354d}
+.lead-totals span{display:block;font-size:12px;font-weight:700;color:#12354d;margin-top:4px}
+.lead-totals>div:first-child b,.lead-totals>div:first-child span{color:#fff}
+.lead-totals-note{margin:4px 0 6px!important}
+.leads-group{color:#12354d!important}
+.lead-note{margin:8px 0 0!important;background:#e2f0f8;border-radius:10px;padding:8px 12px;font-size:13px;color:#12354d}
+.lead-note b{font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-right:6px}
+.lead-note-edit{margin-top:8px}
+.lead-note-edit textarea{width:100%;border:1px solid #c7e2f2;border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;color:#12354d;resize:vertical}
+.lead-note-btns{display:flex;gap:8px;margin-top:6px}
+.lead-note-btns .campaign-primary{width:auto;margin:0;padding:8px 16px;font-size:13px;min-height:0}
+button.lead-note-btn,button.lead-note-cancel{background:#e2f0f8!important;color:#12354d!important;border:0!important;font-size:12px!important;padding:8px 12px!important;min-height:0!important;width:auto!important}
+.leads-list li.done .lead-tick{background:#12354d!important;color:#fff!important}
+html.dark .shell .lead-totals>div{background:#1d3a50!important}
+html.dark .shell .lead-totals>div:first-child{background:#fff!important}
+html.dark .shell .lead-totals b,html.dark .shell .lead-totals span{color:#fff!important}
+html.dark .shell .lead-totals>div:first-child b,html.dark .shell .lead-totals>div:first-child span{color:#12354d!important}
+html.dark .shell .leads-group{color:#fff!important}
+html.dark .shell .lead-note{background:#1d3a50!important;color:#fff!important}
+html.dark .shell .leads-list li.done .lead-tick{background:#fff!important;color:#12354d!important}
+@media(max-width:700px){.lead-totals{grid-template-columns:1fr 1fr}}
+.lead-body small:not(.lead-contact),.lead-add,.lead-where{color:#12354d!important}
+.lead-where{opacity:.75}
+html.dark .shell button.lead-note-btn,html.dark .shell button.lead-note-cancel{background:#1d3a50!important;color:#fff!important}

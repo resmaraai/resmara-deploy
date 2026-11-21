@@ -212,6 +212,15 @@ tr.testrow td{background:#fbfdff;color:#849bae}
   .secsum{display:none}
   .rows .k{flex:0 0 120px}
 }
+.cm-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start}
+.cm-tiles>.cm-tile{height:auto;min-height:0}
+.cm-tile{background:#e2f0f8;border-radius:12px;padding:12px 14px}
+.cm-tile b{display:block;font-size:26px;line-height:1.1;color:#12354d}
+.cm-tile span{display:block;font-size:12px;font-weight:700;color:#12354d;margin-top:4px}
+.cm-tile.main{background:#12354d}.cm-tile.main b,.cm-tile.main span{color:#fff}
+html.dark .cm-tile{background:#1d3a50}html.dark .cm-tile b,html.dark .cm-tile span{color:#fff}
+html.dark .cm-tile.main{background:#fff}html.dark .cm-tile.main b,html.dark .cm-tile.main span{color:#12354d}
+@media(max-width:700px){.cm-tiles{grid-template-columns:1fr 1fr}}
 </style>
 
 <style id="brand-views">
@@ -1487,7 +1496,7 @@ function stagePill(r){ const l = stageLabel(r); const cls = l === 'Live' ? 'ok' 
   return '<span class="pill ' + cls + '">' + esc(l) + '</span>'; }
 function campTable(rows, withAgent){
   return '<div class="scrollx"><table><thead><tr><th>ID</th><th>property</th>' + (withAgent ? '<th>agent</th>' : '') +
-    '<th>status</th><th>day</th><th>posts</th><th>goes live</th></tr></thead><tbody>' +
+    '<th>status</th><th>day</th><th>posts</th><th>leads</th><th>goes live</th></tr></thead><tbody>' +
     rows.map(r => '<tr class="rowlink" data-campaign="' + esc(r.id) + '"><td><b>#' + esc(r.id) + '</b></td>' +
       '<td><div class="property-cell">' + (r.photo_cover
         ? '<img class="camp-thumb" src="' + esc(thumb(r.photo_cover, 160)) + '" alt="' + esc(r.address) + '" loading="lazy">'
@@ -1496,6 +1505,7 @@ function campTable(rows, withAgent){
       (withAgent ? '<td>' + esc(r.agent_name || r.agent_email || '') + '</td>' : '') +
       '<td>' + stagePill(r) + '</td><td>' + (r.stage === 'LIVE' && r.day ? 'Day ' + esc(r.day) + ' of 14' : '—') + '</td>' +
       '<td>' + esc(r.posts_published || 0) + ' of ' + esc(r.posts_total || 0) + ' posted' + (r.posts_failed ? ' · <b class="bad-t">' + esc(r.posts_failed) + ' failed</b>' : '') + '</td>' +
+      '<td>' + (r.leads ? esc(r.leads.total || 0) : '—') + '</td>' +
       '<td>' + esc(dateOnly(r.go_live_date)) + '</td></tr>').join('') + '</tbody></table></div>';
 }
 // The campaign's own library, in the order the calendar uses it. An empty campaign says so —
@@ -1555,13 +1565,29 @@ async function openCampaign(id, focusPost){
     '<div class="br-card" style="margin-top:12px"><div class="detail-head"><div><span class="eyebrow-s">Campaign #' + esc(c.id) + '</span>' +
       '<h3 class="detail-title">' + esc(c.address || '') + '</h3><div class="detail-sub">' + esc(c.agent_name || '') + (c.agent_email ? ' · ' + esc(c.agent_email) : '') + '</div></div>' +
       (c.stage ? stagePill(c) : '') + '</div>' +
-      '<div class="facts">' + fact('Goes live', dateOnly(c.go_live_date)) + fact('Launched', c.launched_at ? when(c.launched_at) : '—') +
-        fact('Created', when(c.created_at)) + fact('Ad budget', c.ad_budget_usd != null ? usd(c.ad_budget_usd) : '—') +
+      '<div class="facts">' + fact('Goes live', dateOnly(c.go_live_date)) + fact('Ends', c.ends_on ? dateOnly(c.ends_on) : '—') +
+        fact('Launched', c.launched_at ? when(c.launched_at) : '—') + fact('Created', when(c.created_at)) +
         fact('Meta campaign ID', c.meta_campaign_id || '—') + '</div></div>' +
     '<div class="br-card"><h3 class="card-title">Photos</h3>' + photosCard(c) + '</div>' +
     '<div class="br-card"><h3 class="card-title">Posts</h3>' + (c._noPosts ? '<div class="hint">Its posts appear here once the back end sends them.</div>' :
-      posts.length ? '<p class="hint" style="margin:-6px 0 10px">Click a post to see it.</p><div class="posts">' + posts.map(p => postRow(p)).join('') + '</div>' : '<div class="hint">No posts written yet.</div>') + '</div>';
+      posts.length ? '<p class="hint" style="margin:-6px 0 10px">Click a post to see it.</p><div class="posts">' + posts.map(p => postRow(p)).join('') + '</div>' : '<div class="hint">No posts written yet.</div>') + '</div>' +
+    campaignMetrics(c);
   if (focusPost) { const r = document.querySelector('[data-post="' + focusPost + '"]'); if (r) { togglePost(r); setTimeout(() => r.scrollIntoView({behavior: 'smooth', block: 'center'}), 50); } }
+}
+// Campaign metrics: what the campaign cost and the leads it generated, by source. Lead counts
+// never go down when an agent removes one from their list (app/services/lead_counts.py), so
+// they can be added up across campaigns ("the average campaign generates N leads").
+function campaignMetrics(c){
+  const L = c.leads || {};
+  const tile = (n, label, main) => '<div class="cm-tile' + (main ? ' main' : '') + '"><b>' + esc(n == null ? '—' : n) + '</b><span>' + esc(label) + '</span></div>';
+  const fee = c.paid_amount_cents != null ? usd(c.paid_amount_cents / 100) : '—';
+  return '<div class="br-card"><h3 class="card-title">Campaign metrics</h3>' +
+    '<div class="cm-tiles">' + tile(L.total, 'Leads in all', true) + tile(L.ad, 'From the ad') + tile(L.posts, 'From the posts') + tile(L.website, 'From the listing page') + '</div>' +
+    (L.removed ? '<p class="hint" style="margin:8px 0 0">' + esc(L.removed) + ' of these the agent later removed as not a lead. They still count.</p>' : '') +
+    '<div class="facts" style="margin-top:16px">' + fact('Resmara fee paid', fee) + fact('Ad budget', c.ad_budget_usd != null ? usd(c.ad_budget_usd) : '—') +
+      fact('Ad spent so far', c.ad_spend_usd != null ? usd(c.ad_spend_usd) : 'Not tracked yet') + '</div>' +
+    (c.ad_spend_usd == null ? '<p class="hint" style="margin:8px 0 0">What Meta actually spent comes from Meta’s numbers for the ad. That’s part of the Active campaign engine.</p>' : '') +
+    '</div>';
 }
 function postRow(p){
   const failed = p.publish_status === 'failed';
