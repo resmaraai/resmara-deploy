@@ -1305,3 +1305,21 @@ html.dark .shell .until-sold-on-box{background:#fff!important}
 html.dark .shell .until-sold-on-box b,html.dark .shell .until-sold-on-box span{color:#12354d!important}
 .campaign-scope .scope-form-actions{margin-top:22px}
 @media(max-width:700px){.campaign-scope .until-sold.is-on{grid-template-columns:1fr}}
+/* PR #17 (Adam, 21 Nov): the top of the campaign calendar. One instruction box, then the facts
+   (dates, the ad, times) on one tidy row, instead of loose small print. */
+.cal-guide{background:#e2f0f8;border-radius:14px;padding:18px 22px;margin:4px 0 16px;color:#12354d}
+.cal-guide>b{display:block;font-size:17px;color:#12354d}
+.cal-guide ul{margin:8px 0 8px;padding-left:20px}
+.cal-guide li,.cal-guide p{color:#12354d;font-size:14px;line-height:1.55}
+.cal-guide p{margin:0}
+.cal-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 16px}
+.cal-facts>div{border:1px solid #c7e2f2;border-radius:12px;padding:12px 14px;background:#fff}
+.cal-facts span{display:block;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#12354d;opacity:.7;margin-bottom:4px}
+.cal-facts b{font-size:14px;line-height:1.4;font-weight:600;color:#12354d}
+.cal-live-note{margin:4px 0 14px}
+html.dark .shell .cal-guide{background:#e2f0f8!important}
+html.dark .shell .cal-guide *{color:#12354d!important}
+html.dark .shell .cal-facts>div{background:#12354d!important;border-color:#2d6a92!important}
+html.dark .shell .cal-facts span,html.dark .shell .cal-facts b{color:#fff!important}
+@media(max-width:800px){.cal-facts{grid-template-columns:1fr}}
+html.dark .shell .panel .cal-guide p,html.dark .shell .panel .cal-guide li,html.dark .shell .panel .cal-guide b,html.dark .shell details.panel .cal-guide p{color:#12354d!important}
