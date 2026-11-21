@@ -1264,3 +1264,14 @@ html.dark .marketing-home .home-nav nav a{color:#fff!important}
 .home-site-preview .lp-view{max-height:520px;position:relative}
 #modal .ig-switch-actions{justify-content:flex-start;gap:10px}
 .card{position:relative}.card-sample{position:absolute;top:14px;left:14px;z-index:2;background:#12354d;color:#fff;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700}
+/* New campaign page: launch details in two columns, the until-sold checkbox, one button */
+.campaign-scope .ls-grid.ls-two{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.until-sold-check{display:flex;gap:12px;align-items:flex-start;margin:18px 0 6px;padding:16px 18px;background:#eef5f8;border-radius:14px;color:#12354d;font-size:14px;line-height:1.55;cursor:pointer}
+.until-sold-check input{width:20px;height:20px;margin-top:2px;flex:0 0 20px;accent-color:#d94c0d}
+.until-sold-check a{color:#12354d;text-decoration:underline;font-weight:600}
+.ls-links{margin-top:10px!important}
+.scope-locked .scope-change{margin-left:14px;color:#12354d;text-decoration:underline;font-size:14px}
+.draft-reports{display:none}
+html.dark .until-sold-check{background:#143a50;color:#fff}
+html.dark .until-sold-check a,html.dark .scope-locked .scope-change{color:#fff}
+@media(max-width:760px){.campaign-scope .ls-grid.ls-two{grid-template-columns:1fr!important}}

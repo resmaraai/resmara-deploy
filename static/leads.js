@@ -11,7 +11,9 @@ function campaignIsLive(c) {
   // least one day. "It has published posts" used to be part of this test, and because the
   // publisher stores "posted" while one endpoint counted "published", a launched campaign
   // read as un-launched and opened on the pre-launch approval screen forever.
-  return Number(c && c.day) > 0 || Boolean(c && c.live && c.launched_at);
+  // Approving and launching (c.launched) switches the page to its live layout straight away, so
+  // Campaign leads sit on top from the moment it's launched, even before the go-live date.
+  return Number(c && c.day) > 0 || Boolean(c && c.launched) || Boolean(c && c.live && c.launched_at);
 }
 function leadsKey(c) { return 'leads-' + (c.reviewId || c.address); }
 // A campaign the account actually owns has a boost id; the sample addresses do not.

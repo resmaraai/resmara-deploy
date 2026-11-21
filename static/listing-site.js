@@ -106,12 +106,13 @@ function listingPageStats(c) {
 }
 
 // Section 3 of a live campaign.
-function listingPagePanel(c, index) {
+// draft = before launch: no numbers yet, and the page isn't public until the campaign launches.
+function listingPagePanel(c, index, draft) {
   const s = listingPageStats(c);
-  return `<section class="panel listing-page-panel" id="listing-page">
+  return `<section class="panel listing-page-panel${draft ? ' lp-draft' : ''}" id="listing-page">
   <h2 class="campaign-step-title"><span>3</span> Your listing page</h2>
-  <p class="fine">Resmara built this page for the home in your brand. Every post and your ad send people here, and anyone who fills in the form or taps Call comes straight to you.</p>
-  <div class="lp-stats"><div><b>${s.visits.toLocaleString()}</b><small>Visits</small></div><div><b>${s.forms}</b><small>Form leads</small></div><div><b>${s.calls}</b><small>Calls</small></div></div>
+  <p class="fine">${draft ? 'Resmara built this website for the home in your brand. It goes live when you launch: every post and your ad link here, and anyone who fills in the form or taps Call comes straight to you.' : 'Resmara built this page for the home in your brand. Every post and your ad send people here, and anyone who fills in the form or taps Call comes straight to you.'}</p>
+  ${draft ? '' : `<div class="lp-stats"><div><b>${s.visits.toLocaleString()}</b><small>Visits</small></div><div><b>${s.forms}</b><small>Form leads</small></div><div><b>${s.calls}</b><small>Calls</small></div></div>`}
   <div class="lp-frame"><div class="lp-bar">${esc(listingPageAddress(c))}</div><div class="lp-view">${listingSiteHTML(c, index)}</div></div>
   <button type="button" class="campaign-primary" onclick="openListingPage(${index})">View full page</button>
 </section>`;
