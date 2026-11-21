@@ -88,7 +88,8 @@ approved and launched, waiting for its go-live date; the card's line reads "Goes
 
 Launching switches the page straight to its live layout. At the far right of the address it shows
 **"Goes live Nov 22"** (or **"Live since Nov 22"** once it starts) and, under it, **"Approved Nov 21
-at 2:00 PM"**. The four sections all start closed:
+at 2:00 PM"**. Every time the page opens, **Campaign leads is open** and the rest are closed; only one
+section is open at a time:
 
 1. Campaign leads
 2. Campaign calendar (locked; **Withdraw post** for posts not yet out)
