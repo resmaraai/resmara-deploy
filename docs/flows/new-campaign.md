@@ -52,8 +52,8 @@ until it sells**.
 ## 3. The staged campaign page (paid for, not launched)
 
 A paid campaign that hasn't launched is **Staged** (orange pill on its card, button **Review staged
-campaign**). Its page has three numbered blocks. Blocks 1 and 2 **open collapsed** with a drop-down
-arrow. The page walks the agent on: **Confirm details** closes block 1 and opens the calendar;
+campaign**). Its page has three numbered blocks. Blocks 1 and 2 fold with a drop-down arrow. A newly opened
+campaign opens with **block 1 open** (or, if the details are already confirmed, the calendar). The page walks the agent on: **Confirm details** closes block 1 and opens the calendar;
 **Approve calendar** closes the calendar and takes them to Ready to go. The listing page isn't on
 this page: it shows on the live campaign page.
 
@@ -110,6 +110,6 @@ Launching switches the page straight to its live layout. The four sections all s
 
 - Preview: https://claude.ai/artifact/Lip2AN9HQZuLf4J5AsP8Vy#client (reload), then **+ Campaign**
   and paste any listing link.
-- Open **905 Laurel Bend** (Staged): blocks 1 and 2 open collapsed, the calendar is already built,
+- Open **905 Laurel Bend** (Staged): block 1 opens on its own, the calendar is already built,
   each button only turns on once the block above is confirmed, and each step opens the next.
 - After **Approve and launch**, the page shows 1 Campaign leads at the top.
