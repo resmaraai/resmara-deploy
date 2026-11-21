@@ -76,8 +76,6 @@ Launching switches the page straight to its live layout. The four sections all s
 3. Your listing page (with visits, form leads and calls)
 4. Reports
 
-The campaign card on My campaigns shows it as Active.
-
 ---
 
 ## 5. What the server has to do (Dan)
