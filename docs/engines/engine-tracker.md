@@ -18,6 +18,7 @@ the face on top.
 | 7 | The ad | **Ad** | Copy comes from the plan | Yes | Engine: Active campaign |
 | 8 | The home's website | **Website** | Should write the page, sort and qualify leads, and summarise results | **Partly.** Page design and preview built; no server: no public page, no lead capture, no tracking | Engine: Website |
 | 9 | Publish, watch the listing, leads, reports | **Active campaign** | AI flags buyer comments as leads and learns from results | **Mostly yes.** It won't post without an ad account | Engine: Active campaign |
+| 10 | Resmara's own marketing (Team room) | **Marketing** | Should be a weekly AI analyst: what's working, what's wasting money, budget moves, the next ad to test, alerts on sudden changes | **No.** The Marketing and Website pages exist but read nothing: Resmara's Meta ad account, GA4 and Clarity aren't connected, and Google Ads isn't supported | Engine 7 · Marketing |
 
 ## Build order (one engine per deployment)
 
@@ -27,7 +28,7 @@ the face on top.
 | #18 | Engine 1 · Login and Meta integration. Built as far as possible; the last piece plugs in once the Meta app review is approved |
 | #19 | Engine 2 · Brand |
 | #20 | Engine 3 · Listing link |
-| then | Engine 4 · Campaign build, Engine 5 · Website, Engine 6 · Active campaign, each its own PR |
+| then | Engine 4 · Campaign build, Engine 5 · Website, Engine 6 · Active campaign, Engine 7 · Marketing, each its own PR |
 
 PR numbers can shift if other pull requests land in between. The Build room ticket titles say
 which is which.
@@ -44,6 +45,7 @@ which is which.
   - Campaign
   - Website
   - Active campaign
+  - Marketing
   - Billing
   - Support
   - Team room
