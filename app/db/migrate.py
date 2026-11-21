@@ -27,6 +27,8 @@ ADDITIONS = {
         ("tour_seen_at", "TIMESTAMP"),
         # Email confirmation before first sign-in (item 8); added to existing databases by ALTER.
         ("email_confirmed_at", "TIMESTAMP"),
+        # Team-marked test account (21 Nov 2026): kept out of Growth, Marketing and Finance counts.
+        ("is_test", "BOOLEAN DEFAULT FALSE"),
         ("confirm_token_hash", "VARCHAR"),
         ("confirm_sent_at", "TIMESTAMP"),
         # The Team room's access list and the fail log the console reads. Both are read on

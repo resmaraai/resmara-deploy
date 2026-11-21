@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import AdAccount, Asset, Boost, Event, Post, User, get_db
 from app.services.lead_counts import lead_totals
+from app.core.testdata import is_test_user
 from app.services import team_access
 
 log = logging.getLogger("resmara.console")
@@ -147,6 +148,8 @@ def _campaign_row(boost: Boost, owner: Optional[User], counts: Dict[str, int],
         "ad_budget_usd": boost.ad_budget_usd,
         "meta_campaign_id": boost.meta_campaign_id,
         "hidden": bool(boost.hidden),
+        # The owner is a test account (test email or team-marked): Team room counts skip it.
+        "is_test": is_test_user(owner),
         "paused_at": _iso(boost.paused_at),
         "listing_url": boost.listing_url,
     }

@@ -66,7 +66,7 @@ def main() -> int:
         return {"Authorization": "Bearer %s" % r.json().get("access_token", "")}
 
     admin = account("owner@example.com", admin=True)
-    client_h = account("agent@example.com")
+    client_h = account("agent@agent-realty.com")
 
     # ── who may look ───────────────────────────────────────────────────────────
     check("a customer is refused", client.get("/api/admin/finance", headers=client_h).status_code == 403,
@@ -139,7 +139,7 @@ def main() -> int:
 
     # ── real money shows up ───────────────────────────────────────────────────
     with SessionLocal() as db:
-        agent = db.query(User).filter(User.email == "agent@example.com").first()
+        agent = db.query(User).filter(User.email == "agent@agent-realty.com").first()
         boost = Boost(user_id=agent.id, address="12 Repeat St, Austin TX")
         db.add(boost)
         db.commit()
@@ -171,7 +171,7 @@ def main() -> int:
 
     # ── the $39 renewal is counted as a renewal, not just as money ────────────
     with SessionLocal() as db:
-        agent = db.query(User).filter(User.email == "agent@example.com").first()
+        agent = db.query(User).filter(User.email == "agent@agent-realty.com").first()
         repeat = Boost(user_id=agent.id, address="12 Repeat St, Austin TX", repeat_round=1)
         db.add(repeat)
         db.commit()

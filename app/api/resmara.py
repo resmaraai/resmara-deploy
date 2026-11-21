@@ -4,7 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.db.session import get_db, User, AdAccount, Creative, Boost, Post, Ad, SupportTicket, Event, Asset, PasswordReset
-from app.core.testdata import is_test_email
+from app.core.testdata import is_test_email, is_test_user
 from app.core.security import get_current_user, get_admin_user
 from app.schemas.resmara import (
     AdAccountCreate, AdAccountOut, CreativeCreate, CreativeOut,
@@ -612,19 +612,38 @@ def admin_users(current_user=Depends(team_access.needs("agents")), db: Session =
     result = []
     for u in users:
         boost_count = db.query(Boost).filter(Boost.user_id == u.id).count()
-        result.append(AdminUserOut(id=u.id, email=u.email, name=u.name, is_active=u.is_active, subscription_status=u.subscription_status, last_login=u.last_login, created_at=u.created_at, campaign_count=boost_count, is_test=is_test_email(u.email), is_admin=bool(u.is_admin)))
+        result.append(AdminUserOut(id=u.id, email=u.email, name=u.name, is_active=u.is_active, subscription_status=u.subscription_status, last_login=u.last_login, created_at=u.created_at, campaign_count=boost_count, is_test=is_test_user(u), is_admin=bool(u.is_admin)))
     return result
+
+class TestFlagIn(BaseModel):
+    is_test: bool
+
+
+@router.patch("/admin/users/{user_id}/test")
+def admin_mark_test(user_id: int, body: TestFlagIn, current_user=Depends(team_access.needs("agents")),
+                    db: Session = Depends(get_db)):
+    """Mark an account as a test account (or a real one again). Test accounts stay in Accounts,
+    tagged, but every Team room count leaves them out."""
+    u = db.query(User).filter(User.id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="No such account")
+    u.is_test = bool(body.is_test)
+    db.commit()
+    return {"id": u.id, "is_test": is_test_user(u), "marked": bool(u.is_test),
+            "by_email": is_test_email(u.email)}
+
 
 @router.get("/admin/support", response_model=list[SupportTicketOut])
 def admin_support(current_user=Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
     """Every ticket, newest first, with the client's email so a reply has a name on it."""
     tickets = db.query(SupportTicket).order_by(SupportTicket.created_at.desc()).all()
-    emails = {u.id: u.email for u in db.query(User).all()}
+    people = {u.id: u for u in db.query(User).all()}
     out = []
     for t in tickets:
         row = SupportTicketOut.model_validate(t)
-        row.client_email = emails.get(t.user_id)
-        row.is_test = is_test_email(row.client_email)
+        person = people.get(t.user_id)
+        row.client_email = person.email if person else None
+        row.is_test = is_test_user(person) if person else is_test_email(row.client_email)
         out.append(row)
     return out
 

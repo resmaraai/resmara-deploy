@@ -48,6 +48,9 @@ class User(Base):
     # Email confirmation before the first sign-in (item 8). The token is stored hashed: a dumped
     # database must not be a pile of working confirmation links.
     email_confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    # Marked by the team as a test account (e.g. a demo client like 'Coggins'): left out of every
+    # Team room count. Accounts on test emails are caught by app.core.testdata anyway.
+    is_test = Column(Boolean, default=False)
     confirm_token_hash = Column(String, nullable=True)
     confirm_sent_at = Column(DateTime(timezone=True), nullable=True)
     # Team room access. A team member is a normal account with a list of the console's sections

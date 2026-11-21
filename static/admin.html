@@ -218,6 +218,10 @@ tr.testrow td{background:#fbfdff;color:#849bae}
 .cm-card .cm-money{grid-template-columns:repeat(3,1fr)}
 .cm-card .cm-money .goal-step b{font-size:22px}
 .cm-card .cm-note{margin:10px 0 0;color:#fff;font-size:13px;opacity:.85}
+.test-note{margin-top:12px;background:#e2f0f8;color:#12354d;border-radius:12px;padding:10px 14px;font-size:13.5px}
+button.ghost.tiny.is-test-on{background:#12354d!important;color:#fff!important;border-color:#12354d!important}
+html.dark .test-note{background:#1d3a50;color:#fff}
+html.dark button.ghost.tiny.is-test-on{background:#fff!important;color:#12354d!important}
 </style>
 
 <style id="brand-views">
@@ -1643,7 +1647,9 @@ function paintAgent(id){
   page.innerHTML = '<button class="back" data-close-agent>All accounts</button>' +
     '<div class="br-card" style="margin-top:12px"><div class="detail-head"><div><span class="eyebrow-s">Agent #' + esc(u.id) + '</span>' +
       '<h3 class="detail-title">' + esc(u.name || u.email) + '</h3><div class="detail-sub">' + esc(u.email) + '</div></div>' +
-      '<button class="ghost tiny" data-resetlink="' + esc(u.id) + '" title="Makes a one-time link you send them if they are locked out">Password reset link</button></div>' +
+      '<div class="row-btns"><button class="ghost tiny' + (u.is_test ? ' is-test-on' : '') + '" data-marktest="' + esc(u.id) + '" title="Test accounts stay listed here, tagged, but every Team room number leaves them out">' + (u.is_test ? '✓ Test account' : 'Mark as test account') + '</button>' +
+      '<button class="ghost tiny" data-resetlink="' + esc(u.id) + '" title="Makes a one-time link you send them if they are locked out">Password reset link</button></div></div>' +
+      (u.is_test ? '<div class="test-note">This is a test account. It stays in Accounts, but Growth, Marketing, Finance, Campaigns and Overview leave it out.</div>' : '') +
       '<div id="resetOut"></div>' +
       '<div class="facts">' + fact('Joined', when(u.created_at)) + fact('Last sign-in', when(u.last_login)) +
         fact('Paid', paid ? usd(paid.paid_usd) : '$0.00') +
@@ -1660,6 +1666,21 @@ function paintAgent(id){
   const uc = $('userCount'); if (uc) uc.classList.add('hidden');
   window.scrollTo({top: 0});
 }
+// Mark an account as a test account (or real again). The server keeps the flag; every count
+// that reads /api/admin/users, /campaigns, /metrics, /finance and /marketing leaves it out.
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-marktest]'); if (!b) return;
+  const id = b.dataset.marktest, u = (userRows || []).find(x => String(x.id) === String(id)); if (!u) return;
+  const next = !u.is_test; b.disabled = true;
+  try {
+    const r = await api('/api/admin/users/' + encodeURIComponent(id) + '/test', {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({is_test: next})});
+    u.is_test = r && r.is_test !== undefined ? !!r.is_test : next;
+    (campRows || []).forEach(c => { if (String(c.user_id) === String(id)) c.is_test = u.is_test; });
+    paintAgent(id); if (typeof paintGrowth === 'function') paintGrowth();
+    // Re-read the counts so Overview, Campaigns, Finance and Marketing drop (or regain) it now.
+    if (typeof loadMetrics === 'function') loadMetrics(); if (typeof loadFinance === 'function') loadFinance();
+  } catch (err) { b.disabled = false; b.textContent = 'Could not save. Try again.'; }
+});
 function closeAgent(){ agentOpen = null; $('accountsHero').classList.remove('hidden'); $('agentPage').classList.add('hidden'); $('usersFilters').classList.remove('hidden'); $('usersWrap').classList.remove('hidden'); }
 document.addEventListener('click', e => {
   if (e.target.closest('[data-close-agent]')) { closeAgent(); return; }
@@ -2395,7 +2416,7 @@ function paintGrowth(){
   const newThis = agents.filter(u => u.created_at && parse(u.created_at) >= m0).length;
   const newLast = agents.filter(u => u.created_at && parse(u.created_at) >= m1 && parse(u.created_at) < m0).length;
   const price = finData && finData.price ? finData.price.cents / 100 : 49;
-  const camps = campRows || [];
+  const camps = (campRows || []).filter(c => !c.is_test);
   const campsThis = camps.filter(c => c.created_at && parse(c.created_at) >= m0);
   const activeThis = new Set(campsThis.map(c => c.user_id)).size;
   const byAgent = {}; camps.forEach(c => { byAgent[c.user_id] = (byAgent[c.user_id] || 0) + 1; });
