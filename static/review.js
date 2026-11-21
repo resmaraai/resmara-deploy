@@ -623,7 +623,7 @@ function campaignStamp(c,r){
 // "Nov 21 at 1:52 PM": when a step was approved, kept on the campaign as a record.
 function stampTime(iso){const d=new Date(iso);if(isNaN(d))return '';return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' at '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
 // Moves the agent on: close the step they just finished and open the next one.
-function goToStep(close,open,target){state.folds=state.folds||{};if(close)state.folds[close]=false;if(open)state.folds[open]=true;persist();details(ReviewStudio.active);setTimeout(()=>document.querySelector(target)?.scrollIntoView({behavior:'smooth',block:'start'}),50)}
+function goToStep(close,open,target){state.folds=state.folds||{};if(close)state.folds[close]=false;if(open){Object.keys(state.folds).forEach(k=>state.folds[k]=false);state.folds[open]=true}persist();details(ReviewStudio.active);setTimeout(()=>document.querySelector(target)?.scrollIntoView({behavior:'smooth',block:'start'}),50)}
 function calendarIntro(r,c,editable,title,start,last){
  const live=r.approved||(typeof campaignIsLive==='function'&&c&&campaignIsLive(c));
  const video=r.items.some(i=>i.kind==='Video post');

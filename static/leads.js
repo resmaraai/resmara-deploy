@@ -281,7 +281,7 @@ function liveCalendar(html) {
 // "View day 7 report" on the calendar opens the Reports section (it starts folded), opens that
 // day's report and scrolls to it.
 function openReportFromCalendar(day) {
-  state.folds = state.folds || {}; state.folds.reports = true; persist(); setupFolds();
+  state.folds = state.folds || {}; FOLDS.forEach(f => { state.folds[f[1]] = false; }); state.folds.reports = true; persist(); setupFolds();
   const btn = [...document.querySelectorAll('.pr-pick')].find(b => b.textContent.includes('Day ' + day + ' report'));
   if (btn && btn.tagName === 'BUTTON' && !btn.classList.contains('on')) btn.click();
   setTimeout(() => (document.querySelector('#pr-view') || document.querySelector('.live-reports'))?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
@@ -404,7 +404,15 @@ function setupFolds() {
     if (head.dataset.fold) return;
     head.dataset.fold = key; head.classList.add('fold-head'); head.setAttribute('role', 'button'); head.tabIndex = 0;
     head.insertAdjacentHTML('beforeend', '<span class="fold-chev" aria-hidden="true"></span>');
-    const flip = e => { if (e.target.closest('button,a')) return; e.preventDefault(); state.folds[key] = !state.folds[key]; persist(); setupFolds(); };
+    const flip = e => {
+      if (e.target.closest('button,a')) return; e.preventDefault();
+      // One section open at a time: opening one closes the others, and the page keeps the
+      // opened section's header in view (sections above it may have just closed).
+      const opening = !state.folds[key];
+      if (opening) { FOLDS.forEach(f => { state.folds[f[1]] = false; }); state.folds[key] = true; } else state.folds[key] = false;
+      persist(); setupFolds();
+      if (opening) { const top = head.getBoundingClientRect().top; if (top < 0 || top > window.innerHeight * 0.6) head.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    };
     head.addEventListener('click', flip);
     head.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') flip(e); });
   });
