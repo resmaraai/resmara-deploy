@@ -279,11 +279,11 @@ function untilSoldButton(c) {
     ? `<button type="button" class="card-pause until-sold-on" onclick="untilSoldInfo(${i},'card')" title="A fresh campaign every 2 weeks until it’s under contract">✓ Running until sold</button>`
     : `<button type="button" class="card-pause" onclick="untilSoldInfo(${i},'card')" title="A fresh campaign every 2 weeks until it’s under contract">Run until sold</button>`;
 }
-function untilSoldPanel(i) {
+function untilSoldPanel(i, locked) {
+  // The navy box on the launch details. Off: the two buttons. On: the buttons go and a box on the
+  // right confirms it's on (Turn off sits under it until the launch details are confirmed).
   const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);
-  return `<div class="until-sold"><b class="until-sold-title">Run it until it sells</b><p class="until-sold-sub">A fresh campaign every 2 weeks until it’s under contract. $39 per renewal.</p><div class="until-sold-line"><div class="eyebrow">TELL YOUR SELLERS</div><p>“${UNTIL_SOLD_LINE}”</p></div><div class="until-sold-actions">${on
-    ? `<strong class="until-sold-running">✓ Running until it sells</strong><button type="button" class="until-sold-how" onclick="setUntilSold(${i},false,'scope')">Turn off</button>`
-    : `<button type="button" class="campaign-primary" onclick="setUntilSold(${i},true,'scope')">Run it until it sells</button>`}<button type="button" class="until-sold-how" onclick="untilSoldInfo(${i},'scope')">How it works</button></div></div>`;
+  return `<div class="until-sold${on ? ' is-on' : ''}"><div class="until-sold-copy"><b class="until-sold-title">Run it until it sells</b><p class="until-sold-sub">A fresh campaign every 2 weeks until it’s under contract. $39 per renewal.</p><div class="until-sold-line"><div class="eyebrow">TELL YOUR SELLERS</div><p>“${UNTIL_SOLD_LINE}”</p></div>${on ? '' : `<div class="until-sold-actions"><button type="button" class="campaign-primary" onclick="setUntilSold(${i},true,'scope')">Run it until it sells</button><button type="button" class="until-sold-how" onclick="untilSoldInfo(${i},'scope')">How it works</button></div>`}</div>${on ? `<div class="until-sold-on-box"><b>✓ Run it until it sells is on</b><span>A fresh 14 days every 2 weeks, $39 each, until it’s under contract.</span>${locked ? '' : `<button type="button" class="until-sold-off" onclick="setUntilSold(${i},false,'scope')">Turn off</button>`}</div>` : ''}</div>`;
 }
 function untilSoldInfo(i, from) {
   const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);
@@ -340,6 +340,7 @@ function setCampaignPaused(i, on) {
 // work through one at a time. A chevron on the right of the heading shows which way it goes, and
 // the choice is remembered on this device.
 const FOLDS = [['#leads', 'leads', '.leads-head h2'], ['.live-cal .review-calendar', 'calendar', 'summary'],
+  ['.campaign-scope', 'scope', 'h2.campaign-step-title'], ['.draft-cal .review-calendar', 'calendar', 'summary'], ['.draft-cal .review-calendar', 'calendar', 'h2.campaign-step-title'],
   ['#listing-page', 'page', 'h2.campaign-step-title'], ['.live-reports', 'reports', 'h2.campaign-step-title']];
 function setupFolds() {
   state.folds = state.folds || {};

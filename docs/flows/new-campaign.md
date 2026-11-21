@@ -41,22 +41,32 @@ until it sells**.
   - card on file: charged straight away ("Paying $49 for this campaign with your card on file");
   - no card: "Add a card to build your campaign" goes to Stripe and comes back to the same step;
   - if the build fails after the charge, it's refunded automatically.
+- **Charge and build are one step (Adam, 21 Nov).** The moment the agent clicks Build my campaign,
+  the card is charged and the engine runs straight away: it picks the photos, checks the link for a
+  video (a video becomes the ad and the day 1 post), writes the 14 posts, builds the ad and the
+  home's website. The agent lands on the campaign page with the calendar already built. Nothing
+  waits for the launch details. (Back end: the build is started from the create step, not from
+  launch details. Engine 3 Listing link and Engine 4 Campaign build.)
 
 ---
 
-## 3. The draft campaign page (before launch)
+## 3. The staged campaign page (paid for, not launched)
 
-Four numbered blocks, top to bottom. Each block has **one** button.
+A paid campaign that hasn't launched is **Staged** (orange pill on its card, button **Review staged
+campaign**). Its page has four numbered blocks. Blocks 1 to 3 **open collapsed** with a drop-down
+arrow; the agent opens the ones they want.
 
 | Block | Shows | The one button | Unlocks |
 |-------|-------|----------------|---------|
-| **1 Launch details** | Go-live date (defaults to the next day), ad budget ($50 default; Meta bills it directly), the **Keep it running until it sells** checkbox ($39 every 2 weeks until under contract, with a "How it works" link), and a note that every post and the ad link to the home's website | **Approve launch details** | Block 2's button |
-| **2 Campaign calendar** | The 14 posts and the ad. Opening a post lets the agent edit the title and caption, upload a replacement photo, and move the date | **Approve calendar** | Block 4's button |
+| **1 Confirm your launch details** | Go-live date (defaults to the next day), ad budget ($50 default; "Meta bills your ad spend separately from your Resmara campaign"), and the navy **Run it until it sells** box: "Tell your sellers" line, an orange **Run it until it sells** button and **How it works** (a pop-up with Got it). Once it's on, both buttons go and a white box on the right says "✓ Run it until it sells is on" (with Turn off until the details are confirmed). No "Send clicks to" field: everything links to the home's website | **Confirm details** | Block 2's button |
+| **2 Campaign calendar** | Already built when the page opens: the 14 posts and the ad. Opening a post lets the agent edit the title and caption, upload a replacement photo, and move the date | **Approve calendar** | Block 4's button |
 | **3 Your listing page** | The website Resmara built for the home, in a scrollable preview, plus **View full page**. No numbers yet | (View full page only) | — |
 | **4 Ready to go?** | What happens next, and how many posts were opened (opening them is optional) | **Approve and launch** | Launch |
 
-- **After approving block 1**, it collapses to one line: "✓ Goes live Nov 22 · $50 ad budget ·
-  Runs until it sells" with a **Change** link (until launch).
+- **After Confirm details**, block 1's header reads "✓ Goes live Nov 22 · $50 ad budget · Runs
+  until it sells" with a **Change** link (until launch). Confirming doesn't rebuild the calendar.
+- If a paid campaign ever opens without its calendar (the build was interrupted), the page starts
+  the build itself.
 - **Approve and launch:** if some posts weren't opened, it asks "You haven't reviewed everything.
   Approve anyway?" Then it launches.
 - **Removed on purpose:**

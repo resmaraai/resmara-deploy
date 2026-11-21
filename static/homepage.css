@@ -1291,3 +1291,17 @@ html.dark .shell .pill.phase-staged{background:#d94c0d!important;color:#fff!impo
 .card-until-sold{background:#fff;color:#12354d;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;box-shadow:0 4px 12px rgba(18,53,77,.18)}
 html.dark .shell .card-pause:not(.resume){background:#e2f0f8!important;color:#12354d!important}
 html.dark .shell .card-until-sold{background:#fff!important;color:#12354d!important}
+/* PR #17 (Adam, 21 Nov): launch details. Run it until it sells is the navy box from the live site:
+   two buttons while it's off; once it's on they go and a white box on the right confirms it. */
+.campaign-scope .until-sold{display:grid;grid-template-columns:1fr;gap:20px;align-items:center}
+.campaign-scope .until-sold.is-on{grid-template-columns:minmax(0,1fr) minmax(220px,300px)}
+.until-sold-copy .until-sold-line:last-child{margin-bottom:0}
+.until-sold-on-box{background:#fff;border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.until-sold-on-box b,.until-sold-on-box span{color:#12354d!important}
+.until-sold-on-box b{font-size:16px}
+.until-sold-on-box span{font-size:13px;line-height:1.45}
+button.until-sold-off{background:#e2f0f8!important;color:#12354d!important;border:0!important;border-radius:999px!important;padding:8px 16px!important;font-weight:700;width:auto!important;min-height:0!important;margin-top:4px}
+html.dark .shell .until-sold-on-box{background:#fff!important}
+html.dark .shell .until-sold-on-box b,html.dark .shell .until-sold-on-box span{color:#12354d!important}
+.campaign-scope .scope-form-actions{margin-top:22px}
+@media(max-width:700px){.campaign-scope .until-sold.is-on{grid-template-columns:1fr}}
