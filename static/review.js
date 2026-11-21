@@ -313,8 +313,7 @@ function reviewDateLabel(date,time,zone){
 function approveReview(){
  const r=activeReview();if(r.approved)return;
  if(!r.scopeConfirmed||!r.calendarApproved||!r.items.length){toast('Confirm your launch details and approve the calendar first.');document.querySelector('.campaign-scope')?.scrollIntoView({block:'start'});return}
- const unopened=r.items.filter(i=>!i.reviewed).length;
- show(unopened?`<span class="eyebrow">NOT EVERYTHING REVIEWED</span><h2>You haven’t reviewed everything.</h2><p>${unopened} of ${r.items.length} posts and ads haven’t been opened. Are you sure you want to approve the whole campaign?</p><p class="fine">Once approved, your posts and ad are locked and go live on your go-live date.</p><div class="modal-actions"><button class="nc-cancel" onclick="modal.close()">Keep reviewing</button><button class="campaign-primary" onclick="confirmCampaignApproval()">Yes, approve</button></div>`:`<h2>Approve and launch?</h2><p>Your posts and ad are locked and go live on your go-live date.</p><div class="modal-actions"><button class="nc-cancel" onclick="modal.close()">Keep reviewing</button><button class="campaign-primary" onclick="confirmCampaignApproval()">Approve</button></div>`);
+ show(`<h2>Approve and launch?</h2><p>Your posts and ad are locked and go live on your go-live date.</p><div class="modal-actions"><button class="nc-cancel" onclick="modal.close()">Keep reviewing</button><button class="campaign-primary" onclick="confirmCampaignApproval()">Approve</button></div>`);
 }
 async function confirmCampaignApproval(){
  const r=activeReview();if(r.approved||!r.scopeConfirmed||!r.calendarApproved||!r.items.length)return;
@@ -369,8 +368,14 @@ function reviewCalendar(r,c){
  return `<details class="panel review-calendar" open><summary class="campaign-step-title"><span>2</span> Campaign calendar ${r.calendarApproved||r.approved?'<small>✓ Calendar Approved</small>':''}</summary>${calendarIntro(r,c,editable,title,start,last)}<div class="review-month-scroll"><div class="review-month-grid"><div class="review-month-weekdays">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<span>${d}</span>`).join('')}</div>${weeks.join('')}</div></div><p class="fine">${r.liveGeneration?'Draft copy, captions and creative directions from your campaign engine'+(r.engine&&r.engine.host?' ('+esc(r.engine.host)+')':'')+'. Nothing has been published.':'Sample schedule and creative. Nothing is published from this preview.'}${r.buildNotes&&r.buildNotes.length?' '+r.buildNotes.map(esc).join(' '):''}</p><div class="scope-form-actions"><span class="fine">${r.scopeConfirmed?'Confirm the dates and creative before approving.':'Confirm your launch details first.'}</span>${r.approved?'':r.calendarApproved?'<button class="alt" onclick="unlockCampaignCalendar()">Unlock calendar</button>':`<button class="campaign-primary scope-approval-button" onclick="approveCampaignCalendar()" ${r.scopeConfirmed?'':'disabled'}>Approve calendar</button>`}</div></details>`;
 }
 
-function approveCampaignCalendar(){
+// Approve calendar asks first when some posts or the ad were never opened and marked reviewed.
+function approveCampaignCalendar(force){
  const r=activeReview();if(r.approved||!r.items.length||r.needsBuild||ReviewStudio.building.has(r))return;
+ const unopened=r.items.filter(i=>!i.reviewed).length;
+ if(unopened&&force!==true){
+  show(`<span class="eyebrow">NOT EVERYTHING REVIEWED</span><h2>You haven’t reviewed everything.</h2><p>${unopened} of ${r.items.length} posts and ads haven’t been marked as reviewed. Are you sure you want to approve the calendar?</p><p class="fine">That’s fine if you’re happy with what Resmara made. You can still change things until you launch.</p><div class="modal-actions"><button class="nc-cancel" onclick="modal.close()">Keep reviewing</button><button class="campaign-primary" onclick="modal.close();approveCampaignCalendar(true)">Yes, approve calendar</button></div>`);
+  return;
+ }
  r.calendarApproved=true;persist();details(ReviewStudio.active);
  document.querySelector('.review-approval')?.scrollIntoView({block:'nearest'});
 }

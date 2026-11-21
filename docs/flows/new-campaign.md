@@ -67,8 +67,10 @@ arrow; the agent opens the ones they want.
   until it sells" with a **Change** link (until launch). Confirming doesn't rebuild the calendar.
 - If a paid campaign ever opens without its calendar (the build was interrupted), the page starts
   the build itself.
-- **Approve and launch:** if some posts weren't opened, it asks "You haven't reviewed everything.
-  Approve anyway?" Then it launches.
+- **Approve calendar:** if any post or the ad wasn't marked reviewed (Save and mark reviewed in
+  the post editor), it asks first: "You haven't reviewed everything. 12 of 15 posts and ads haven't
+  been marked as reviewed. Are you sure?" with **Keep reviewing** or **Yes, approve calendar**.
+- **Approve and launch:** a plain "Approve and launch?" check, then it launches.
 - **Removed on purpose:**
   - "Send clicks to": everything goes to the listing website;
   - the photo box at the top: photos are swapped inside posts;
