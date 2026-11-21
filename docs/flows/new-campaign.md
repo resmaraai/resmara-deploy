@@ -17,8 +17,8 @@ until it sells**.
 | 2 | Link check | Watches it check. If it finds nothing: types the address and uploads photos | "We have the home's details and N photos" |
 | 3 | Permission | Ticks "I have permission to use these photos…" | Payment step |
 | 4 | Pay | Clicks **Build my campaign · $49**. That click is the approval: the card on file is charged. No card: "Add a card to build your campaign" first, through Stripe | Building |
-| 5 | Building | Waits about a minute. Resmara researches the home, picks the best 14 photos, writes and designs the posts and the ad, and builds the website | The campaign page (draft) |
-| 6 | 1 Launch details | Sets the go-live date and ad budget, ticks "Keep it running until it sells" if wanted. **Approve launch details** | Block 2 |
+| 5 | Building | Waits about a minute. Resmara researches the home, picks the best 14 photos, writes and designs the posts and the ad, and builds the website | The campaign page (staged), calendar already built |
+| 6 | 1 Confirm your launch details | Sets the go-live date and ad budget, clicks **Run it until it sells** if wanted. **Confirm details** | Block 2 |
 | 7 | 2 Campaign calendar | Opens any post to change copy or swap the photo. **Approve calendar** | Block 4 |
 | 8 | 3 Your listing page | Looks at the website Resmara built (optional) | — |
 | 9 | 4 Ready to go? | **Approve and launch** | The live campaign page |
@@ -73,7 +73,8 @@ arrow; the agent opens the ones they want.
   - "Send clicks to": everything goes to the listing website;
   - the photo box at the top: photos are swapped inside posts;
   - Reports before launch;
-  - the separate Run until sold buttons: it's now a checkbox in block 1.
+  - the Run until sold button on the campaign card: once it's on, the card shows a "Run until sold
+    is on" tag instead.
 
 ---
 
@@ -91,7 +92,9 @@ Launching switches the page straight to its live layout. The four sections all s
 ## 5. What the server has to do (Dan)
 
 1. **The property file and the new check outcomes:** Listing Link Engine, sections 4 and 5.
-2. **Charge before build:** refund on a failed build.
+2. **Charge and build in one step:** start the build from the create step (photos, video check,
+   posts, ad, website), so the calendar exists before the agent lands on the page. Refund on a
+   failed build.
 3. **Save launch details** (start, budget, until-sold) in one call. Until-sold uses the existing
    `RM.setUntilSold`.
 4. **Approve and launch** = the existing `approveAll`. It sets `launched_at`, so the live layout
@@ -105,6 +108,6 @@ Launching switches the page straight to its live layout. The four sections all s
 
 - Preview: https://claude.ai/artifact/Lip2AN9HQZuLf4J5AsP8Vy#client (reload), then **+ Campaign**
   and paste any listing link.
-- Walk every block in order and check that each button only turns on once the block above is
-  approved.
+- Open **905 Laurel Bend** (Staged): every block opens collapsed, the calendar is already built,
+  and each button only turns on once the block above is confirmed.
 - After **Approve and launch**, the page shows 1 Campaign leads at the top.
