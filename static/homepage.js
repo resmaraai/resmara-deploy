@@ -280,7 +280,7 @@ function brandKitSections(k){
   <section class="mb-sec"><h4>YOU</h4><div class="mb-grid">${field('agent','Agent name',k.agent,'Website')}${field('company','Brokerage',k.brokerage,'Brokerage profile')}${field('license','License number',k.license,'Brokerage profile')}${field('website','Website',k.website,'','url')}${field('market','Markets you serve',k.market,'Your listings')}${field('brandLink','Instagram or brand guide',k.brandLink,'Found','url')}</div></section>
   <section class="mb-sec"><h4>LOGO &amp; HEADSHOT</h4><div class="mb-assets">${img('logo','Logo',k.logo,'Found on your website')}${img('headshot','Headshot',k.headshot,'Found on your brokerage profile')}</div></section>
   <section class="mb-sec"><h4>COLOURS</h4><div class="mb-swatches">${k.palette.map(([role,hex],i)=>`<label class="mb-sw"><input type="color" value="${esc(hex)}" oninput="this.nextElementSibling.querySelector('code').textContent=this.value.toUpperCase();brandColoursSync(this.form)"><span><b>${esc(role)}</b><code>${esc(hex.toUpperCase())}</code></span></label>`).join('')}</div><small>Click a colour to change it.</small><input type="hidden" name="colours" value="${esc(k.palette.map(p=>p[1]).join(', '))}"></section>
-  <div class="mb-two"><section class="mb-sec"><h4>TYPOGRAPHY</h4><p class="mb-type-h" style="font-family:'${esc(k.fonts[0])}',serif">The long view</p><label class="mb-font"><span>Headlines</span><input name="fontHead" list="gfonts" value="${esc(k.fonts[0])}" oninput="brandFontPick(this,'.mb-type-h')" autocomplete="off"></label><p class="mb-type-b" style="font-family:'${esc(k.fonts[1])}',sans-serif">Morning light, wide oak floors and room to breathe.</p><label class="mb-font"><span>Body</span><input name="fontBody" list="gfonts" value="${esc(k.fonts[1])}" oninput="brandFontPick(this,'.mb-type-b')" autocomplete="off"></label><datalist id="gfonts">${GOOGLE_FONTS.map(f=>`<option value="${esc(f)}">`).join('')}</datalist><small>Pick from the list or type the name of any Google font.</small></section>
+  <div class="mb-two"><section class="mb-sec"><h4>TYPOGRAPHY</h4><p class="mb-type-h" style="font-family:'${esc(k.fonts[0])}',serif">The long view</p>${fontPicker('fontHead','Headlines',k.fonts[0],'.mb-type-h')}<p class="mb-type-b" style="font-family:'${esc(k.fonts[1])}',sans-serif">Morning light, wide oak floors and room to breathe.</p>${fontPicker('fontBody','Body',k.fonts[1],'.mb-type-b')}<small>Resmara picked these to match your brand. Change either one any time.</small></section>
   <section class="mb-sec"><h4>VOICE</h4><textarea name="voice" rows="2">${esc(k.voice)}</textarea><div class="mb-chips">${k.use.map(w=>`<span class="ok">“${esc(w)}”</span>`).join('')}${k.avoid.map(w=>`<span class="no">${esc(w)}</span>`).join('')}</div></section></div>
   <div class="mb-two"><section class="mb-sec"><h4>YOUR LOOK</h4><input type="hidden" name="theme" value="${esc(k.theme)}"><div class="mb-looks">${['Modern','Classic','Rustic','Match my brand'].map(t=>`<button type="button" class="${t===k.theme?'on':''}" onclick="const f=this.form;f.elements.theme.value='${t}';this.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===this));brandMarkDirty()">${t}</button>`).join('')}</div><small>Change your look any time. New campaigns use it once you save.</small></section>
   <section class="mb-sec"><h4>ON EVERY POST</h4><ul class="mb-legal">${k.legal.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><small>Your brokerage’s rules, checked.</small></section></div>
@@ -301,7 +301,52 @@ function loadGoogleFont(name){
  name=String(name||'').trim();if(!name)return;const id='gf-'+name.replace(/\W+/g,'-').toLowerCase();if(document.getElementById(id))return;
  const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family='+encodeURIComponent(name).replace(/%20/g,'+')+':wght@400;600;700&display=swap';document.head.appendChild(l);
 }
-function brandFontPick(input,target){const name=input.value.trim();if(!name)return;loadGoogleFont(name);const el=input.form.querySelector(target);if(el)el.style.fontFamily="'"+name.replace(/'/g,'')+"',"+(target==='.mb-type-h'?'serif':'sans-serif')}
+// A font picker that looks like our drop-downs: the button shows the current font in itself;
+// the list shows every font written in its own typeface with a short sample, with a search box.
+// Any Google font can be used: type its name and choose "Use … from Google Fonts".
+function fontPicker(name,label,value,target){
+ return `<div class="mb-font"><span>${label}</span><input type="hidden" name="${name}" value="${esc(value)}"><button type="button" class="mb-fontpick" data-target="${target}" onclick="openFontPicker(this)" style="font-family:'${esc(value)}',${target==='.mb-type-h'?'serif':'sans-serif'}"><b>${esc(value)}</b><i class="mb-fontpick-chev" aria-hidden="true"></i></button></div>`;
+}
+function loadFontBatch(names,sample){
+ const fresh=names.filter(n=>!loadFontBatch.done.has(n));if(!fresh.length)return;fresh.forEach(n=>loadFontBatch.done.add(n));
+ for(let i=0;i<fresh.length;i+=20){
+  const fam=fresh.slice(i,i+20).map(n=>'family='+encodeURIComponent(n).replace(/%20/g,'+')).join('&');
+  const chars=[...new Set((fresh.slice(i,i+20).join('')+sample+'0123456789').split(''))].join('');
+  const l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?'+fam+'&display=swap&text='+encodeURIComponent(chars);document.head.appendChild(l);
+ }
+}
+loadFontBatch.done=new Set();
+function openFontPicker(btn){
+ closeFontPicker();
+ const wrap=btn.closest('.mb-font'),input=wrap.querySelector('input[type=hidden]'),head=btn.dataset.target==='.mb-type-h';
+ const sample=head?'The long view':'Morning light and room to breathe.';
+ loadFontBatch(GOOGLE_FONTS,sample+'Use from Google Fonts');
+ const panel=document.createElement('div');panel.className='mb-fontlist';
+ panel.innerHTML=`<input type="search" class="mb-fontsearch" placeholder="Search Google fonts" aria-label="Search fonts"><div class="mb-fontopts" role="listbox"></div>`;
+ document.body.appendChild(panel);panel.dataset.for=input.name;
+ // Fixed to the button, so the brand kit's rounded card can't clip it.
+ const place=()=>{const r=btn.getBoundingClientRect(),below=window.innerHeight-r.bottom;panel.style.left=r.left+'px';panel.style.width=r.width+'px';
+  if(below<300&&r.top>below){panel.style.top='';panel.style.bottom=(window.innerHeight-r.top+6)+'px'}else{panel.style.bottom='';panel.style.top=(r.bottom+6)+'px'}};
+ place();panel._place=place;
+ const opts=panel.querySelector('.mb-fontopts'),search=panel.querySelector('.mb-fontsearch');
+ const draw=()=>{
+  const q=search.value.trim().toLowerCase();
+  const list=GOOGLE_FONTS.filter(f=>!q||f.toLowerCase().includes(q));
+  opts.innerHTML=list.map(f=>`<button type="button" role="option" class="mb-fontopt${f===input.value?' on':''}" data-font="${esc(f)}" style="font-family:'${esc(f)}',${head?'serif':'sans-serif'}"><b>${esc(f)}</b><span>${esc(sample)}</span></button>`).join('')+
+   (q&&!list.length?`<button type="button" class="mb-fontopt use" data-font="${esc(search.value.trim())}"><b>Use “${esc(search.value.trim())}” from Google Fonts</b><span>Any font on fonts.google.com works</span></button>`:'')+
+   (!list.length&&!q?'<p class="fine">No fonts.</p>':'');
+ };
+ draw();search.addEventListener('input',draw);
+ opts.addEventListener('click',e=>{const o=e.target.closest('.mb-fontopt');if(!o)return;const f=o.dataset.font;input.value=f;loadGoogleFont(f);
+  btn.querySelector('b').textContent=f;btn.style.fontFamily="'"+f.replace(/'/g,'')+"',"+(head?'serif':'sans-serif');
+  const prev=btn.form&&btn.form.querySelector(btn.dataset.target);if(prev)prev.style.fontFamily=btn.style.fontFamily;
+  brandMarkDirty();closeFontPicker();});
+ setTimeout(()=>{search.focus();opts.querySelector('.on')?.scrollIntoView({block:'nearest'})},0);
+}
+function closeFontPicker(){document.querySelectorAll('.mb-fontlist').forEach(p=>p.remove())}
+document.addEventListener('click',e=>{if(!e.target.closest('.mb-fontlist')&&!e.target.closest('.mb-fontpick'))closeFontPicker()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeFontPicker()});
+window.addEventListener('scroll',()=>document.querySelectorAll('.mb-fontlist').forEach(p=>p._place&&p._place()),true);window.addEventListener('resize',closeFontPicker);
 function brandMarkDirty(){window.brandDirty=true;const u=document.querySelector('.mb-unsaved');if(u)u.hidden=false}
 // Research again rebuilds the kit from the agent's Facebook Page and website. What they typed is
 // kept; Meta's facts only fill empty fields (brandFromPage).
