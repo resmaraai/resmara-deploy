@@ -1381,3 +1381,20 @@ html.dark .shell .lead-totals-box .lead-totals>div:not(:first-child){background:
    something to click. */
 html.dark .shell .review-calendar-post{background:#e2f0f8!important;border-color:#c7e2f2!important;color:#12354d!important}
 html.dark .shell .review-calendar-post *{color:#12354d!important}
+/* Calendar report markers: one look. "View day 7 report" is the clickable one (opens the report);
+   "Day 14 report due" is just a label until that day. Same in dark mode. */
+.review-calendar-report{display:block;margin-top:6px}
+.cal-report-chip{display:inline-flex;align-items:center;gap:6px;background:#e2f0f8;color:#12354d!important;border:1px solid #c7e2f2;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:700;line-height:1.3;width:auto;min-height:0}
+.cal-report-chip::before{content:'';width:7px;height:7px;border-radius:50%;background:#d94c0d;flex:none}
+button.cal-report-chip.is-ready{background:#fff!important;color:#12354d!important;border:1px solid #12354d!important;cursor:pointer;padding:4px 10px!important;margin:0!important;box-shadow:none!important}
+button.cal-report-chip.is-ready:hover{background:#12354d!important;color:#fff!important}
+html.dark .shell .cal-report-chip{background:#e2f0f8!important;color:#12354d!important;border-color:#c7e2f2!important}
+html.dark .shell button.cal-report-chip.is-ready{background:#fff!important;color:#12354d!important;border-color:#fff!important}
+/* PR #17 (Adam, 21 Nov): the property report keeps its light look in dark mode (it's a document
+   for the seller), like the pop-ups. Its Close button is white with dark blue text. */
+html.dark .shell article.pr-doc{background:#fff!important;color:#12354d!important;border-color:#c7e2f2!important}
+html.dark .shell .pr-doc :is(b,span,div,p,li,ol,figcaption,section,small,strong,h3,h4,em,td,th){color:#12354d!important}
+html.dark .shell .pr-doc .pr-head,html.dark .shell .pr-doc .pr-head :is(b,span,div,p,small,h2,h3){color:#fff!important}
+html.dark .shell .pr-doc .pr-label{color:#12354d!important}
+html.dark .shell button.pr-close{background:#fff!important;color:#12354d!important;border-color:#fff!important}
+html.dark .shell .pr-doc figure em{color:#fff!important}

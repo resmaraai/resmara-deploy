@@ -278,9 +278,13 @@ function liveCalendar(html) {
     .replace('This is your campaign calendar. Open any post or ad to check its information and creative before you approve. You only need to open the items you want to spot-check or change.', 'Your campaign is live. Open any post or ad to see it.')
     .replace(/campaignReport\(\[\.\.\.state\.campaigns,\.\.\.examples\]\[ReviewStudio\.active\],(\d+)\)/g, 'openReportFromCalendar($1)');
 }
+// "View day 7 report" on the calendar opens the Reports section (it starts folded), opens that
+// day's report and scrolls to it.
 function openReportFromCalendar(day) {
+  state.folds = state.folds || {}; state.folds.reports = true; persist(); setupFolds();
   const btn = [...document.querySelectorAll('.pr-pick')].find(b => b.textContent.includes('Day ' + day + ' report'));
-  if (btn && btn.tagName === 'BUTTON') { if (!btn.classList.contains('on')) btn.click(); else document.querySelector('#pr-view')?.scrollIntoView({ behavior: 'smooth' }); }
+  if (btn && btn.tagName === 'BUTTON' && !btn.classList.contains('on')) btn.click();
+  setTimeout(() => (document.querySelector('#pr-view') || document.querySelector('.live-reports'))?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
 }
 
 // ---- Pause / resume a running campaign ------------------------------------------------------
