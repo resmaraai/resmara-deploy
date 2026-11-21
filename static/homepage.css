@@ -1405,3 +1405,10 @@ html.dark .shell .review-calendar .review-calendar-post,html.dark .shell .review
 .review-calendar .review-calendar-post *,html.dark .shell .review-calendar .review-calendar-post *{color:#12354d!important}
 .review-calendar .review-calendar-post:hover,.review-calendar .review-month-ad:hover,
 html.dark .shell .review-calendar .review-calendar-post:hover,html.dark .shell .review-calendar .review-month-ad:hover{background:#eef8ff!important;border-color:#eef8ff!important;filter:none!important}
+/* My Brand (PR #17, 21 Nov): font pickers and the unsaved-changes flag. */
+.mb-font{display:flex;align-items:center;gap:10px;margin:6px 0 14px}
+.mb-font span{font-size:12px;font-weight:700;color:#12354d;min-width:72px}
+.mb-font input{flex:1;border:1px solid #c7e2f2;border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;color:#12354d;background:#fff}
+.mb-unsaved{background:#d94c0d;color:#fff!important;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700}
+html.dark .shell .mb-font span{color:#fff!important}
+html.dark .shell .mb-font input{background:#fff!important;color:#12354d!important}

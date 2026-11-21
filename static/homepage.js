@@ -1,4 +1,5 @@
-function home(){
+const GOOGLE_FONTS=["Playfair Display", "Jost", "Inter", "Roboto", "Open Sans", "Lato", "Montserrat", "Poppins", "Raleway", "Nunito", "Source Sans 3", "Work Sans", "DM Sans", "DM Serif Display", "Libre Baskerville", "Lora", "Merriweather", "Cormorant Garamond", "EB Garamond", "Crimson Text", "Cinzel", "Bodoni Moda", "Libre Caslon Text", "Spectral", "Prata", "Marcellus", "Italiana", "Josefin Sans", "Josefin Slab", "Archivo", "Archivo Black", "Manrope", "Outfit", "Plus Jakarta Sans", "Sora", "Urbanist", "Figtree", "Mulish", "Karla", "Rubik", "Barlow", "Barlow Condensed", "Oswald", "Bebas Neue", "Anton", "League Spartan", "Kumbh Sans", "Lexend", "Quicksand", "Cabin", "PT Sans", "PT Serif", "Noto Sans", "Noto Serif", "IBM Plex Sans", "IBM Plex Serif", "Fraunces", "Newsreader", "Syne", "Space Grotesk", "Red Hat Display", "Albert Sans", "Epilogue", "Hanken Grotesk", "Instrument Sans", "Instrument Serif", "Gilda Display", "Tenor Sans", "Forum", "Bellefair", "Cormorant", "Old Standard TT", "Abril Fatface", "Yeseva One", "Alegreya", "Alegreya Sans", "Vollkorn", "Cardo", "Domine", "Arvo", "Roboto Slab", "Zilla Slab", "Bitter", "Rokkitt", "Great Vibes", "Allura", "Parisienne", "Dancing Script", "Sacramento", "Pinyon Script", "Satisfy", "Kaushan Script", "Caveat", "Amatic SC", "Teko", "Exo 2", "Titillium Web", "Ubuntu", "Hind", "Assistant", "Heebo", "Varela Round", "Nanum Myeongjo", "Gloock", "Bricolage Grotesque", "Onest", "Geologica", "Golos Text", "Literata", "Petrona", "Young Serif"];
+function home(){if(typeof brandLeaveGuard==='function'&&brandLeaveGuard(()=>home()))return;
  if(window.stopResmaraGuide)stopResmaraGuide();
  location.hash='';document.title='Resmara — Your listing gets attention. Your clients get you.';
  app.innerHTML=`<div class="marketing-home">
@@ -278,20 +279,46 @@ function brandKitSections(k){
   <header class="mb-head"><div class="mb-id">${k.logo?`<img src="${esc(k.logo)}" alt="Logo">`:`<span class="mb-mono lg">${esc(initials)}</span>`}<div><b>${esc(k.brokerage||k.agent)}</b><small>${esc(k.agent)}${k.market?' · '+esc(k.market):''}</small></div></div><span class="mb-tag">BRAND KIT</span></header>
   <section class="mb-sec"><h4>YOU</h4><div class="mb-grid">${field('agent','Agent name',k.agent,'Website')}${field('company','Brokerage',k.brokerage,'Brokerage profile')}${field('license','License number',k.license,'Brokerage profile')}${field('website','Website',k.website,'','url')}${field('market','Markets you serve',k.market,'Your listings')}${field('brandLink','Instagram or brand guide',k.brandLink,'Found','url')}</div></section>
   <section class="mb-sec"><h4>LOGO &amp; HEADSHOT</h4><div class="mb-assets">${img('logo','Logo',k.logo,'Found on your website')}${img('headshot','Headshot',k.headshot,'Found on your brokerage profile')}</div></section>
-  <section class="mb-sec"><h4>COLOURS</h4><div class="mb-swatches">${k.palette.map(([role,hex],i)=>`<label class="mb-sw"><input type="color" value="${esc(hex)}" oninput="this.nextElementSibling.querySelector('code').textContent=this.value.toUpperCase();brandColoursSync(this.form)"><span><b>${esc(role)}</b><code>${esc(hex.toUpperCase())}</code></span></label>`).join('')}</div><input type="hidden" name="colours" value="${esc(k.palette.map(p=>p[1]).join(', '))}"></section>
-  <div class="mb-two"><section class="mb-sec"><h4>TYPOGRAPHY</h4><p class="mb-type-h" style="font-family:'${esc(k.fonts[0])}',serif">The long view</p><small>Headlines · ${esc(k.fonts[0])}</small><p class="mb-type-b" style="font-family:'${esc(k.fonts[1])}',sans-serif">Morning light, wide oak floors and room to breathe.</p><small>Body · ${esc(k.fonts[1])}</small></section>
+  <section class="mb-sec"><h4>COLOURS</h4><div class="mb-swatches">${k.palette.map(([role,hex],i)=>`<label class="mb-sw"><input type="color" value="${esc(hex)}" oninput="this.nextElementSibling.querySelector('code').textContent=this.value.toUpperCase();brandColoursSync(this.form)"><span><b>${esc(role)}</b><code>${esc(hex.toUpperCase())}</code></span></label>`).join('')}</div><small>Click a colour to change it.</small><input type="hidden" name="colours" value="${esc(k.palette.map(p=>p[1]).join(', '))}"></section>
+  <div class="mb-two"><section class="mb-sec"><h4>TYPOGRAPHY</h4><p class="mb-type-h" style="font-family:'${esc(k.fonts[0])}',serif">The long view</p><label class="mb-font"><span>Headlines</span><input name="fontHead" list="gfonts" value="${esc(k.fonts[0])}" oninput="brandFontPick(this,'.mb-type-h')" autocomplete="off"></label><p class="mb-type-b" style="font-family:'${esc(k.fonts[1])}',sans-serif">Morning light, wide oak floors and room to breathe.</p><label class="mb-font"><span>Body</span><input name="fontBody" list="gfonts" value="${esc(k.fonts[1])}" oninput="brandFontPick(this,'.mb-type-b')" autocomplete="off"></label><datalist id="gfonts">${GOOGLE_FONTS.map(f=>`<option value="${esc(f)}">`).join('')}</datalist><small>Pick from the list or type the name of any Google font.</small></section>
   <section class="mb-sec"><h4>VOICE</h4><textarea name="voice" rows="2">${esc(k.voice)}</textarea><div class="mb-chips">${k.use.map(w=>`<span class="ok">“${esc(w)}”</span>`).join('')}${k.avoid.map(w=>`<span class="no">${esc(w)}</span>`).join('')}</div></section></div>
-  <div class="mb-two"><section class="mb-sec"><h4>YOUR LOOK</h4><div class="mb-looks">${['Modern','Classic','Rustic','Match my brand'].map(t=>`<button type="button" class="${t===k.theme?'on':''}" onclick="state.brand={...state.brand,theme:'${t}'};persist();this.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===this))">${t}</button>`).join('')}</div><small>Change your look any time. New campaigns use it.</small></section>
+  <div class="mb-two"><section class="mb-sec"><h4>YOUR LOOK</h4><input type="hidden" name="theme" value="${esc(k.theme)}"><div class="mb-looks">${['Modern','Classic','Rustic','Match my brand'].map(t=>`<button type="button" class="${t===k.theme?'on':''}" onclick="const f=this.form;f.elements.theme.value='${t}';this.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===this));brandMarkDirty()">${t}</button>`).join('')}</div><small>Change your look any time. New campaigns use it once you save.</small></section>
   <section class="mb-sec"><h4>ON EVERY POST</h4><ul class="mb-legal">${k.legal.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><small>Your brokerage’s rules, checked.</small></section></div>
   <section class="mb-sec"><h4>WHERE RESMARA LOOKED</h4><div class="mb-sources">${k.sources.map(([t,v])=>`<span>✓ <b>${esc(t)}</b> ${esc(v)}</span>`).join('')}</div></section>
   `}
 function myBrand(){
  const k=brandKitData();
  $('#content').innerHTML=`<div class="welcome mb-page-head"><h1>My Brand</h1></div><div class="notice page-intro">This is the brand kit Resmara built from your website, socials and brokerage. Every post and ad follows it, so check it over, fix anything that’s off and save.</div>
- <form class="mb" onsubmit="saveBrandProfile(event,this,false)">${brandKitSections(k)}<p class="fine" data-brand-error role="alert"></p>
-  <div class="mb-foot"><div class="mb-status"><button class="mb-research" type="button" onclick="toast('Resmara is researching your brand again. This takes a minute.')">Research again</button><button class="mb-research" type="button" onclick="brandFromPage(this)">Build from my Facebook Page</button><span>✓ Researched ${esc(k.researched||'from your website')}</span></div><button class="campaign-primary">Save my brand</button></div>
+ <form class="mb" onsubmit="saveBrandProfile(event,this,false)" oninput="brandMarkDirty()" onchange="brandMarkDirty()">${brandKitSections(k)}<p class="fine" data-brand-error role="alert"></p>
+  <div class="mb-foot"><div class="mb-status"><button class="mb-research" type="button" onclick="brandResearchAgain(this)">Research again</button><span>✓ Researched ${esc(k.researched||'from your website')}</span><span class="mb-unsaved" hidden>Unsaved changes</span></div><button class="campaign-primary">Save my brand</button></div>
  </form>`;
+ window.brandDirty=false;
+ [k.fonts[0],k.fonts[1]].forEach(loadGoogleFont);
 }
+// ---- My Brand: fonts, unsaved changes ------------------------------------------------------
+// Any Google font: the name is loaded from Google Fonts on the fly so the preview shows it.
+function loadGoogleFont(name){
+ name=String(name||'').trim();if(!name)return;const id='gf-'+name.replace(/\W+/g,'-').toLowerCase();if(document.getElementById(id))return;
+ const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family='+encodeURIComponent(name).replace(/%20/g,'+')+':wght@400;600;700&display=swap';document.head.appendChild(l);
+}
+function brandFontPick(input,target){const name=input.value.trim();if(!name)return;loadGoogleFont(name);const el=input.form.querySelector(target);if(el)el.style.fontFamily="'"+name.replace(/'/g,'')+"',"+(target==='.mb-type-h'?'serif':'sans-serif')}
+function brandMarkDirty(){window.brandDirty=true;const u=document.querySelector('.mb-unsaved');if(u)u.hidden=false}
+// Research again rebuilds the kit from the agent's Facebook Page and website. What they typed is
+// kept; Meta's facts only fill empty fields (brandFromPage).
+function brandResearchAgain(btn){
+ if(window.RM&&RM.brandFromMeta&&(state.metaConnected||(state.connected&&state.connected.meta)))return brandFromPage(btn);
+ toast('Resmara is researching your brand again. This takes a minute.');
+}
+// Leaving My Brand with unsaved changes asks first. Returns true when it stopped the move.
+let brandAfterSave=null;
+function brandLeaveGuard(go){
+ if(!window.brandDirty||!document.querySelector('form.mb'))return false;
+ show(`<span class="eyebrow">MY BRAND</span><h2>Save your changes before you leave?</h2><p>You changed your brand kit but haven’t saved it. New campaigns only use what’s saved.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="window.brandDirty=false;modal.close();brandPendingGo()">Leave without saving</button><button type="button" class="campaign-primary" onclick="modal.close();brandSaveThenGo()">Save changes</button></div>`);
+ brandLeaveGuard.go=go;return true;
+}
+function brandPendingGo(){const go=brandLeaveGuard.go;brandLeaveGuard.go=null;if(go)go()}
+function brandSaveThenGo(){const f=document.querySelector('form.mb');if(!f)return brandPendingGo();brandAfterSave=brandLeaveGuard.go;brandLeaveGuard.go=null;f.requestSubmit()}
+window.addEventListener('beforeunload',e=>{if(window.brandDirty&&document.querySelector('form.mb')){e.preventDefault();e.returnValue=''}});
 // Brand Engine section 4: the kit is built from the Page the agent connected. Meta's facts fill
 // only the fields that are empty - the agent's own words are never overwritten - and the model's
 // suggestions are shown for a yes/no, not applied silently.
@@ -373,6 +400,9 @@ async function saveBrandProfile(event,form,onboarding){
   const name=fields.agent.value.trim(),company=fields.company.value.trim(),market=fields.market.value.trim();
   if(!name)throw new Error('Enter your agent name.');
   const brand={...state.brand,website,brandLink,market,license:fields.license.value.trim(),colours:fields.colours.value.trim(),voice:fields.voice.value.trim()};
+  if(fields.fontHead&&fields.fontBody)brand.fonts=[fields.fontHead.value.trim()||'Playfair Display',fields.fontBody.value.trim()||'Jost'];
+  if(fields.theme)brand.theme=fields.theme.value;
+  if(fields.colours&&form.querySelector('.mb-sw'))brand.palette=[...form.querySelectorAll('.mb-sw')].map(l=>[l.querySelector('b').textContent,l.querySelector('input').value.toUpperCase()]);
   delete brand.suggestion;
   brand.colour=brand.colours;
   const brandMedia={...state.brandMedia};
@@ -386,8 +416,9 @@ async function saveBrandProfile(event,form,onboarding){
   try{localStorage.setItem('resmara',JSON.stringify(next))}catch{throw new Error('This browser couldn’t save the profile. Try smaller images or use the Chrome preview.')}
   Object.assign(state,next);
   const synced=await pushBrandToAccount(brand,name,company);
-  if(onboarding)onboard(1);else{myBrand();toast(synced?'Brand profile saved to your account.':'Brand profile saved in this browser — sign in to keep it on your account.')}
- }catch(e){error.textContent=e.message}finally{button.disabled=false}
+  window.brandDirty=false;
+  if(onboarding)onboard(1);else{const go=brandAfterSave;brandAfterSave=null;myBrand();toast(synced?'Brand saved. New campaigns use it.':'Brand saved in this browser — sign in to keep it on your account.');if(go)go()}
+ }catch(e){brandAfterSave=null;error.textContent=e.message}finally{button.disabled=false}
 }
 function runMetaAudit(scenario){
  show(`<span class="eyebrow">FIRST CAMPAIGN · STEP 3 OF 3</span><h2>Resmara is checking your setup.</h2><div class="audit-track"><span class="robot-avatar" aria-hidden="true"></span></div><p role="status">Checking business access, Page permissions and ad account readiness…</p><p class="fine">Simulated check. No access to your Meta account.</p>`);
