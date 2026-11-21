@@ -19,10 +19,9 @@ until it sells**.
 | 4 | Pay | Clicks **Build my campaign · $49**. That click is the approval: the card on file is charged. No card: "Add a card to build your campaign" first, through Stripe | Building |
 | 5 | Building | Waits about a minute. Resmara researches the home, picks the best 14 photos, writes and designs the posts and the ad, and builds the website | The campaign page (staged), calendar already built |
 | 6 | 1 Confirm your launch details | Sets the go-live date and ad budget, clicks **Run it until it sells** if wanted. **Confirm details** | Block 2 |
-| 7 | 2 Campaign calendar | Opens any post to change copy or swap the photo. **Approve calendar** | Block 4 |
-| 8 | 3 Your listing page | Looks at the website Resmara built (optional) | — |
-| 9 | 4 Ready to go? | **Approve and launch** | The live campaign page |
-| 10 | Live | Leads come in at the top | — |
+| 7 | 2 Campaign calendar | Opens any post to change copy or swap the photo. **Approve calendar** | Block 3 |
+| 8 | 3 Ready to go? | **Approve and launch** | The live campaign page |
+| 9 | Live | Leads come in at the top; the listing page appears here | — |
 
 ---
 
@@ -53,15 +52,16 @@ until it sells**.
 ## 3. The staged campaign page (paid for, not launched)
 
 A paid campaign that hasn't launched is **Staged** (orange pill on its card, button **Review staged
-campaign**). Its page has four numbered blocks. Blocks 1 to 3 **open collapsed** with a drop-down
-arrow; the agent opens the ones they want.
+campaign**). Its page has three numbered blocks. Blocks 1 and 2 **open collapsed** with a drop-down
+arrow. The page walks the agent on: **Confirm details** closes block 1 and opens the calendar;
+**Approve calendar** closes the calendar and takes them to Ready to go. The listing page isn't on
+this page: it shows on the live campaign page.
 
 | Block | Shows | The one button | Unlocks |
 |-------|-------|----------------|---------|
 | **1 Confirm your launch details** | Go-live date (defaults to the next day), ad budget ($50 default; "Meta bills your ad spend separately from your Resmara campaign"), and the navy **Run it until it sells** box: "Tell your sellers" line, an orange **Run it until it sells** button and **How it works** (a pop-up with Got it). Once it's on, both buttons go and a white box on the right says "✓ Run it until it sells is on" (with Turn off until the details are confirmed). No "Send clicks to" field: everything links to the home's website | **Confirm details** | Block 2's button |
-| **2 Campaign calendar** | Already built when the page opens: the 14 posts and the ad. Opening a post lets the agent edit the title and caption, upload a replacement photo, and move the date | **Approve calendar** | Block 4's button |
-| **3 Your listing page** | The website Resmara built for the home, in a scrollable preview, plus **View full page**. No numbers yet | (View full page only) | — |
-| **4 Ready to go?** | What happens next, and how many posts were opened (opening them is optional) | **Approve and launch** | Launch |
+| **2 Campaign calendar** | Already built when the page opens: the 14 posts and the ad. Opening a post lets the agent edit the title and caption, upload a replacement photo, and move the date. Once approved, the header keeps the record: "✓ Calendar approved Nov 21 at 1:50 PM" | **Approve calendar** | Block 3's button |
+| **3 Ready to go?** | What happens next, and how many posts were opened (opening them is optional) | **Approve and launch** | Launch |
 
 - **After Confirm details**, block 1's header reads "✓ Goes live Nov 22 · $50 ad budget · Runs
   until it sells" with a **Change** link (until launch). Confirming doesn't rebuild the calendar.
@@ -110,6 +110,6 @@ Launching switches the page straight to its live layout. The four sections all s
 
 - Preview: https://claude.ai/artifact/Lip2AN9HQZuLf4J5AsP8Vy#client (reload), then **+ Campaign**
   and paste any listing link.
-- Open **905 Laurel Bend** (Staged): every block opens collapsed, the calendar is already built,
-  and each button only turns on once the block above is confirmed.
+- Open **905 Laurel Bend** (Staged): blocks 1 and 2 open collapsed, the calendar is already built,
+  each button only turns on once the block above is confirmed, and each step opens the next.
 - After **Approve and launch**, the page shows 1 Campaign leads at the top.
