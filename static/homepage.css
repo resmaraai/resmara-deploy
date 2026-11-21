@@ -1398,3 +1398,10 @@ html.dark .shell .pr-doc .pr-head,html.dark .shell .pr-doc .pr-head :is(b,span,d
 html.dark .shell .pr-doc .pr-label{color:#12354d!important}
 html.dark .shell button.pr-close{background:#fff!important;color:#12354d!important;border-color:#fff!important}
 html.dark .shell .pr-doc figure em{color:#fff!important}
+/* PR #17 (Adam, 21 Nov): calendar posts and the ad bar match, in light and dark mode: the ad's
+   light blue at rest, and the ad's lighter hover colour on hover (no filter, so both change alike). */
+.review-calendar .review-calendar-post,.review-calendar .review-month-ad,
+html.dark .shell .review-calendar .review-calendar-post,html.dark .shell .review-calendar .review-month-ad{background:#d8effd!important;color:#12354d!important;border-color:#d8effd!important;filter:none!important;transition:background .15s}
+.review-calendar .review-calendar-post *,html.dark .shell .review-calendar .review-calendar-post *{color:#12354d!important}
+.review-calendar .review-calendar-post:hover,.review-calendar .review-month-ad:hover,
+html.dark .shell .review-calendar .review-calendar-post:hover,html.dark .shell .review-calendar .review-month-ad:hover{background:#eef8ff!important;border-color:#eef8ff!important;filter:none!important}
