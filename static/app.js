@@ -30,7 +30,7 @@ async function syncLiveCampaigns(){
   const before=signature(state.campaigns);
   list.forEach(b=>{
    if(!b||b.id==null)return;
-   const card={address:b.address,area:(b.campaign_days||14)+'-day campaign · $'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',status:liveStatusLabel(b),boostId:b.id,live:true,day:0,hidden:b.hidden===true,posts_total:b.posts_total||0,posts_approved:b.posts_approved||0,posts_published:b.posts_published||0,url:'',media:'',image:b.image||undefined,budget:'$'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',until_sold:b.until_sold===true,until_sold_at:b.until_sold_at||null,new_leads:b.new_leads||0,launched_at:b.launched_at||null,stage:b.stage||null};
+   const card={address:b.address,area:(b.campaign_days||14)+'-day campaign · $'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',status:liveStatusLabel(b),boostId:b.id,live:true,day:0,hidden:b.hidden===true,posts_total:b.posts_total||0,posts_approved:b.posts_approved||0,posts_published:b.posts_published||0,url:'',media:'',image:b.image||undefined,budget:'$'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',until_sold:b.until_sold===true,until_sold_at:b.until_sold_at||null,new_leads:b.new_leads||0,launched_at:b.launched_at||null,go_live_date:b.go_live_date||null,stage:b.stage||null};
    const existing=state.campaigns.find(c=>String(campaignBoostId(c))===String(b.id));
    if(existing)Object.assign(existing,card);else state.campaigns.push(card);
   });
@@ -88,10 +88,21 @@ function confirmDeleteCampaign(id){
 // A campaign is Active (running), Republished (renewed and running again) or Completed.
 // Completed campaigns leave the top list and sit in "Completed campaigns" below.
 // A paid campaign that hasn't been launched yet is Staged (built or not), so the agent can come back to it.
+// Approved and launched but its go-live date hasn't come yet: Ready to go live. Active once it starts.
 function campaignPhase(c){
  const ph=campaignPhaseRaw(c);
- return ph==='active'&&typeof campaignIsLive==='function'&&!campaignIsLive(c)?'staged':ph;
+ if(ph!=='active')return ph;
+ if(typeof campaignIsLive==='function'&&!campaignIsLive(c))return 'staged';
+ return campaignStartsLater(c)?'ready':'active';
 }
+// The day a campaign starts: the go-live date it was approved with (yyyy-mm-dd), if any.
+function campaignGoLive(c){return (c&&(c.go_live||c.go_live_date))||''}
+function campaignStartsLater(c){
+ if(Number(c&&c.day)>0||Number(c&&c.posts_published)>0)return false;
+ const d=campaignGoLive(c);if(!d)return false;
+ return d>new Date().toLocaleDateString('en-CA');
+}
+function goLiveLabel(d){const x=new Date(String(d).slice(0,10)+'T12:00:00');return isNaN(x)?'':x.toLocaleDateString('en-US',{month:'short',day:'numeric'})}
 function campaignPhaseRaw(c){
  if(c.phase)return c.phase;
  const st=String(c.status||'').toLowerCase();
@@ -99,7 +110,7 @@ function campaignPhaseRaw(c){
  if(c.completed||st.includes('complete')||(c.live&&c.posts_total&&c.posts_published>=c.posts_total))return 'completed';
  return 'active';
 }
-const PHASE_LABEL={staged:'Staged',active:'Active',republished:'Republished',completed:'Completed'};
+const PHASE_LABEL={staged:'Staged',ready:'Ready to go live',active:'Active',republished:'Republished',completed:'Completed'};
 // A campaign's photo comes from the API as "/uploads/<file>", which only resolves when this
 // app is served at the domain root. Under the Command Center's /resmara/ mount the path has
 // to carry that prefix (api.js owns the rule). Guarded so a page without api.js still paints.
@@ -114,7 +125,7 @@ function cardFlags(c){
 }
 function campaignCard(c,top){
  const ph=campaignPhase(c),key=encodeURIComponent(campaignKey(c));
- return `<article class="card">${typeof clientView==='function'&&clientView()&&examples.includes(c)?'<span class="card-sample">Sample</span>':''}${cardFlags(c)}${c.image?`<img src="${esc(mediaPath(c.image))}" alt="${esc(c.address)}">`:(c.live?`<div class="card-noimg">No photos yet — import the listing link</div>`:`<img src="${img}" alt="Illustrative property photo">`)}<div class="card-body"><div class="card-status-row"><span class="pill phase-${ph}${campaignPaused(c)?' is-paused':''}">${campaignPaused(c)?'Paused':PHASE_LABEL[ph]}</span><span class="card-actions">${pauseButton(c)}</span></div><h3>${esc(c.address)}</h3><p>${esc(c.area||'Your saved campaign draft')}</p><div class="progress"><i style="width:${c.live?Math.min(100,(c.posts_published||0)/Math.max(c.posts_total||14,1)*100):(c.day||0)/14*100}%"></i></div><div class="flex small"><span>${c.live?(c.posts_total||0)+' posts · '+(c.posts_published||0)+' published':c.day?'Day '+c.day+' of 14':'Awaiting campaign generation'}</span><span>${c.live?esc(c.status==='Draft'?'Not built yet':'Meta ad'):c.day?'Facebook + Instagram':'Draft'}</span></div><button class="alt" onclick="details(${[...state.campaigns,...examples].indexOf(c)})">${ph==='staged'?'Review staged campaign':ph==='completed'?'View campaign':'View active campaign'} &nbsp;</button></div></article>`;
+ return `<article class="card">${typeof clientView==='function'&&clientView()&&examples.includes(c)?'<span class="card-sample">Sample</span>':''}${cardFlags(c)}${c.image?`<img src="${esc(mediaPath(c.image))}" alt="${esc(c.address)}">`:(c.live?`<div class="card-noimg">No photos yet — import the listing link</div>`:`<img src="${img}" alt="Illustrative property photo">`)}<div class="card-body"><div class="card-status-row"><span class="pill phase-${ph}${campaignPaused(c)?' is-paused':''}">${campaignPaused(c)?'Paused':PHASE_LABEL[ph]}</span><span class="card-actions">${pauseButton(c)}</span></div><h3>${esc(c.address)}</h3><p>${esc(c.area||'Your saved campaign draft')}</p><div class="progress"><i style="width:${c.live?Math.min(100,(c.posts_published||0)/Math.max(c.posts_total||14,1)*100):(c.day||0)/14*100}%"></i></div><div class="flex small"><span>${ph==='ready'?'Goes live '+esc(goLiveLabel(campaignGoLive(c))):c.live?(c.posts_total||0)+' posts · '+(c.posts_published||0)+' published':c.day?'Day '+c.day+' of 14':'Awaiting campaign generation'}</span><span>${ph==='ready'?'Facebook + Instagram':c.live?esc(c.status==='Draft'?'Not built yet':'Meta ad'):c.day?'Facebook + Instagram':'Draft'}</span></div><button class="alt" onclick="details(${[...state.campaigns,...examples].indexOf(c)})">${ph==='staged'?'Review staged campaign':ph==='completed'?'View campaign':'View active campaign'} &nbsp;</button></div></article>`;
 }
 function campaignList(){
  syncLiveCampaigns();

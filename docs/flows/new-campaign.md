@@ -82,7 +82,13 @@ this page: it shows on the live campaign page.
 
 ## 4. After launch (the live campaign page)
 
-Launching switches the page straight to its live layout. The four sections all start closed:
+**Card states:** **Staged** (orange: paid for, not launched) → **Ready to go live** (dark blue:
+approved and launched, waiting for its go-live date; the card's line reads "Goes live Nov 22") →
+**Active** (light blue: posting; "Day 3 of 14") → Completed.
+
+Launching switches the page straight to its live layout. At the far right of the address it shows
+**"Goes live Nov 22"** (or **"Live since Nov 22"** once it starts) and, under it, **"Approved Nov 21
+at 2:00 PM"**. The four sections all start closed:
 
 1. Campaign leads
 2. Campaign calendar (locked; **Withdraw post** for posts not yet out)
@@ -101,7 +107,9 @@ Launching switches the page straight to its live layout. The four sections all s
    `RM.setUntilSold`.
 4. **Approve and launch** = the existing `approveAll`. It sets `launched_at`, so the live layout
    shows right away (front end: `campaignIsLive()` also accepts `launched`).
-5. **Destination:** always the listing website (`homes.resmara.com/<slug>`). The old
+5. **The go-live date on each campaign:** the boosts list sends `go_live_date`, so the card can
+   show Ready to go live and "Goes live Nov 22" until the first post goes out.
+6. **Destination:** always the listing website (`homes.resmara.com/<slug>`). The old
    `destination` field can stay in the data for now, but the page no longer sets it.
 
 ---

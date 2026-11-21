@@ -1326,3 +1326,13 @@ html.dark .shell .panel .cal-guide p,html.dark .shell .panel .cal-guide li,html.
 /* Step header records (✓ Goes live…, ✓ Calendar approved…): dark blue, white in dark mode. */
 .campaign-step-title small{color:#12354d!important;font-weight:700}
 html.dark .shell .campaign-step-title small{color:#fff!important}
+/* PR #17 (Adam, 21 Nov): Ready to go live = approved and launched, waiting for its go-live date.
+   Live campaign pages show the go-live date and approval time at the far right of the address. */
+.pill.phase-ready{background:#12354d;color:#fff}
+html.dark .shell .pill.phase-ready{background:#fff!important;color:#12354d!important}
+.review-heading.has-stamp{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.campaign-stamp{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right}
+.campaign-stamp b{font-size:16px;color:#12354d}
+.campaign-stamp span{font-size:13px;color:#12354d}
+html.dark .shell .campaign-stamp b,html.dark .shell .campaign-stamp span{color:#fff!important}
+@media(max-width:700px){.campaign-stamp{align-items:flex-start;text-align:left}}
