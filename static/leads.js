@@ -172,7 +172,7 @@ function leadTotalsBox(c, leads, cache) {
   if (cache && cache.loading) return '';
   const t = leadTotals(c, leads, cache);
   const tile = (n, label) => `<div><b>${Number(n || 0)}</b><span>${label}</span></div>`;
-  return `<div class="lead-totals">${tile(t.total, 'Total leads')}${tile(t.ad, 'From your ad')}${tile(t.posts, 'From your posts')}${tile(t.website, 'From your listing page')}</div><p class="fine lead-totals-note">Every lead this campaign has generated. Removing one from the list doesn’t lower these numbers.</p>`;
+  return `<div class="lead-totals-box"><span class="lead-totals-title">LEADS FROM THIS CAMPAIGN</span><div class="lead-totals">${tile(t.total, 'Total leads')}${tile(t.ad, 'From your ad')}${tile(t.posts, 'From your posts')}${tile(t.website, 'From your listing page')}</div><p class="lead-totals-note">Every lead this campaign has generated. Removing one from the list doesn’t lower these numbers.</p></div>`;
 }
 // A note per lead: Add note opens a small box under the lead, Save closes it.
 function leadNoteBlock(l, index, i) {

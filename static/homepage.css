@@ -1365,3 +1365,12 @@ html.dark .shell .leads-list li.done .lead-tick{background:#fff!important;color:
 .lead-body small:not(.lead-contact),.lead-add,.lead-where{color:#12354d!important}
 .lead-where{opacity:.75}
 html.dark .shell button.lead-note-btn,html.dark .shell button.lead-note-cancel{background:#1d3a50!important;color:#fff!important}
+/* Lead totals as the big dark blue box with small boxes inside; the first one is orange. */
+.lead-totals-box{background:#12354d;border-radius:18px;padding:18px 20px;margin:8px 0 6px}
+.lead-totals-title{display:block;font-size:11px;font-weight:800;letter-spacing:1.4px;color:#fff;margin-bottom:12px}
+.lead-totals-box .lead-totals{margin:0}
+.lead-totals-box .lead-totals>div{background:rgba(255,255,255,.08)!important}
+.lead-totals-box .lead-totals>div:first-child{background:#d94c0d!important}
+.lead-totals-box .lead-totals b,.lead-totals-box .lead-totals span{color:#fff!important}
+.lead-totals-box .lead-totals-note{margin:10px 0 0!important;color:#fff!important;font-size:12px;opacity:.85}
+html.dark .shell .lead-totals-box{background:#12354d!important;border:1px solid #2d6a92}

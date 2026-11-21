@@ -212,15 +212,12 @@ tr.testrow td{background:#fbfdff;color:#849bae}
   .secsum{display:none}
   .rows .k{flex:0 0 120px}
 }
-.cm-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start}
-.cm-tiles>.cm-tile{height:auto;min-height:0}
-.cm-tile{background:#e2f0f8;border-radius:12px;padding:12px 14px}
-.cm-tile b{display:block;font-size:26px;line-height:1.1;color:#12354d}
-.cm-tile span{display:block;font-size:12px;font-weight:700;color:#12354d;margin-top:4px}
-.cm-tile.main{background:#12354d}.cm-tile.main b,.cm-tile.main span{color:#fff}
-html.dark .cm-tile{background:#1d3a50}html.dark .cm-tile b,html.dark .cm-tile span{color:#fff}
-html.dark .cm-tile.main{background:#fff}html.dark .cm-tile.main b,html.dark .cm-tile.main span{color:#12354d}
-@media(max-width:700px){.cm-tiles{grid-template-columns:1fr 1fr}}
+.cm-card{margin-top:18px}
+.cm-card .cm-eyebrow{color:#fff!important}
+.cm-card .goal-steps{margin-top:14px}
+.cm-card .cm-money{grid-template-columns:repeat(3,1fr)}
+.cm-card .cm-money .goal-step b{font-size:22px}
+.cm-card .cm-note{margin:10px 0 0;color:#fff;font-size:13px;opacity:.85}
 </style>
 
 <style id="brand-views">
@@ -1579,14 +1576,15 @@ async function openCampaign(id, focusPost){
 // they can be added up across campaigns ("the average campaign generates N leads").
 function campaignMetrics(c){
   const L = c.leads || {};
-  const tile = (n, label, main) => '<div class="cm-tile' + (main ? ' main' : '') + '"><b>' + esc(n == null ? '—' : n) + '</b><span>' + esc(label) + '</span></div>';
+  const n = v => v == null ? '—' : v;
+  const tile = (v, label, first) => '<div class="goal-step' + (first ? ' alert' : '') + '"><b>' + esc(n(v)) + '</b><span>' + esc(label) + '</span></div>';
   const fee = c.paid_amount_cents != null ? usd(c.paid_amount_cents / 100) : '—';
-  return '<div class="br-card"><h3 class="card-title">Campaign metrics</h3>' +
-    '<div class="cm-tiles">' + tile(L.total, 'Leads in all', true) + tile(L.ad, 'From the ad') + tile(L.posts, 'From the posts') + tile(L.website, 'From the listing page') + '</div>' +
-    (L.removed ? '<p class="hint" style="margin:8px 0 0">' + esc(L.removed) + ' of these the agent later removed as not a lead. They still count.</p>' : '') +
-    '<div class="facts" style="margin-top:16px">' + fact('Resmara fee paid', fee) + fact('Ad budget', c.ad_budget_usd != null ? usd(c.ad_budget_usd) : '—') +
-      fact('Ad spent so far', c.ad_spend_usd != null ? usd(c.ad_spend_usd) : 'Not tracked yet') + '</div>' +
-    (c.ad_spend_usd == null ? '<p class="hint" style="margin:8px 0 0">What Meta actually spent comes from Meta’s numbers for the ad. That’s part of the Active campaign engine.</p>' : '') +
+  const spent = c.ad_spend_usd != null ? usd(c.ad_spend_usd) : 'Not tracked yet';
+  return '<div class="goal-card hero cm-card"><span class="eyebrow-s cm-eyebrow">CAMPAIGN METRICS</span>' +
+    '<div class="goal-steps">' + tile(L.total, 'Leads in all', true) + tile(L.ad, 'From the ad') + tile(L.posts, 'From the posts') + tile(L.website, 'From the listing page') + '</div>' +
+    (L.removed ? '<p class="cm-note">' + esc(L.removed) + ' of these the agent later removed as not a lead. They still count.</p>' : '') +
+    '<div class="goal-steps cm-money">' + tile(fee, 'Resmara fee paid') + tile(c.ad_budget_usd != null ? usd(c.ad_budget_usd) : '—', 'Ad budget') + tile(spent, 'Ad spent so far') + '</div>' +
+    (c.ad_spend_usd == null ? '<p class="cm-note">What Meta actually spent comes from Meta’s numbers for the ad. That’s part of the Active campaign engine.</p>' : '') +
     '</div>';
 }
 function postRow(p){
