@@ -1374,3 +1374,18 @@ html.dark .shell button.lead-note-btn,html.dark .shell button.lead-note-cancel{b
 .lead-totals-box .lead-totals b,.lead-totals-box .lead-totals span{color:#fff!important}
 .lead-totals-box .lead-totals-note{margin:10px 0 0!important;color:#fff!important;font-size:12px;opacity:.85}
 html.dark .shell .lead-totals-box{background:#12354d!important;border:1px solid #2d6a92}
+/* PR #17 (Adam, 21 Nov): in dark mode, action buttons that were dark blue on dark blue are
+   orange with white text so they stand out. Navigation, the dark-mode switch, Sign out and the
+   tiles you pick from (calendar posts, reports, styles) keep their own looks. */
+html.dark .shell button.alt:not(.theme-toggle),
+html.dark .shell button.lead-tick,
+html.dark .shell button.lead-note-btn,
+html.dark .shell button.lead-note-cancel,
+html.dark .shell button.nc-cancel,
+html.dark .shell button.mb-research,
+html.dark dialog button.nc-cancel{background:#d94c0d!important;color:#fff!important;border-color:#d94c0d!important}
+html.dark .shell .sidebar button.alt{background:#13283a!important;color:#d6e6f1!important;border-color:#23425a!important}
+html.dark .shell .leads-list li.done .lead-tick{background:#fff!important;color:#12354d!important;border-color:#fff!important}
+html.dark .shell .lead-totals-box .lead-totals>div:first-child{background:#d94c0d!important}
+html.dark .shell .lead-totals-box .lead-totals>div:first-child b,html.dark .shell .lead-totals-box .lead-totals>div:first-child span{color:#fff!important}
+html.dark .shell .lead-totals-box .lead-totals>div:not(:first-child){background:rgba(255,255,255,.08)!important}
