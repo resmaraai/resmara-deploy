@@ -1275,3 +1275,10 @@ html.dark .marketing-home .home-nav nav a{color:#fff!important}
 html.dark .until-sold-check{background:#143a50;color:#fff}
 html.dark .until-sold-check a,html.dark .scope-locked .scope-change{color:#fff}
 @media(max-width:760px){.campaign-scope .ls-grid.ls-two{grid-template-columns:1fr!important}}
+/* PR #17 (Adam, 21 Nov): the problem block reads like the "What makes Resmara different" block:
+   text and video sit together as one tidy pair, and the video is a little bigger. */
+.home-workload:not(.home-link-band) .home-workload-inner{grid-template-columns:minmax(0,540px) auto;justify-content:center;gap:72px}
+.home-workload:not(.home-link-band) .home-workload p{max-width:540px}
+.home-workload:not(.home-link-band) .home-problem-video{margin:0}
+.home-workload:not(.home-link-band) .home-problem-video video{height:min(560px,72vh)}
+@media(max-width:1000px){.home-workload:not(.home-link-band) .home-workload-inner{grid-template-columns:1fr;gap:36px}.home-workload:not(.home-link-band) .home-problem-video{margin:0 auto}}
