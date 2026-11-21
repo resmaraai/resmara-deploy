@@ -1284,8 +1284,8 @@ html.dark .until-sold-check a,html.dark .scope-locked .scope-change{color:#fff}
 @media(max-width:1000px){.home-workload:not(.home-link-band) .home-workload-inner{grid-template-columns:1fr;gap:36px}.home-workload:not(.home-link-band) .home-problem-video{margin:0 auto}}
 /* PR #17 (Adam, 21 Nov): campaign cards. Staged = paid for, not launched yet. Run until sold is a
    tag on the photo once it's on (it's switched on from the campaign page), not a card button. */
-.pill.phase-staged{background:#fff1c7;color:#12354d}
-html.dark .shell .pill.phase-staged{background:#fff1c7!important;color:#12354d!important}
+.pill.phase-staged{background:#d94c0d;color:#fff}
+html.dark .shell .pill.phase-staged{background:#d94c0d!important;color:#fff!important}
 .card-flags{position:absolute;top:12px;right:12px;z-index:2;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .card-flags .card-leads{position:static}
 .card-until-sold{background:#fff;color:#12354d;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;box-shadow:0 4px 12px rgba(18,53,77,.18)}
