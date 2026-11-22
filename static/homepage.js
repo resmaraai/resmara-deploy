@@ -564,27 +564,27 @@ function toggleTheme(){const dark=!document.documentElement.classList.contains('
 // One page, one short guide per piece. The onboarding screens and the red box link straight to the
 // guide they need (setupGuides('instagram') opens that one).
 const SETUP_GUIDES = [
- { id: 'facebook', title: 'Create a Facebook account', need: 'Required', time: '5 minutes',
+ { id: 'facebook', video: true, title: 'Create a Facebook account', need: 'Required', time: '5 minutes',
    why: 'Every Facebook business Page is run from a personal account. Your personal posts and details never show on your Page.',
    steps: ['Go to facebook.com and click Create new account.', 'Use your real name and an email or phone number you check.', 'Confirm the code Facebook sends you.'],
    link: ['Open Facebook', 'https://www.facebook.com/'] },
- { id: 'page', title: 'Create your Facebook business Page', need: 'Required', time: '10 minutes',
+ { id: 'page', video: true, title: 'Create your Facebook business Page', need: 'Required', time: '10 minutes',
    why: 'Resmara posts your listings to a business Page, never to your personal profile.',
    steps: ['On a computer, log in to Facebook and open Pages in the left menu, then Create Page.', 'Use your business name, for example “Jamie Carter, Realtor”, and pick the Real Estate Agent category.', 'Add a headshot or logo, a cover photo, and your website, phone and email.'],
    link: ['Create a Page', 'https://www.facebook.com/pages/create'] },
- { id: 'admin', title: 'Make sure you have full control of your Page', need: 'Required', time: '2 minutes',
+ { id: 'admin', video: true, title: 'Make sure you have full control of your Page', need: 'Required', time: '2 minutes',
    why: 'Resmara can only post to a Page you fully control. Pages made by a brokerage, an old assistant or a marketing company are often owned by someone else.',
    steps: ['On Facebook, switch into your Page.', 'Open Settings, then Page access.', 'Check your name is listed with full control. If it isn’t, ask whoever is listed to give you full control.'] },
- { id: 'instagram', title: 'Switch your Instagram to a business account', need: 'Recommended', time: '1 minute',
+ { id: 'instagram', video: true, title: 'Switch your Instagram to a business account', need: 'Recommended', time: '1 minute',
    why: 'Meta only lets apps like Resmara post to business (Professional) Instagram accounts. It’s free, and you keep all your posts and followers. Your account becomes public.',
    steps: ['In the Instagram app, go to your profile and open the menu.', 'Under For professionals, tap Account type and tools, then Switch to professional account.', 'Pick a category such as Real Estate Agent, choose Business and tap Next.'],
    note: 'No Instagram yet? Make one in the Instagram app first. Without Instagram, Resmara posts to your Facebook Page only.' },
- { id: 'link', title: 'Link your Instagram to your Facebook Page', need: 'Recommended', time: '2 minutes',
+ { id: 'link', video: true, title: 'Link your Instagram to your Facebook Page', need: 'Recommended', time: '2 minutes',
    why: 'Resmara finds your Instagram through your Facebook Page, so the two have to be linked.',
    steps: ['On Facebook, switch into your Page and open Settings.', 'Open Linked accounts, then Instagram, and click Connect account.', 'Log in to your Instagram and confirm. If it’s still a personal account, Facebook offers to switch it to business right here.'],
    note: 'An Instagram can be linked to one Page at a time. If it’s linked to an old Page, disconnect it there first.',
    link: ['Open linked accounts', 'https://www.facebook.com/settings/?tab=linked_instagram'] },
- { id: 'ads', title: 'Set up your ad account and payment method', need: 'Recommended', time: '5 minutes',
+ { id: 'ads', video: true, title: 'Set up your ad account and payment method', need: 'Recommended', time: '5 minutes',
    why: 'Your listing ad runs from your own Meta ad account. Meta bills your ad budget to your card directly. Resmara never charges or keeps any of it.',
    steps: ['Open Meta Business Suite, then Settings, Accounts and Ad accounts.', 'Click Add, then Create a new ad account. Enter a name, your time zone and currency, and give yourself full control.', 'In Ads Manager, open Billing & payments and add a card or PayPal.'],
    note: 'Without an ad account your posts still go out. Only the listing ad is off.',
@@ -598,7 +598,9 @@ function setupGuides(open) {
  if (typeof modal !== 'undefined' && modal.open) modal.close();
  location.hash = 'setup-guides'; document.title = 'Setup — Resmara';
  const jump = id => `document.getElementById('sg-${id}').scrollIntoView({behavior:'smooth',block:'start'});return false`;
- const card = (g, n) => `<li class="sg-card" id="sg-${g.id}"><span class="home-step-num">${n + 1}</span><small>${g.need.toUpperCase()} · ${g.time.toUpperCase()}</small><h3>${g.title}</h3><p>${g.why}</p>
+ // Each guide with a tutorial has a short whiteboard video at the top (static/video/setup/). Nothing loads until play.
+ const video = g => g.video ? `<div class="sg-video"><video src="video/setup/setup-${g.id}.mp4" poster="video/setup/setup-${g.id}.jpg" playsinline preload="none" aria-label="Video: ${g.title}" onended="this.removeAttribute('controls');this.load();this.nextElementSibling.hidden=false"></video><button type="button" class="hpv-play" aria-label="Play the tutorial: ${g.title}" onclick="const v=this.previousElementSibling;this.hidden=true;v.controls=true;v.play()"><span></span></button></div>` : '';
+ const card = (g, n) => `<li class="sg-card" id="sg-${g.id}"><span class="home-step-num">${n + 1}</span><small>${g.need.toUpperCase()} · ${g.time.toUpperCase()}</small><h3>${g.title}</h3>${video(g)}<p>${g.why}</p>
   <ol class="sg-steps">${g.steps.map(t => `<li>${t}</li>`).join('')}</ol>${g.note ? `<p class="sg-note">${g.note}</p>` : ''}${g.link ? `<a class="home-primary sg-btn" href="${g.link[1]}" target="_blank" rel="noopener">${g.link[0]}</a>` : ''}</li>`;
  app.innerHTML = `<div class="marketing-home">${siteNav('setup-guides')}<main>
   <section class="home-section sg-hero"><div class="home-section-heading"><div><span class="home-kicker">SETUP</span><h2>Set up once.<br><span>Resmara does the rest.</span></h2></div><p>Resmara posts, advertises and reports through your own Facebook Page, Instagram and Meta ad account. Get these three ready and your campaigns run in full from day one. Each step below takes a few minutes.</p></div>

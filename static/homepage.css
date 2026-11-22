@@ -1431,3 +1431,10 @@ html.dark .mb-fontlist,html.dark button.mb-fontopt:not(.on),html.dark .shell but
 html.dark .mb-fontlist *,html.dark .shell button.mb-fontpick *{color:#12354d!important}
 html.dark button.mb-fontopt.on *{color:#fff!important}
 html.dark .shell .mb-fontpick-chev{border-color:#12354d!important}
+
+/* Setup guides: tutorial video at the top of each card */
+.sg-video{position:relative;margin:4px 0 16px;border-radius:18px;overflow:hidden;background:#fff;border:1px solid #cfe3ef;aspect-ratio:16/9}
+.sg-video video{display:block;width:100%;height:100%;object-fit:contain;background:#fff}
+.sg-video .hpv-play{width:64px;height:64px}
+.sg-video .hpv-play span{border-top-width:12px;border-bottom-width:12px;border-left-width:20px;margin-left:5px}
+html.dark .sg-video{border-color:#1f4d68}
