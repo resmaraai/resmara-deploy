@@ -27,12 +27,13 @@ const OB_SCENARIOS = {
   noAd: { label: 'No ad account', results: [1, 1, 1, 0] },
   igPersonal: { label: 'Instagram is a personal account', results: [1, 1, 0, 1] },
   notAdmin: { label: 'Not an admin of the Facebook Page', results: [1, 0, 1, 1] },
-  noPage: { label: 'No Facebook business Page', results: [0, 0, 0, 1] }
+  noPage: { label: 'No Facebook business Page', results: [0, 0, 0, 1] },
+  noFacebook: { label: 'No Facebook account at all', results: [0, 0, 0, 0], noFacebook: true }
 };
 const OB_FIX = [
   ['No Facebook business Page found', 'Resmara posts to a Facebook business Page, not your personal profile. You’ll need a Page for your real estate business.'],
   ['You aren’t an admin of the Page', 'You need full control of the Page. Ask whoever manages it to make you an admin, or have them connect Resmara.'],
-  ['Instagram isn’t a business account', 'Switch your Instagram to a professional (business) account in Instagram’s settings and link it to your Facebook Page.'],
+  ['Instagram isn’t a business account', 'Facebook can switch it to a business account for you while it links it to your Page. It takes about a minute.'],
   ['No ad account ready to run ads', 'Your listing ads run from your own Meta ad account, with a card on file so Meta can bill your ad budget.']
 ];
 
@@ -52,9 +53,9 @@ function onboard(stage = 0) {
   show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>Connect your Meta account.</h2>
   <p>Connect your Meta account. Log in with your Facebook details and choose the Page, Instagram account and ad account Resmara can use. Resmara also learns your brand from what you already post.</p>
   <ul class="ob-list"><li>Your Facebook Page and Instagram, so Resmara can post for you</li><li>Your ad account, so your listing ads run under your name</li><li>Your posts and website, so everything looks and sounds like you</li></ul>
-  <p class="fine">Nothing is ever posted without your approval.</p>
+  <p class="fine">Nothing is ever posted without your approval. <a href="#" onclick="obNoFacebook();return false">Don’t have Facebook?</a></p>
   ${live ? '' : `<p class="ob-preview">Testing: <b>${esc((OB_SCENARIOS[state.mockScenario] || OB_SCENARIOS.ready).label)}</b> · <a href="#" onclick="obPickScenario(true);return false">change</a></p>`}
-  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Cancel</button><button class="campaign-primary ob-fb" onclick="${live ? 'connectMeta()' : "obFbConsent(state.mockScenario || 'ready')"}">Connect your Meta account</button></div>`);
+  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Cancel</button><button class="campaign-primary ob-fb" onclick="${live ? 'connectMeta()' : (OB_SCENARIOS[state.mockScenario] || {}).noFacebook ? 'obNoFacebook()' : "obFbConsent(state.mockScenario || 'ready')"}">Connect your Meta account</button></div>`);
   modal.dataset.gate = 'meta';
 }
 
@@ -70,35 +71,101 @@ function obCheck(scenario) {
   const results = (OB_SCENARIOS[scenario] || OB_SCENARIOS.ready).results.map(Boolean);
   ok = results.every(Boolean);
   obWalk(document.querySelector('#ob-box'), labels, results, '', () => {
-    state.metaAudit = { status: ok ? 'ready' : 'blocked', checkedAt: new Date().toISOString() };
-    state.connected = ok; persist();
+    // Only the Facebook Page is required: it's where the posts go. A personal Instagram or a
+    // missing ad account limits the campaign (no Instagram posts, no ad) but never locks the
+    // agent out. What's missing is kept so every page can say so until it's fixed.
+    const issues = results.map((r, i) => r ? null : i).filter(i => i !== null);
+    const pageOk = results[0] && results[1];
+    state.metaIssues = issues;
+    state.metaAudit = { status: ok ? 'ready' : pageOk ? 'limited' : 'blocked', checkedAt: new Date().toISOString() };
+    state.connected = pageOk; state.metaChecked = true; state.noFacebook = false; persist();
     if (ok) { show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>You’re connected.</h2><div class="nc-msg ok"><span class="robot-avatar"></span><div><b>Green light.</b> Your Page, Instagram and ad account are all set. Next, Resmara builds your brand.</div></div><div class="modal-actions"><span></span><button class="campaign-primary" onclick="onboard(1)">Build my brand</button></div>`); return; }
-    obNeedsSetup(results.map((r, i) => r ? null : i).filter(i => i !== null));
+    obNeedsSetup(issues);
   });
 }
 
 function obNeedsSetup(idx) {
   state.obIssues = idx; persist();
-  const issues = idx.map(i => `<b>${OB_FIX[i][0]}.</b> ${OB_FIX[i][1]}`);
-  show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>Almost there.</h2>
-  <p>Resmara needs a couple more things in place before it can post and run ads for you:</p>
+  const pageOk = !idx.includes(0) && !idx.includes(1);
+  const issues = metaShownIssues(idx).map(i => `<b>${OB_FIX[i][0]}.</b> ${OB_FIX[i][1]}`);
+  show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>${pageOk ? 'You’re connected, with a couple of limits.' : 'You’re in, with one thing to fix.'}</h2>
+  ${pageOk ? `<div class="nc-msg ok"><span class="robot-avatar"></span><div><b>Your Facebook Page is connected.</b> ${metaLimitLine(idx)}</div></div><p>To get the most from Resmara, fix these when you can:</p>` : `<div class="nc-msg ok"><span class="robot-avatar"></span><div><b>You can still run campaigns.</b> ${metaLimitLine(idx)}</div></div><p>Resmara can’t find a Facebook Page it can post to yet. Fix this when you can:</p>`}
   <ul class="ob-issues">${issues.map(i => `<li>${i}</li>`).join('')}</ul>
-  <p class="ob-retry"><b>Once you’ve done this, come back here and click Check again</b> to try one more time.</p>
-  <div class="notice ob-help"><b>We’ll set it up with you.</b> Most agents need a hand with this part. Book a free setup session and one of our team will get your accounts ready with you, step by step.</div>
-  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="obCheck('ready')">Check again</button><button class="campaign-primary" onclick="obBook()">Book a free setup session</button></div><p class="fine ob-skip">Preview: Check again acts as if you fixed it.</p>
+  <div class="notice ob-help"><b>We’ll set it up with you.</b> Book a free setup call and one of our team will fix it with you, step by step, or follow our <a href="#setup-guides" onclick="setupGuides('${META_GUIDE[metaShownIssues(idx)[0]]}');return false">setup guides</a>. You’ll also see a reminder at the top of your dashboard until it’s sorted.</div>
+  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="obBook()">Book a free setup call</button><div class="ig-switch-go"><button type="button" class="nc-cancel" onclick="${metaFixAction(idx)}">Fix it now</button><button class="campaign-primary" onclick="onboard(1)">Continue</button></div></div><p class="fine ob-skip"><a href="#" onclick="obCheck('ready');return false">Check again</a> · Preview: Check again acts as if you fixed it.</p>
 `);
+}
+// With no Page there's nothing to be an admin of, so that line would only repeat the first.
+// What "Fix it now" opens: the Instagram switch when that's the only thing Facebook can fix in
+// place (a Page is connected), otherwise the Setup guide for the first issue.
+function metaFixAction(idx) {
+  const shown = metaShownIssues(idx);
+  return shown[0] === 2 && !idx.includes(0) && !idx.includes(1) ? 'obIgSwitch()' : `setupGuides('${META_GUIDE[shown[0]]}')`;
+}
+// Which setup guide fixes each issue.
+const META_GUIDE = ['page', 'admin', 'instagram', 'ads'];
+function metaShownIssues(idx) { return idx.includes(0) ? idx.filter(i => i !== 1) : idx; }
+// What a campaign can do with what is connected, in one line.
+function metaLimitLine(idx) {
+  const ig = idx.includes(2), ad = idx.includes(3);
+  if (idx.includes(0) || idx.includes(1)) return 'Resmara still builds your campaigns and listing page. Until a Facebook Page is connected, you download each post and share it yourself. Once it’s connected, the rest go out on schedule.';
+  return 'Your campaigns can still run, with limited reach: ' + (ig && ad ? 'posts go to your Facebook Page only, and your listing ad is off until it’s fixed.' : ig ? 'posts go to your Facebook Page only, not Instagram, until it’s fixed.' : 'your posts go out, but your listing ad is off until it’s fixed.');
+}
+// A red box at the top of every dashboard page and campaign until the Meta account is sorted.
+const META_ISSUE_SHORT = ['No Facebook business Page is connected', 'You aren’t an admin of your Facebook Page', 'Your Instagram isn’t connected as a business account', 'Your ad account can’t run ads yet'];
+function metaIssueBanner() {
+  const idx = state.metaIssues || [];
+  const box = document.querySelector('#content');
+  if (!box || !idx.length || box.querySelector('.meta-issue')) return;
+  box.insertAdjacentHTML('afterbegin', `<div class="meta-issue" role="alert"><b class="meta-issue-title">There’s an issue with your Meta account.</b><ul>${metaShownIssues(idx).map(i => `<li>${META_ISSUE_SHORT[i]}.</li>`).join('')}</ul><p>${metaLimitLine(idx)}</p><div class="meta-issue-actions"><button type="button" class="mi-btn mi-main" onclick="${metaFixAction(idx)}">Fix it now</button><button type="button" class="mi-btn" onclick="obBook()">Book a call to fix it</button><button type="button" class="mi-btn" onclick="onboard(0)">Check again</button></div></div>`);
+}
+
+// No Facebook account at all: the one hard stop. Resmara learns the brand from Facebook and posts
+// through a Facebook Page, so the agent makes an account and a Page first (free, about 10 minutes).
+function obNoFacebook() {
+  state.noFacebook = true; persist();
+  show(`${obSteps(0)}<span class="eyebrow">STEP 1 OF 3</span><h2>You’ll need a Facebook account first.</h2>
+  <p>Resmara learns your brand from Facebook and posts your listings to a Facebook business Page, so it can’t build campaigns without one. Setting it up is free and takes about 10 minutes.</p>
+  <ol class="ig-switch-steps">
+    <li><span>1</span><div><b>Create a Facebook account</b> at facebook.com, using your own name.</div></li>
+    <li><span>2</span><div><b>Create a business Page</b> for your real estate business. Facebook walks you through it.</div></li>
+    <li><span>3</span><div><b>Come back here</b> and click Connect your Meta account.</div></li>
+  </ol>
+  <div class="notice ob-help"><b>We’ll set it up with you.</b> Book a free setup call and one of our team will get you on Facebook, step by step.</div>
+  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="obBook()">Book a free setup call</button><div class="ig-switch-go"><button type="button" class="nc-cancel" onclick="onboard(0)">I’ve set it up</button><a class="campaign-primary ig-switch-open" href="https://www.facebook.com/pages/create" target="_blank" rel="noopener">Open Facebook</a></div></div>
+  <p class="fine">You can look around your dashboard in the meantime. Campaigns start once you’re connected. <a href="#setup-guides" onclick="setupGuides('facebook');return false">See the step-by-step guides</a></p>`);
   modal.dataset.gate = 'meta';
+}
+
+// Meta doesn't let apps switch an Instagram to Professional, but Facebook's own "Connect account"
+// flow does it while linking the Instagram to the Page. This explains it, then opens that page.
+const IG_LINK_SETTINGS = 'https://www.facebook.com/settings/?tab=linked_instagram';
+function obIgSwitch() {
+  const again = state.brandBuilt ? 'onboard(0)' : "obCheck('ready')";
+  show(`<span class="eyebrow">ABOUT A MINUTE</span><h2>Switch your Instagram to a business account.</h2>
+  <p>Meta only lets apps like Resmara post to business (Professional) Instagram accounts. Facebook can switch yours for you while it links it to your Page.</p>
+  <div class="ig-switch-facts"><div><b>It’s free.</b> It takes about a minute.</div><div><b>Nothing is lost.</b> Your posts and followers stay.</div><div><b>You gain a Contact button</b> and stats on every post.</div><div><b>Your account must be public</b> for business accounts.</div></div>
+  <ol class="ig-switch-steps">
+    <li><span>1</span><div><b>Open Facebook.</b> The button below opens Facebook’s linked accounts page in a new tab.</div></li>
+    <li><span>2</span><div><b>Act as your business Page.</b> If Facebook shows your personal profile, switch to your Page first.</div></li>
+    <li><span>3</span><div><b>Click Connect account</b> next to Instagram and sign in to your Instagram.</div></li>
+    <li><span>4</span><div><b>Follow Facebook’s prompts.</b> When it asks, choose Business. That switches your account and links it to your Page.</div></li>
+    <li><span>5</span><div><b>Come back here</b> and click Check again.</div></li>
+  </ol>
+  <div class="modal-actions ig-switch-actions"><button type="button" class="nc-cancel" onclick="${again}">Check again</button><a class="campaign-primary ig-switch-open" href="${IG_LINK_SETTINGS}" target="_blank" rel="noopener">Open Facebook to switch</a></div>
+  <p class="fine">Stuck? <a href="#setup-guides" onclick="setupGuides('instagram');return false">See the full guide</a> or <a href="#" onclick="obBook();return false">book a free setup call</a> and we’ll do it with you.</p>`);
+  modal.classList.add('wide-modal'); modal.dataset.gate = 'meta';
 }
 
 // Free setup session: the real Calendly booking page, right in the pop-up.
 const SETUP_CALENDLY = 'https://calendly.com/d/d32t-m77-tmt/real-estate-boost-onboarding-session';
-function obBook() {
+function obBook(standalone) {
   const [first, ...rest] = String(state.name || '').split(' ');
   const q = new URLSearchParams({ embed_type: 'Inline', embed_domain: location.hostname || 'resmara.com', hide_gdpr_banner: '1', hide_landing_page_details: '1', primary_color: 'd94c0d', name: state.name || '', email: state.email || '', first_name: first || '', last_name: rest.join(' ') });
   show(`<span class="eyebrow">FREE SETUP SESSION</span><h2>Let’s get you set up.</h2><p>Pick a time for a 30-minute video call. One of our team will connect your Facebook Page, Instagram and ad account with you.</p>
   <div class="cal-embed"><iframe src="${SETUP_CALENDLY}?${q}" title="Book your setup session" loading="lazy"></iframe></div>
   <p class="fine">Calendly not loading? <a href="${SETUP_CALENDLY}" target="_blank" rel="noopener">Open the booking page</a>.</p>
-  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="obNeedsSetup(state.obIssues||[3])">Back</button><span></span></div>`);
+  <div class="modal-actions"><button type="button" class="nc-cancel" onclick="${standalone || state.brandBuilt ? 'modal.close()' : 'obNeedsSetup(state.obIssues||[3])'}">Back</button><span></span></div>`);
   modal.classList.add('wide-modal'); modal.dataset.gate = 'meta';
 }
 // When the booking is made inside the embed, Calendly tells the page.
@@ -109,7 +176,7 @@ addEventListener('message', e => {
     // has to survive a new browser the same way the Meta connection does.
     state.setupSession = { booked: new Date().toISOString() }; persist();
     if (window.RM && RM.isLoggedIn()) RM.bookSetupSession({ booked: true }).catch(() => {});
-    show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">YOU’RE BOOKED IN</span><h2>See you soon.</h2><p>Calendly has emailed you the time and a video link. We’ll connect your Meta account together on the call. Until then you can look around and set up your brand, but campaigns can’t run until you’re connected.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Close</button><button class="campaign-primary" onclick="onboard(1)">Build my brand</button></div>`);
+    show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">YOU’RE BOOKED IN</span><h2>See you soon.</h2><p>Calendly has emailed you the time and a video link. We’ll sort out your Meta account together on the call. Until then you can carry on as normal.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Close</button><button class="campaign-primary" onclick="onboard(1)">Build my brand</button></div>`);
   }
 });
 
@@ -196,11 +263,15 @@ function addPaymentCard() {
 }
 
 // ===== Review copy: start over as a brand-new client =====
-if (state.freshClient && typeof examples !== 'undefined') examples.splice(0);
+// New clients start with one sample campaign, 1248 Oakridge Drive, so they can open it and see what
+// a campaign looks like. (The sales demo keeps both samples.)
+function clientView() { return !!state.freshClient || !!(window.RM && RM.isLoggedIn && RM.isLoggedIn()); }
+function trimSamples() { if (typeof examples !== 'undefined' && clientView() && examples.length > 1) examples.splice(1); }
+trimSamples();
 function newClientDemo() {
   try { localStorage.clear(); } catch (e) {}
   state = { campaigns: [], freshClient: true, connected: false };
-  examples.splice(0); persist();
+  examples.splice(1); persist();
   location.hash = ''; home(); window.scrollTo(0, 0);
   obPickScenario(false);
 }
@@ -231,7 +302,9 @@ function obSignIn() {
 // ---- Meta connection is required ------------------------------------------------------------
 // Resmara can't post or run ads without the agent's Meta account, so step 1 can't be skipped.
 // Until it's connected (or a setup session is booked), sign-in lands on Accounts with the prompt.
-function metaBlocked() { return !!state.metaRequired && !state.connected; }
+// Campaigns need the Facebook login to have happened (that's where the brand comes from), not a
+// Page: without a Page, posts are downloaded and shared by hand until it's connected.
+function metaBlocked() { return !!state.metaRequired && !state.connected && !state.metaChecked; }
 // What the account has actually done, read from the server (item 8). localStorage alone let a
 // cleared browser skip the required Meta step, which is the one thing that must not be
 // skippable — so on every sign-in the stored answers win over the local ones.
@@ -252,7 +325,7 @@ function metaRequiredPrompt() {
   show(`<span class="robot-avatar ob-bot-lg" aria-hidden="true"></span><span class="eyebrow">META ACCOUNT NEEDED</span><h2>Please connect your Meta account.</h2><p>Resmara posts and runs ads through your Facebook Page, Instagram and ad account, so we can’t run campaigns for you until they’re connected.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="obBook()">Book a free setup session</button><button class="campaign-primary" onclick="onboard(0)">Connect your Meta account</button></div>`);
 }
 function metaGateOnLogin() {
-  hydrateOnboarding().then(() => {
+  hydrateOnboarding().then(() => (state.connected && window.RM && RM.onboardingAudit ? RM.onboardingAudit().then(applyMetaChecks).catch(() => {}) : null)).then(() => {
     if (metaNagging()) { dashboard('accounts'); setTimeout(() => onboard(0), 400); return; }
     dashboard('campaigns');
     if (state.firstRun && !state.tourDone) setTimeout(() => onboard(state.connected ? 1 : 0), 400);
@@ -291,10 +364,22 @@ let introLastView = null;
 (function () {
   const base = dashboard;
   dashboard = function (v = 'campaigns') {
+    trimSamples();
     base(v);
     const seen = state.introViews || (state.introViews = {});
     if (v !== introLastView) { seen[v] = (seen[v] || 0) + 1; introLastView = v; persist(); }
     if (seen[v] > 2) document.querySelectorAll('#content .notice.page-intro:not(#connNotice)').forEach(n => n.remove());
+    metaIssueBanner();
+  };
+})();
+(function () {
+  const base = details;
+  details = function (i) {
+    const out = base(i); metaIssueBanner();
+    const c = [...state.campaigns, ...examples][i], box = document.querySelector('#content');
+    if (clientView() && examples.includes(c) && box && !box.querySelector('.sample-note'))
+      box.insertAdjacentHTML('afterbegin', '<div class="notice page-intro sample-note"><b>This is a sample campaign.</b> It shows what you’ll get for every listing: your leads, the posts and ad calendar, the listing website and your seller reports. Open each section to look around. Your own campaigns appear next to it when you click + Campaign.</div>');
+    return out;
   };
 })();
 
@@ -331,6 +416,7 @@ function paintSupportBadge() {
 (function () {
   const base = dashboard;
   dashboard = function (v = 'campaigns') {
+    trimSamples();
     base(v); paintSupportBadge();
     // Live app: ask the API how many team replies the agent hasn't seen yet.
     if (supportSignedIn() && window.RM && RM.tickets) RM.tickets().then(rows => {
@@ -388,6 +474,21 @@ function paintSupportBadge() {
 // Four things have to be true before Resmara can post and spend: a Page, admin rights on it, an
 // Instagram professional account linked to it, and a way to pay. Each line is Meta's answer,
 // and anything Meta does not answer says so instead of showing a tick.
+// The server's four checks, in the order the red box and the setup screens use:
+// 0 page, 1 page_admin, 2 instagram, 3 ad_account. Only the Page is required; the other two limit
+// the campaign (no Instagram posts, no ad) and keep the red box up until they pass.
+const META_CHECK_KEYS = ['page', 'page_admin', 'instagram', 'ad_account'];
+function applyMetaChecks(r) {
+  const checks = r.checks || [];
+  const issues = META_CHECK_KEYS.map((k, i) => { const c = checks.find(x => x.key === k); return c && !c.ok ? i : null; }).filter(i => i !== null);
+  const pageOk = !issues.includes(0) && !issues.includes(1) && !!r.connected;
+  const loggedIn = !!r.connected || checks.some(c => c.detail && c.detail !== 'Not connected');
+  state.metaChecked = state.metaChecked || loggedIn;
+  state.metaIssues = loggedIn ? issues : [];
+  state.connected = pageOk;
+  state.metaAudit = { status: pageOk ? (issues.length ? 'limited' : 'ready') : 'blocked', checkedAt: new Date().toISOString() };
+  persist();
+}
 function runMetaAudit() {
   const box = document.querySelector('#connDetail');
   const btn = document.querySelector('#metaAuditBtn');
@@ -402,8 +503,7 @@ function runMetaAudit() {
         `<p class="fine">Once you've done this, come back here and click Check connection.</p>` +
         (r.connected ? '' : `<div class="btn-pair"><button class="campaign-primary" onclick="connectMeta()">Connect Meta</button><button class="alt" onclick="obBook()">Book a free setup session</button></div>`);
     }
-    state.metaAudit = { status: r.connected && (r.checks || []).every(c => c.ok) ? 'ready' : 'blocked', checkedAt: new Date().toISOString() };
-    state.connected = !!r.connected;
+    applyMetaChecks(r);
     persist();
     const bad = (r.checks || []).filter(c => !c.ok);
     toast(r.connected ? (bad.length ? `${bad.length} thing(s) still to fix` : 'You\'re ready to run campaigns.') : 'Meta is not connected yet.');

@@ -25,6 +25,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import get_admin_user
+from app.core.testdata import test_user_ids
 from app.db.session import (Asset, Boost, Cost, CreditPurchase, FinanceSetting, Order, User,
                             get_db)
 from app.services import billing, storage, team_access
@@ -148,8 +149,10 @@ def finance(db: Session = Depends(get_db), current_user: User = Depends(team_acc
 
     now = datetime.utcnow()
     month_ago = now - timedelta(days=30)
-    paid_orders = db.query(Order).filter(Order.status == "paid").all()
-    paid_packs = db.query(CreditPurchase).filter(CreditPurchase.status == "paid").all()
+    # Test accounts (test emails and team-marked ones) never count as revenue or customers.
+    tests = test_user_ids(db)
+    paid_orders = [o for o in db.query(Order).filter(Order.status == "paid").all() if o.user_id not in tests]
+    paid_packs = [p for p in db.query(CreditPurchase).filter(CreditPurchase.status == "paid").all() if p.user_id not in tests]
 
     recent = [o for o in paid_orders if o.paid_at and o.paid_at >= month_ago]
     recent += [p for p in paid_packs if p.paid_at and p.paid_at >= month_ago]

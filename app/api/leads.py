@@ -21,6 +21,7 @@ from app.core.config import settings
 from app.db.session import Boost, Lead, User, get_db
 from app.core.security import get_current_user
 from app.services import leads as leads_service
+from app.services.lead_counts import lead_totals
 
 router = APIRouter()
 
@@ -44,6 +45,7 @@ class LeadOut(BaseModel):
     reason: Optional[str] = None
     notified_at: Optional[datetime] = None
     email_error: Optional[str] = None
+    note: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:
@@ -58,7 +60,8 @@ class LeadCreate(BaseModel):
 
 
 class LeadUpdate(BaseModel):
-    status: str
+    status: Optional[str] = None
+    note: Optional[str] = Field(default=None, max_length=2000)
 
 
 def _owned_boost(boost_id: int, user: User, db: Session) -> Boost:
@@ -102,6 +105,8 @@ def list_leads(boost_id: int, include_removed: bool = False,
         "boost_id": boost.id,
         "leads": [LeadOut.model_validate(r) for r in rows],
         "open": open_count,
+        # Every lead ever flagged on this campaign, by source. Removed ones still count.
+        "totals": lead_totals(db, [boost.id])[boost.id],
         "scan": {
             "checked_at": boost.leads_checked_at,
             "note": boost.leads_scan_note,
@@ -124,11 +129,17 @@ def create_lead(boost_id: int, body: LeadCreate,
 @router.patch("/leads/{lead_id}", response_model=LeadOut)
 def update_lead(lead_id: int, body: LeadUpdate,
                 current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Tick a lead off (handled) or put it back to new. Removing has its own route."""
-    if body.status not in STATUSES:
+    """Tick a lead off (handled) or put it back to new, and/or save the agent's note on it.
+    Removing has its own route."""
+    if body.status is None and body.note is None:
+        raise HTTPException(status_code=422, detail="Send a status, a note, or both")
+    if body.status is not None and body.status not in STATUSES:
         raise HTTPException(status_code=422, detail=f"status must be one of {', '.join(STATUSES)}")
     lead = _owned_lead(lead_id, current_user, db)
-    lead.status = body.status
+    if body.status is not None:
+        lead.status = body.status
+    if body.note is not None:
+        lead.note = body.note.strip() or None
     db.commit()
     db.refresh(lead)
     return LeadOut.model_validate(lead)

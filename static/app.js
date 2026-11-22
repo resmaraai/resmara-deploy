@@ -2,7 +2,7 @@ const $=s=>document.querySelector(s),app=$('#app'),modal=$('#modal');const img='
 
 // The two sample listings every account sees. They are the only campaigns a brand-new
 // account opens on, and they are the same for every customer (owner: Oakridge and Willow).
-const examples=[{address:'1248 Oakridge Drive',area:'Austin, TX · $845,000',day:7,status:'Demo · Active',phase:'active',image:'sample/card-1.jpg'},{address:'76 Willow Lane',area:'Austin, TX · $625,000',day:3,status:'Demo · Republished',phase:'republished',image:'sample/card-2.jpg'}];function dashboard(v='campaigns'){if(window.stopResmaraGuide)stopResmaraGuide();view=v;openCampaignKey=null;location.hash='dashboard';app.innerHTML=`<div class="shell"><aside class="sidebar">${logo}<span class="eyebrow" style="margin:16px 12px -15px;color:#52778f">YOUR WORKSPACE</span><nav class="side-nav">${[['campaigns','◫','My campaigns'],['brand','✦','My Brand'],['credits','◇','Billing'],['accounts','◎','Accounts'],['support','✉','Support']].map(([id,icon,label])=>`<button class="${v===id?'active':''}" onclick="dashboard('${id}')">${icon} &nbsp; ${label}</button>`).join('')}</nav>${themeToggle()}${state.priorDemos?.length?'<button class="alt" onclick="restorePriorDemo()">Switch to previous demo</button>':''}<button class="alt" onclick="signOutDemo()">Sign out</button><a class="small" onclick="home()">Back to homepage</a><p class="side-legal"><a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="data-deletion.html" target="_blank" rel="noopener">Data deletion</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></p></aside><main class="main workspace-main"><div id="content"></div></main></div>`;if(v==='accounts')accounts();else if(v==='brand')myBrand();else if(v==='credits')myCredits();else if(v==='support')supportPage();else campaignList()}// Pull the campaigns that actually exist in the API and keep them in the same list as local
+const examples=[{address:'1248 Oakridge Drive',area:'Austin, TX · $845,000',day:7,status:'Demo · Active',phase:'active',image:'sample/card-1.jpg'},{address:'76 Willow Lane',area:'Austin, TX · $625,000',day:3,status:'Demo · Republished',phase:'republished',image:'sample/card-2.jpg'}];function dashboard(v='campaigns'){if(v!=='brand'&&typeof brandLeaveGuard==='function'&&brandLeaveGuard(()=>dashboard(v)))return;if(window.stopResmaraGuide)stopResmaraGuide();view=v;openCampaignKey=null;location.hash='dashboard';app.innerHTML=`<div class="shell"><aside class="sidebar">${logo}<span class="eyebrow" style="margin:16px 12px -15px;color:#52778f">YOUR WORKSPACE</span><nav class="side-nav">${[['campaigns','◫','My campaigns'],['brand','✦','My Brand'],['credits','◇','Billing'],['accounts','◎','Accounts'],['support','✉','Support']].map(([id,icon,label])=>`<button class="${v===id?'active':''}" onclick="dashboard('${id}')">${icon} &nbsp; ${label}</button>`).join('')}</nav>${themeToggle()}${state.priorDemos?.length?'<button class="alt" onclick="restorePriorDemo()">Switch to previous demo</button>':''}<button class="alt" onclick="signOutDemo()">Sign out</button><a class="small" onclick="home()">Back to homepage</a><p class="side-legal"><a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="data-deletion.html" target="_blank" rel="noopener">Data deletion</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></p></aside><main class="main workspace-main"><div id="content"></div></main></div>`;if(v==='accounts')accounts();else if(v==='brand')myBrand();else if(v==='credits')myCredits();else if(v==='support')supportPage();else campaignList()}// Pull the campaigns that actually exist in the API and keep them in the same list as local
 // drafts, so a client sees their real campaign after a reload or on another device.
 let liveCampaignsSyncedAt=0;
 // Which campaign page is open, if any. The list only repaints itself while the list is the view.
@@ -30,7 +30,7 @@ async function syncLiveCampaigns(){
   const before=signature(state.campaigns);
   list.forEach(b=>{
    if(!b||b.id==null)return;
-   const card={address:b.address,area:(b.campaign_days||14)+'-day campaign · $'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',status:liveStatusLabel(b),boostId:b.id,live:true,day:0,hidden:b.hidden===true,posts_total:b.posts_total||0,posts_approved:b.posts_approved||0,posts_published:b.posts_published||0,url:'',media:'',image:b.image||undefined,budget:'$'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',until_sold:b.until_sold===true,until_sold_at:b.until_sold_at||null,new_leads:b.new_leads||0,launched_at:b.launched_at||null,stage:b.stage||null};
+   const card={address:b.address,area:(b.campaign_days||14)+'-day campaign · $'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',status:liveStatusLabel(b),boostId:b.id,live:true,day:0,hidden:b.hidden===true,posts_total:b.posts_total||0,posts_approved:b.posts_approved||0,posts_published:b.posts_published||0,url:'',media:'',image:b.image||undefined,budget:'$'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',until_sold:b.until_sold===true,until_sold_at:b.until_sold_at||null,new_leads:b.new_leads||0,launched_at:b.launched_at||null,go_live_date:b.go_live_date||null,stage:b.stage||null};
    const existing=state.campaigns.find(c=>String(campaignBoostId(c))===String(b.id));
    if(existing)Object.assign(existing,card);else state.campaigns.push(card);
   });
@@ -87,21 +87,45 @@ function confirmDeleteCampaign(id){
 }
 // A campaign is Active (running), Republished (renewed and running again) or Completed.
 // Completed campaigns leave the top list and sit in "Completed campaigns" below.
+// A paid campaign that hasn't been launched yet is Staged (built or not), so the agent can come back to it.
+// Approved and launched but its go-live date hasn't come yet: Ready to go live. Active once it starts.
 function campaignPhase(c){
+ const ph=campaignPhaseRaw(c);
+ if(ph!=='active')return ph;
+ if(typeof campaignIsLive==='function'&&!campaignIsLive(c))return 'staged';
+ return campaignStartsLater(c)?'ready':'active';
+}
+// The day a campaign starts: the go-live date it was approved with (yyyy-mm-dd), if any.
+function campaignGoLive(c){return (c&&(c.go_live||c.go_live_date))||''}
+function campaignStartsLater(c){
+ if(Number(c&&c.day)>0||Number(c&&c.posts_published)>0)return false;
+ const d=campaignGoLive(c);if(!d)return false;
+ return d>new Date().toLocaleDateString('en-CA');
+}
+function goLiveLabel(d){const x=new Date(String(d).slice(0,10)+'T12:00:00');return isNaN(x)?'':x.toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+function campaignPhaseRaw(c){
  if(c.phase)return c.phase;
  const st=String(c.status||'').toLowerCase();
  if(c.renewed||st.includes('republish'))return 'republished';
  if(c.completed||st.includes('complete')||(c.live&&c.posts_total&&c.posts_published>=c.posts_total))return 'completed';
  return 'active';
 }
-const PHASE_LABEL={active:'Active',republished:'Republished',completed:'Completed'};
+const PHASE_LABEL={staged:'Staged',ready:'Ready to go live',active:'Active',republished:'Republished',completed:'Completed'};
 // A campaign's photo comes from the API as "/uploads/<file>", which only resolves when this
 // app is served at the domain root. Under the Command Center's /resmara/ mount the path has
 // to carry that prefix (api.js owns the rule). Guarded so a page without api.js still paints.
 function mediaPath(u){return typeof mediaUrl==='function'?mediaUrl(u):u}
+// The corner of a card's photo: new leads (opens them) and, once it's switched on, a plain
+// "Run until sold is on" tag. Run until sold itself is set on the campaign page.
+function cardFlags(c){
+ const i=[...state.campaigns,...examples].indexOf(c),n=typeof newLeadCount==='function'?newLeadCount(c):0;
+ const leads=n?`<button type="button" class="card-leads" onclick="openLeads(${i})">${n} new lead${n>1?'s':''}</button>`:'';
+ const sold=typeof untilSoldOn==='function'&&campaignPhase(c)!=='completed'&&untilSoldOn(c)?'<span class="card-until-sold">✓ Run until sold is on</span>':'';
+ return leads||sold?`<div class="card-flags">${leads}${sold}</div>`:'';
+}
 function campaignCard(c,top){
  const ph=campaignPhase(c),key=encodeURIComponent(campaignKey(c));
- return `<article class="card">${typeof newLeadCount==='function'&&newLeadCount(c)?`<button type="button" class="card-leads" onclick="openLeads(${[...state.campaigns,...examples].indexOf(c)})">${newLeadCount(c)} new lead${newLeadCount(c)>1?'s':''}</button>`:''}${c.image?`<img src="${esc(mediaPath(c.image))}" alt="${esc(c.address)}">`:(c.live?`<div class="card-noimg">No photos yet — import the listing link</div>`:`<img src="${img}" alt="Illustrative property photo">`)}<div class="card-body"><div class="card-status-row"><span class="pill phase-${ph}${campaignPaused(c)?' is-paused':''}">${campaignPaused(c)?'Paused':PHASE_LABEL[ph]}</span><span class="card-actions">${untilSoldButton(c)}${pauseButton(c)}</span></div><h3>${esc(c.address)}</h3><p>${esc(c.area||'Your saved campaign draft')}</p><div class="progress"><i style="width:${c.live?Math.min(100,(c.posts_published||0)/Math.max(c.posts_total||14,1)*100):(c.day||0)/14*100}%"></i></div><div class="flex small"><span>${c.live?(c.posts_total||0)+' posts · '+(c.posts_published||0)+' published':c.day?'Day '+c.day+' of 14':'Awaiting campaign generation'}</span><span>${c.live?esc(c.status==='Draft'?'Not built yet':'Meta ad'):c.day?'Facebook + Instagram':'Draft'}</span></div><button class="alt" onclick="details(${[...state.campaigns,...examples].indexOf(c)})">${c.day||c.live?'View campaign':'Review draft'} &nbsp;</button></div></article>`;
+ return `<article class="card">${typeof clientView==='function'&&clientView()&&examples.includes(c)?'<span class="card-sample">Sample</span>':''}${cardFlags(c)}${c.image?`<img src="${esc(mediaPath(c.image))}" alt="${esc(c.address)}">`:(c.live?`<div class="card-noimg">No photos yet — import the listing link</div>`:`<img src="${img}" alt="Illustrative property photo">`)}<div class="card-body"><div class="card-status-row"><span class="pill phase-${ph}${campaignPaused(c)?' is-paused':''}">${campaignPaused(c)?'Paused':PHASE_LABEL[ph]}</span><span class="card-actions">${pauseButton(c)}</span></div><h3>${esc(c.address)}</h3><p>${esc(c.area||'Your saved campaign draft')}</p><div class="progress"><i style="width:${c.live?Math.min(100,(c.posts_published||0)/Math.max(c.posts_total||14,1)*100):(c.day||0)/14*100}%"></i></div><div class="flex small"><span>${ph==='ready'?'Goes live '+esc(goLiveLabel(campaignGoLive(c))):c.live?(c.posts_total||0)+' posts · '+(c.posts_published||0)+' published':c.day?'Day '+c.day+' of 14':'Awaiting campaign generation'}</span><span>${ph==='ready'?'Facebook + Instagram':c.live?esc(c.status==='Draft'?'Not built yet':'Meta ad'):c.day?'Facebook + Instagram':'Draft'}</span></div><button class="alt" onclick="details(${[...state.campaigns,...examples].indexOf(c)})">${ph==='staged'?'Review staged campaign':ph==='completed'?'View campaign':'View active campaign'} &nbsp;</button></div></article>`;
 }
 function campaignList(){
  syncLiveCampaigns();
@@ -223,30 +247,47 @@ function ncCheck(form){
  if(!host||!host.includes('.')){fail(' It doesn’t look like a complete web link.');return}
  form.dataset.state='checking';ncReady(form);
  out.innerHTML=`<div class="nc-msg wait nc-walk"><b>Resmara is checking your link…</b><div class="nc-steps"><span class="robot-avatar nc-bot" aria-hidden="true"></span><ul class="link-checks"><li data-k="open" class="now">Opening the link…</li><li data-k="details">Looking for the home’s details…</li><li data-k="photos">Looking for the photos…</li><li data-k="video">Looking for a video…</li></ul></div></div>`;
- const unreadable=/login|signin|sign-in|my\.flexmls/i.test(url),noPhotos=/zillow|realtor\.com|redfin|trulia|homes\.com/i.test(host);
- const hasVideo=/video|tour/i.test(url),order=['open','details','photos','video'],bot=out.querySelector('.nc-bot');const mark=(k,ok,t)=>{if(!fresh())return;const li=out.querySelector(`[data-k=${k}]`);if(li){li.className=ok?'ok':'no';li.textContent=t}const nx=out.querySelector(`[data-k=${order[order.indexOf(k)+1]}]`);if(nx&&bot){nx.classList.add('now');bot.style.transform=`translateY(${nx.offsetTop}px)`}};
- setTimeout(()=>mark('open',!unreadable,unreadable?'This link needs an MLS sign-in':'Link opened'),800);
- setTimeout(()=>mark('details',!unreadable,unreadable?'Couldn’t read the home’s details':'Found the home’s details'),1600);
- setTimeout(()=>{
-  mark('photos',!(unreadable||noPhotos),unreadable||noPhotos?'Couldn’t get the photos':'Photos will come from this link');
-  setTimeout(()=>{
-  const vid=hasVideo&&!unreadable&&!noPhotos;
-  mark('video',true,vid?'Found a listing video':'No video, so your ad will be a photo carousel');
-  setTimeout(()=>{
-   if(!fresh())return;
-   const linkAddress=listingAddressFromLink(url);
-   ncFillAddress(form,linkAddress);
-   // A typed address wins over the one guessed from the link: the agent knows the property,
-   // and the link slug is a guess. This is the field the campaign is created with.
-   draft={url,address:ncTypedAddress(form)||linkAddress,addressSource:ncTypedAddress(form)?'manual':'link',photoSource:'listing',media:url,photos:[],hasVideo:vid};
-   if(unreadable){fail(' It needs an MLS sign-in to open.')}
-   else if(noPhotos){form.dataset.state='details';out.innerHTML=`<div class="nc-msg part"><b>We have the home’s details, but we can’t get the photos from this link.</b>Upload your photos below and you’re ready to go.</div>`;ncReady(form)}
-   else{form.dataset.state='ok';out.innerHTML=`<div class="nc-msg ok"><span class="robot-avatar" aria-hidden="true"></span><div><b>Green light.</b> We have the home’s details. Resmara pulls the photos from this link when it builds, and tells you how many it got${vid?'; the listing video becomes your first post.':'.'} You’re ready to build.</div></div>`;ncReady(form)}
-  },500);
-  },800);
- },2400);
+ const order=['open','details','photos','video'],bot=out.querySelector('.nc-bot');const mark=(k,ok,t)=>{if(!fresh())return;const li=out.querySelector(`[data-k=${k}]`);if(li){li.className=ok?'ok':'no';li.textContent=t}const nx=out.querySelector(`[data-k=${order[order.indexOf(k)+1]}]`);if(nx&&bot){nx.classList.add('now');bot.style.transform=`translateY(${nx.offsetTop}px)`}};
+ // Signed in, the server opens the link for real (POST /api/content/listing/check). The review
+ // copy has no server, so it reads the link the way the server would: a sign-in link fails, a
+ // portal that blocks photos gives details only, and a link with no home in it is turned away.
+ const live=window.RM&&RM.checkListing&&RM.isLoggedIn&&RM.isLoggedIn();
+ const verdict=live?RM.checkListing(url).catch(e=>({ok:false,reason:'error',message:(e&&e.message)||'We couldn’t open that link just now.'})):new Promise(res=>setTimeout(()=>res(ncDemoVerdict(url,host)),2200));
+ const started=Date.now(),wait=ms=>new Promise(r=>setTimeout(r,ms));
+ verdict.then(async v=>{
+  // The steps tick over at a readable pace even when the answer comes back at once.
+  const pace=async()=>{await wait(Math.max(0,700-(Date.now()-started)))};
+  await pace();
+  if(!fresh())return;
+  const opened=v.ok||v.reason==='no_photos'||v.reason==='pending'||v.reason==='sold'||(v.opened&&v.reason!=='no_listing');
+  mark('open',v.reason!=='sign_in'&&v.reason!=='not_a_link'&&v.reason!=='error',v.reason==='sign_in'?'This link needs an MLS sign-in':v.reason==='error'?'Couldn’t open the link':'Link opened');await wait(600);
+  mark('details',!!v.details,v.details?'Found the home’s details':'Couldn’t find a home at this link');await wait(600);
+  if(!v.ok&&v.reason!=='no_photos'){
+   mark('photos',false,'Skipped');mark('video',false,'Skipped');
+   fail(' '+(v.message||'We couldn’t find a home for sale at this link.'));return;
+  }
+  mark('photos',v.reason!=='no_photos',v.reason==='no_photos'?'Couldn’t get the photos':(v.photos?'Found '+v.photos+' photos':'Photos will come from this link'));await wait(600);
+  const vid=!!v.video;
+  mark('video',true,vid?'Found a listing video':'No video, so your ad will be a photo carousel');await wait(400);
+  if(!fresh())return;
+  const linkAddress=v.address||listingAddressFromLink(url);
+  ncFillAddress(form,linkAddress);
+  // A typed address wins over the one guessed from the link: the agent knows the property,
+  // and the link slug is a guess. This is the field the campaign is created with.
+  draft={url,address:ncTypedAddress(form)||linkAddress,addressSource:ncTypedAddress(form)?'manual':'link',photoSource:'listing',media:url,photos:[],hasVideo:vid};
+  if(v.reason==='no_photos'){form.dataset.state='details';out.innerHTML=`<div class="nc-msg part"><b>We have the home’s details, but we can’t get the photos from this link.</b>Upload your photos below and you’re ready to go.</div>`;ncReady(form)}
+  else{form.dataset.state='ok';out.innerHTML=`<div class="nc-msg ok"><span class="robot-avatar" aria-hidden="true"></span><div><b>Green light.</b> We have the home’s details${v.photos?' and '+v.photos+' photos':''}${vid?', plus a listing video. Your video will be your ad and your first post.':'.'} You’re ready to build.</div></div>`;ncReady(form)}
+ });
 }
-
+// What the server would say about a link, for the review copy that has no server.
+function ncDemoVerdict(url,host){
+ if(/login|signin|sign-in|my\.flexmls/i.test(url))return {ok:false,reason:'sign_in',message:'This link needs an MLS sign-in to open.'};
+ let path='';try{path=new URL(url).pathname}catch{}
+ const home=/\d{1,6}[-_ ][a-z]/i.test(decodeURIComponent(path));
+ if(!home)return {ok:false,reason:'no_listing',opened:true,message:'We couldn’t find a home for sale at this link.'};
+ if(/zillow|realtor\.com|redfin|trulia|homes\.com/i.test(host))return {ok:true,reason:'no_photos',details:true,photos:0,video:false};
+ return {ok:true,reason:'ok',details:true,photos:24,video:/video|tour/i.test(url)};
+}
 function ncReady(form){const st=form.dataset.state,n=form.files.files.length,addr=['street','city','state','zip'].every(k=>form[k].value.trim()),btn=form.querySelector('.nc-build');
  const build=st==='ok'||st==='details'||st==='manual';
  btn.textContent=st==='checking'?'Checking…':build?'Build my campaign · $49':'Check my link';
@@ -327,7 +368,7 @@ function confirmPage(token){
 if(state.clientSignedIn&&window.RM&&!RM.isLoggedIn()){state.clientSignedIn=false;persist();}
 if(/\/confirm\/?$/.test(location.pathname)){confirmPage(new URLSearchParams(location.search).get('token')||'')}
 else if(/\/reset\/?$/.test(location.pathname)){resetPasswordPage(new URLSearchParams(location.search).get('token')||'')}
-else if(location.hash==='#pricing'||(!location.hash&&document.body.dataset.page==='pricing'))pricing();else if(location.hash==='#dashboard'&&state.clientSignedIn)dashboard();else if(document.body.dataset.page==='how-it-works'||location.hash==='#how-it-works')howItWorks();else home();
+else if(location.hash==='#setup-guides')setupGuides();else if(location.hash==='#pricing'||(!location.hash&&document.body.dataset.page==='pricing'))pricing();else if(location.hash==='#dashboard'&&state.clientSignedIn)dashboard();else if(document.body.dataset.page==='how-it-works'||location.hash==='#how-it-works')howItWorks();else home();
 // If a bearer token is stored, refresh the session from the backend (best effort).
 // A token that has already passed its expiry is dropped by RM.isLoggedIn(), so this only
 // asks when there is a real session to ask about.
@@ -355,7 +396,7 @@ if(window.RM&&RM.onSessionLost)RM.onSessionLost(()=>{
 });
 
 // Resmara stays available across the workspace and homepage.
-const pipDock=document.createElement('div');pipDock.id='pip-dock';pipDock.innerHTML='<button class="pip-launcher" onclick="togglePip()" aria-label="Ask Resmara for help"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><span>Ask Resmara</span><span class="pip-online"></span></button><section id="pip-chat" class="pip-chat" hidden aria-label="Resmara support chat"><header class="flex"><div class="flex"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><div><b>Resmara</b><small>Real Estate Social Marketing, Analytics & Reporting Assistant</small></div></div><button class="pip-close" onclick="togglePip()" aria-label="Close Resmara chat">×</button></header><div id="pip-messages" class="pip-messages" aria-live="polite"><div class="pip-reply">Hi, I’m Resmara! I’ll help you get settled, build your campaign and find your way around. What can I help with?</div></div><div class="pip-questions"><button onclick="pipAnswer(0)">Start my first campaign</button><button onclick="pipAnswer(1)">Connect social accounts</button><button onclick="pipAnswer(2)">Fees and ad spend</button><button onclick="pipAnswer(3)">Find my reports</button></div><form class="pip-input" onsubmit="event.preventDefault();pipFreeText(this.question.value);this.reset()"><input name="question" aria-label="Message Resmara" required placeholder="Ask Resmara a question…"><button aria-label="Send message">↑</button></form><p class="pip-demo-note">Guided answers · anything else can be sent to the team as a real support request.</p></section>';document.body.append(pipDock);function togglePip(){const panel=document.querySelector('#pip-chat');panel.hidden=!panel.hidden}function pipMessage(t,mine=false){const e=document.createElement('div');e.className=mine?'pip-user':'pip-reply';e.textContent=t;document.querySelector('#pip-messages').append(e);e.scrollIntoView({block:'nearest'})}function pipAnswer(n){const questions=['How do I start my first campaign?','How do I connect my social accounts?','How do fees and ad spend work?','Where are my reports?'];const answers=['Start with My Brand, then add the listing: the address, the MLS or listing link, and your photos and videos. Resmara builds the 14-day calendar and you approve it before anything goes out. A campaign is $49, paid when you build it.','Open Accounts and connect your Facebook Page and Instagram account. Publishing runs through Meta, so the connection has to be yours — Resmara never posts without it.','One property campaign is $49, paid once when you build it. No subscription, no credits, nothing to top up. Meta ad spend is separate and goes to Meta from your own ad account.','Open the campaign’s report for the day 7 and day 14 views. Before a campaign has been running there are no numbers to show; it fills in from your connected accounts.'];pipMessage(questions[n],true);pipMessage(answers[n])}function pipFreeText(q){if(/start|first|campaign|listing/i.test(q))return pipAnswer(0);if(/connect|facebook|instagram|meta account/i.test(q))return pipAnswer(1);if(/cost|fee|price|budget|spend|pay/i.test(q))return pipAnswer(2);if(/report|result|performance/i.test(q))return pipAnswer(3);pipMessage(q,true);pipMessage('I keep to the guided answers above for setup, social connections, fees and reports. For anything else, send it to the team and a person will reply on your Support page.');pipOfferTicket(q)}
+const pipDock=document.createElement('div');pipDock.id='pip-dock';pipDock.innerHTML='<button class="pip-launcher" onclick="togglePip()" aria-label="Ask Resmara for help"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><span>Ask Resmara</span><span class="pip-online"></span></button><section id="pip-chat" class="pip-chat" hidden aria-label="Resmara support chat"><header class="flex"><div class="flex"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><div><b>Resmara</b><small>Real Estate Social Marketing, Analytics & Reporting Assistant</small></div></div><button class="pip-close" onclick="togglePip()" aria-label="Close Resmara chat">×</button></header><div id="pip-messages" class="pip-messages" aria-live="polite"><div class="pip-reply">Hi, I’m Resmara! I’ll help you get settled, build your campaign and find your way around. What can I help with?</div></div><div class="pip-questions"><button onclick="pipAnswer(0)">Start my first campaign</button><button onclick="pipAnswer(1)">Connect social accounts</button><button onclick="pipAnswer(2)">Fees and ad spend</button><button onclick="pipAnswer(3)">Find my reports</button></div><form class="pip-input" onsubmit="event.preventDefault();pipFreeText(this.question.value);this.reset()"><input name="question" aria-label="Message Resmara" required placeholder="Ask Resmara a question…"><button aria-label="Send message">Send</button></form><p class="pip-demo-note">Guided answers · anything else can be sent to the team as a real support request.</p></section>';document.body.append(pipDock);function togglePip(){const panel=document.querySelector('#pip-chat');panel.hidden=!panel.hidden}function pipMessage(t,mine=false){const e=document.createElement('div');e.className=mine?'pip-user':'pip-reply';e.textContent=t;document.querySelector('#pip-messages').append(e);e.scrollIntoView({block:'nearest'})}function pipAnswer(n){const questions=['How do I start my first campaign?','How do I connect my social accounts?','How do fees and ad spend work?','Where are my reports?'];const answers=['Start with My Brand, then add the listing: the address, the MLS or listing link, and your photos and videos. Resmara builds the 14-day calendar and you approve it before anything goes out. A campaign is $49, paid when you build it.','Open Accounts and connect your Facebook Page and Instagram account. Publishing runs through Meta, so the connection has to be yours — Resmara never posts without it.','One property campaign is $49, paid once when you build it. No subscription, no credits, nothing to top up. Meta ad spend is separate and goes to Meta from your own ad account.','Open the campaign’s report for the day 7 and day 14 views. Before a campaign has been running there are no numbers to show; it fills in from your connected accounts.'];pipMessage(questions[n],true);pipMessage(answers[n])}function pipFreeText(q){if(/start|first|campaign|listing/i.test(q))return pipAnswer(0);if(/connect|facebook|instagram|meta account/i.test(q))return pipAnswer(1);if(/cost|fee|price|budget|spend|pay/i.test(q))return pipAnswer(2);if(/report|result|performance/i.test(q))return pipAnswer(3);pipMessage(q,true);pipMessage('I keep to the guided answers above for setup, social connections, fees and reports. For anything else, send it to the team and a person will reply on your Support page.');pipOfferTicket(q)}
 
 
 function confirmDemoCampaignCredit(button){

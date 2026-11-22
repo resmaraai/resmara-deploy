@@ -212,6 +212,16 @@ tr.testrow td{background:#fbfdff;color:#849bae}
   .secsum{display:none}
   .rows .k{flex:0 0 120px}
 }
+.cm-card{margin-top:18px}
+.cm-card .cm-eyebrow{color:#fff!important}
+.cm-card .goal-steps{margin-top:14px}
+.cm-card .cm-money{grid-template-columns:repeat(3,1fr)}
+.cm-card .cm-money .goal-step b{font-size:22px}
+.cm-card .cm-note{margin:10px 0 0;color:#fff;font-size:13px;opacity:.85}
+.test-note{margin-top:12px;background:#e2f0f8;color:#12354d;border-radius:12px;padding:10px 14px;font-size:13.5px}
+button.ghost.tiny.is-test-on{background:#12354d!important;color:#fff!important;border-color:#12354d!important}
+html.dark .test-note{background:#1d3a50;color:#fff}
+html.dark button.ghost.tiny.is-test-on{background:#fff!important;color:#12354d!important}
 </style>
 
 <style id="brand-views">
@@ -1487,7 +1497,7 @@ function stagePill(r){ const l = stageLabel(r); const cls = l === 'Live' ? 'ok' 
   return '<span class="pill ' + cls + '">' + esc(l) + '</span>'; }
 function campTable(rows, withAgent){
   return '<div class="scrollx"><table><thead><tr><th>ID</th><th>property</th>' + (withAgent ? '<th>agent</th>' : '') +
-    '<th>status</th><th>day</th><th>posts</th><th>goes live</th></tr></thead><tbody>' +
+    '<th>status</th><th>day</th><th>posts</th><th>leads</th><th>goes live</th></tr></thead><tbody>' +
     rows.map(r => '<tr class="rowlink" data-campaign="' + esc(r.id) + '"><td><b>#' + esc(r.id) + '</b></td>' +
       '<td><div class="property-cell">' + (r.photo_cover
         ? '<img class="camp-thumb" src="' + esc(thumb(r.photo_cover, 160)) + '" alt="' + esc(r.address) + '" loading="lazy">'
@@ -1496,6 +1506,7 @@ function campTable(rows, withAgent){
       (withAgent ? '<td>' + esc(r.agent_name || r.agent_email || '') + '</td>' : '') +
       '<td>' + stagePill(r) + '</td><td>' + (r.stage === 'LIVE' && r.day ? 'Day ' + esc(r.day) + ' of 14' : '—') + '</td>' +
       '<td>' + esc(r.posts_published || 0) + ' of ' + esc(r.posts_total || 0) + ' posted' + (r.posts_failed ? ' · <b class="bad-t">' + esc(r.posts_failed) + ' failed</b>' : '') + '</td>' +
+      '<td>' + (r.leads ? esc(r.leads.total || 0) : '—') + '</td>' +
       '<td>' + esc(dateOnly(r.go_live_date)) + '</td></tr>').join('') + '</tbody></table></div>';
 }
 // The campaign's own library, in the order the calendar uses it. An empty campaign says so —
@@ -1555,13 +1566,30 @@ async function openCampaign(id, focusPost){
     '<div class="br-card" style="margin-top:12px"><div class="detail-head"><div><span class="eyebrow-s">Campaign #' + esc(c.id) + '</span>' +
       '<h3 class="detail-title">' + esc(c.address || '') + '</h3><div class="detail-sub">' + esc(c.agent_name || '') + (c.agent_email ? ' · ' + esc(c.agent_email) : '') + '</div></div>' +
       (c.stage ? stagePill(c) : '') + '</div>' +
-      '<div class="facts">' + fact('Goes live', dateOnly(c.go_live_date)) + fact('Launched', c.launched_at ? when(c.launched_at) : '—') +
-        fact('Created', when(c.created_at)) + fact('Ad budget', c.ad_budget_usd != null ? usd(c.ad_budget_usd) : '—') +
+      '<div class="facts">' + fact('Goes live', dateOnly(c.go_live_date)) + fact('Ends', c.ends_on ? dateOnly(c.ends_on) : '—') +
+        fact('Launched', c.launched_at ? when(c.launched_at) : '—') + fact('Created', when(c.created_at)) +
         fact('Meta campaign ID', c.meta_campaign_id || '—') + '</div></div>' +
     '<div class="br-card"><h3 class="card-title">Photos</h3>' + photosCard(c) + '</div>' +
     '<div class="br-card"><h3 class="card-title">Posts</h3>' + (c._noPosts ? '<div class="hint">Its posts appear here once the back end sends them.</div>' :
-      posts.length ? '<p class="hint" style="margin:-6px 0 10px">Click a post to see it.</p><div class="posts">' + posts.map(p => postRow(p)).join('') + '</div>' : '<div class="hint">No posts written yet.</div>') + '</div>';
+      posts.length ? '<p class="hint" style="margin:-6px 0 10px">Click a post to see it.</p><div class="posts">' + posts.map(p => postRow(p)).join('') + '</div>' : '<div class="hint">No posts written yet.</div>') + '</div>' +
+    campaignMetrics(c);
   if (focusPost) { const r = document.querySelector('[data-post="' + focusPost + '"]'); if (r) { togglePost(r); setTimeout(() => r.scrollIntoView({behavior: 'smooth', block: 'center'}), 50); } }
+}
+// Campaign metrics: what the campaign cost and the leads it generated, by source. Lead counts
+// never go down when an agent removes one from their list (app/services/lead_counts.py), so
+// they can be added up across campaigns ("the average campaign generates N leads").
+function campaignMetrics(c){
+  const L = c.leads || {};
+  const n = v => v == null ? '—' : v;
+  const tile = (v, label, first) => '<div class="goal-step' + (first ? ' alert' : '') + '"><b>' + esc(n(v)) + '</b><span>' + esc(label) + '</span></div>';
+  const fee = c.paid_amount_cents != null ? usd(c.paid_amount_cents / 100) : '—';
+  const spent = c.ad_spend_usd != null ? usd(c.ad_spend_usd) : 'Not tracked yet';
+  return '<div class="goal-card hero cm-card"><span class="eyebrow-s cm-eyebrow">CAMPAIGN METRICS</span>' +
+    '<div class="goal-steps">' + tile(L.total, 'Leads in all', true) + tile(L.ad, 'From the ad') + tile(L.posts, 'From the posts') + tile(L.website, 'From the listing page') + '</div>' +
+    (L.removed ? '<p class="cm-note">' + esc(L.removed) + ' of these the agent later removed as not a lead. They still count.</p>' : '') +
+    '<div class="goal-steps cm-money">' + tile(fee, 'Resmara fee paid') + tile(c.ad_budget_usd != null ? usd(c.ad_budget_usd) : '—', 'Ad budget') + tile(spent, 'Ad spent so far') + '</div>' +
+    (c.ad_spend_usd == null ? '<p class="cm-note">What Meta actually spent comes from Meta’s numbers for the ad. That’s part of the Active campaign engine.</p>' : '') +
+    '</div>';
 }
 function postRow(p){
   const failed = p.publish_status === 'failed';
@@ -1619,7 +1647,9 @@ function paintAgent(id){
   page.innerHTML = '<button class="back" data-close-agent>All accounts</button>' +
     '<div class="br-card" style="margin-top:12px"><div class="detail-head"><div><span class="eyebrow-s">Agent #' + esc(u.id) + '</span>' +
       '<h3 class="detail-title">' + esc(u.name || u.email) + '</h3><div class="detail-sub">' + esc(u.email) + '</div></div>' +
-      '<button class="ghost tiny" data-resetlink="' + esc(u.id) + '" title="Makes a one-time link you send them if they are locked out">Password reset link</button></div>' +
+      '<div class="row-btns"><button class="ghost tiny' + (u.is_test ? ' is-test-on' : '') + '" data-marktest="' + esc(u.id) + '" title="Test accounts stay listed here, tagged, but every Team room number leaves them out">' + (u.is_test ? '✓ Test account' : 'Mark as test account') + '</button>' +
+      '<button class="ghost tiny" data-resetlink="' + esc(u.id) + '" title="Makes a one-time link you send them if they are locked out">Password reset link</button></div></div>' +
+      (u.is_test ? '<div class="test-note">This is a test account. It stays in Accounts, but Growth, Marketing, Finance, Campaigns and Overview leave it out.</div>' : '') +
       '<div id="resetOut"></div>' +
       '<div class="facts">' + fact('Joined', when(u.created_at)) + fact('Last sign-in', when(u.last_login)) +
         fact('Paid', paid ? usd(paid.paid_usd) : '$0.00') +
@@ -1636,6 +1666,21 @@ function paintAgent(id){
   const uc = $('userCount'); if (uc) uc.classList.add('hidden');
   window.scrollTo({top: 0});
 }
+// Mark an account as a test account (or real again). The server keeps the flag; every count
+// that reads /api/admin/users, /campaigns, /metrics, /finance and /marketing leaves it out.
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-marktest]'); if (!b) return;
+  const id = b.dataset.marktest, u = (userRows || []).find(x => String(x.id) === String(id)); if (!u) return;
+  const next = !u.is_test; b.disabled = true;
+  try {
+    const r = await api('/api/admin/users/' + encodeURIComponent(id) + '/test', {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({is_test: next})});
+    u.is_test = r && r.is_test !== undefined ? !!r.is_test : next;
+    (campRows || []).forEach(c => { if (String(c.user_id) === String(id)) c.is_test = u.is_test; });
+    paintAgent(id); if (typeof paintGrowth === 'function') paintGrowth();
+    // Re-read the counts so Overview, Campaigns, Finance and Marketing drop (or regain) it now.
+    if (typeof loadMetrics === 'function') loadMetrics(); if (typeof loadFinance === 'function') loadFinance();
+  } catch (err) { b.disabled = false; b.textContent = 'Could not save. Try again.'; }
+});
 function closeAgent(){ agentOpen = null; $('accountsHero').classList.remove('hidden'); $('agentPage').classList.add('hidden'); $('usersFilters').classList.remove('hidden'); $('usersWrap').classList.remove('hidden'); }
 document.addEventListener('click', e => {
   if (e.target.closest('[data-close-agent]')) { closeAgent(); return; }
@@ -2371,7 +2416,7 @@ function paintGrowth(){
   const newThis = agents.filter(u => u.created_at && parse(u.created_at) >= m0).length;
   const newLast = agents.filter(u => u.created_at && parse(u.created_at) >= m1 && parse(u.created_at) < m0).length;
   const price = finData && finData.price ? finData.price.cents / 100 : 49;
-  const camps = campRows || [];
+  const camps = (campRows || []).filter(c => !c.is_test);
   const campsThis = camps.filter(c => c.created_at && parse(c.created_at) >= m0);
   const activeThis = new Set(campsThis.map(c => c.user_id)).size;
   const byAgent = {}; camps.forEach(c => { byAgent[c.user_id] = (byAgent[c.user_id] || 0) + 1; });
