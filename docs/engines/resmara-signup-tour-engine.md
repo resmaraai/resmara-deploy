@@ -1,6 +1,6 @@
 # Resmara sign-up tour engine brain
 
-**Status:** written and greenlit with Adam, sent to Dan 22 Nov · **Builds in:** PR #(number) · **Started:** 22 Nov 2026
+**Status:** written and greenlit with Adam, sent to Dan 22 Nov · **Builds in:** PR #23 · **Started:** 22 Nov 2026
 **Client journey map:** every screen and branch from the website to the first live campaign,
 with screenshots: https://claude.ai/artifact/X8J4hm7tRAdokpEUYsv4Kb (a copy is in the repo at
 `docs/journey/index.html`). **Clickable mockup:** `signup-tour-screens/mockup.js` (preview only, not

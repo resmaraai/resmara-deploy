@@ -12,7 +12,7 @@ Each engine also has a Build room ticket in the Team room. **Started:** 21 Nov 2
 |--------|---------------|----------|-------------|-----------|
 | **Engine 1 · Login and Meta integration** (account, Meta connection, audit, setup to-do list; ends at Show me around) | ✅ Done | ✅ Greenlit | ✅ **PR #18**, 22 Nov (merged) | `engines/engine-1-brain.md` |
 | **Engine 2 · Brand** (quick AI investigation during sign-up that researches the agent and builds their brand page) | ✅ Done | ✅ Greenlit | ✅ **PR #22**, 22 Nov (merged) | `engines/engine-2-brain.md` |
-| **Resmara sign-up tour** (new: starts with the finish pop-up showing brand and Facebook status with Show me around, then errors first, then where everything is, ends on Let's start your first campaign) | 📝 Draft | 👀 Mockup with Adam for review | — | `engines/resmara-signup-tour-engine.md` |
+| **Resmara sign-up tour** (finish pop-up, fixes first, one setup plan, tour, first campaign: build then pay to unlock; carries Engine 1's Facebook-only log-in and no teams) | ✅ Done | ✅ Greenlit | ✅ **PR #23**, 22 Nov | `engines/resmara-signup-tour-engine.md` |
 | Email campaigns, Digital ads and the Marketing overview (Team room) | 📝 Logged | — | — | Notes below |
 | **Engine 3 · Listing link** | Not started | — | — | — |
 | **Engine 4 · Campaign build** (photos, posts, post design) | Not started | — | — | — |
@@ -31,10 +31,9 @@ the sign-up tour PR, under `docs/journey/`.
 
 ## Up next
 
-1. Resmara sign-up tour: mock it up as one click-through (the finish pop-up, the tour, then the
-   first campaign's payment pop-up). Adam reviews it before it goes to Dan as one PR.
-2. Email campaigns, Digital ads and the Marketing overview.
-3. Engine 3 · Listing link, then Engines 4–8 in order.
+1. Email campaigns, Digital ads and the Marketing overview.
+2. Engine 3 · Listing link, then Engines 4–8 in order.
+3. The AI tutorial videos for the Setup page, and the Resmara setup session in Calendly.
 
 ## The new agent's path (decided 22 Nov)
 
