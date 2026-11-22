@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Resmara client journey: website to first campaign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=DM+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root{--navy:#12354d;--orange:#d94c0d;--sky:#e2f0f8;--sky2:#d8effd;--white:#fff}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#f6fafd;color:var(--navy);font-family:'DM Sans',system-ui,sans-serif;font-size:16px;line-height:1.5}
+  header{background:var(--navy);color:#fff;padding:44px 6vw 36px}
+  header .kick{font-size:12px;letter-spacing:.14em;font-weight:700;color:#fff;opacity:.85}
+  header h1{font-family:'Archivo',sans-serif;font-weight:800;font-size:clamp(30px,4vw,48px);line-height:1.05;margin:8px 0 12px;color:#fff}
+  header p{max-width:760px;margin:0;color:#fff;opacity:.92}
+  .legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:22px;font-size:14px;color:#fff}
+  .legend span{display:flex;align-items:center;gap:8px;color:#fff}
+  .legend i{display:inline-block;width:26px;height:6px;border-radius:3px}
+  .legend .lg-main i{background:var(--orange)}.legend .lg-br i{background:#fff}
+  nav.jump{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--sky2);display:flex;gap:6px;overflow-x:auto;padding:10px 6vw}
+  nav.jump a{flex:0 0 auto;text-decoration:none;color:var(--navy);font-size:13px;font-weight:600;border-radius:999px;padding:6px 12px;background:var(--sky)}
+  nav.jump a:hover{background:var(--sky2)}
+  main{padding:30px 6vw 80px;position:relative}
+  .spine{position:absolute;left:calc(6vw + 23px);top:30px;bottom:80px;width:6px;border-radius:3px;background:var(--orange)}
+  .station{position:relative;display:grid;grid-template-columns:52px 1fr;gap:22px;margin-bottom:46px;scroll-margin-top:70px}
+  .dot{width:52px;height:52px;border-radius:50%;background:var(--orange);color:#fff;display:grid;place-items:center;font-family:'Archivo',sans-serif;font-weight:800;font-size:20px;position:relative;z-index:2;box-shadow:0 0 0 6px #f6fafd}
+  .body{min-width:0}
+  .head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .head h2{font-family:'Archivo',sans-serif;font-weight:800;font-size:clamp(22px,2.4vw,30px);margin:8px 0 2px;color:var(--navy)}
+  .tag{font-size:12px;font-weight:700;letter-spacing:.08em;border-radius:999px;padding:3px 10px;background:var(--sky);color:var(--navy)}
+  .lead{margin:4px 0 14px;max-width:860px}
+  .row{display:grid;grid-template-columns:minmax(300px,520px) 1fr;gap:26px;align-items:start}
+  .mainshot{margin:0;background:#fff;border:3px solid var(--orange);border-radius:16px;overflow:hidden;cursor:zoom-in;box-shadow:0 10px 30px rgba(18,53,77,.12)}
+  .mainshot img{display:block;width:100%}
+  .mainshot figcaption{padding:10px 14px;font-size:14px;border-top:1px solid var(--sky2)}
+  .buttons{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+  .buttons li{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+  .buttons b.btn{flex:0 0 auto;background:var(--navy);color:#fff;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+  .buttons b.btn.o{background:var(--orange)}
+  .branches{position:relative;padding-left:26px}
+  .branches:before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:3px;border-radius:2px;background:var(--navy)}
+  .branches h3{margin:0 0 10px;font-size:13px;letter-spacing:.12em;font-weight:700;color:var(--navy)}
+  .bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  .br{position:relative;background:#fff;border:1px solid var(--sky2);border-radius:14px;overflow:hidden;box-shadow:0 4px 14px rgba(18,53,77,.06)}
+  .br:before{content:"";position:absolute;left:-27px;top:44px;width:26px;height:3px;background:var(--navy)}
+  .bgrid .br:not(:first-child):before{display:none}
+  .br img{display:block;width:100%;aspect-ratio:1280/860;object-fit:cover;object-position:top;cursor:zoom-in;border-bottom:1px solid var(--sky2)}
+  .br .t{padding:10px 12px 12px}
+  .br .t b{display:block;font-size:14px}
+  .br .t span{display:block;font-size:13px;margin-top:3px}
+  .br .t em{display:inline-block;font-style:normal;font-size:12px;font-weight:700;margin-top:6px;background:var(--sky);border-radius:999px;padding:2px 9px}
+  .br.text{background:var(--sky);border-color:var(--sky)}
+  .br.text .t{padding:14px}
+  .note{background:#fff;border-left:4px solid var(--orange);border-radius:10px;padding:10px 14px;margin-top:12px;font-size:14px;max-width:860px}
+  .end{display:grid;grid-template-columns:52px 1fr;gap:22px}
+  .end .dot{background:var(--navy)}
+  .end p{margin:12px 0 0;font-weight:600}
+  #lb{position:fixed;inset:0;background:rgba(18,53,77,.88);display:none;align-items:center;justify-content:center;z-index:50;padding:24px;cursor:zoom-out}
+  #lb.on{display:flex}
+  #lb figure{margin:0;max-width:min(1280px,96vw);max-height:92vh;display:flex;flex-direction:column;gap:10px}
+  #lb img{max-width:100%;max-height:82vh;object-fit:contain;border-radius:12px;background:#fff}
+  #lb figcaption{color:#fff;font-weight:600;text-align:center}
+  @media (max-width:900px){.row{grid-template-columns:1fr}.branches{padding-left:18px}.br:before{left:-19px;width:18px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="kick">RESMARA · CLIENT JOURNEY · 22 NOV 2026</div>
+  <h1>From the website to their first live campaign.</h1>
+  <p>Every screen a new agent sees, in order. The orange line is the main path. The branches off each stop show every version of that screen, depending on what they have set up and what they click. Click any screenshot to see it full size.</p>
+  <div class="legend"><span class="lg-main"><i></i>Main path</span><span class="lg-br"><i></i>Branches: other versions and where each button goes</span></div>
+</header>
+<nav class="jump" id="jump"></nav>
+<main><div class="spine" aria-hidden="true"></div><div id="stops"></div>
+  <div class="end"><div class="dot">✓</div><p>Their first campaign is live: posts going out, the ad running, leads coming in. From here the campaign engines take over.</p></div>
+</main>
+<div id="lb" role="dialog" aria-label="Screenshot" onclick="this.classList.remove('on')"><figure><img alt=""><figcaption></figcaption></figure></div>
+<script>
+const I = n => 'img/' + n + '.jpg';
+const STOPS = [
+ { id:'land', name:'Lands on the website', tag:'Website', shot:'s01-home', cap:'resmara.com',
+   lead:'They arrive at the homepage. Two buttons lead in, and both open the same log-in pop-up.',
+   buttons:[['Client Login','top right: opens Log in with Facebook (or My Dashboard if they’re already signed in on this browser)',1],['Let’s get started','opens the same Log in with Facebook pop-up',1]],
+   branches:[] },
+ { id:'login', name:'Log in with Facebook', tag:'Engine 1', shot:'s02-login', cap:'One door for new and returning clients',
+   lead:'New or returning, it’s the same button. A Facebook account is required; a personal one is fine.',
+   buttons:[['Continue with Facebook','opens Facebook’s own window',1]],
+   branches:[
+     {text:true, t:'No Facebook account', d:'“You’ll need one to use Resmara.” The link opens Facebook’s sign-up; they come back and press Continue with Facebook.', go:'Back to this pop-up'},
+     {text:true, t:'Returning client', d:'Facebook already knows them, so Continue with Facebook signs them straight in. No setup, no tour.', go:'Their dashboard'} ] },
+ { id:'facebook', name:'Facebook’s own window', tag:'Meta', shot:'s03-fb1', cap:'Continue as Jamie?',
+   lead:'This is Facebook’s window, not Resmara’s. They approve the Page, Instagram and ad account, and the permissions. Resmara can’t change how it looks.',
+   buttons:[['Continue as Jamie','choose what Resmara can access',1],['Cancel','back to Log in with Facebook']],
+   branches:[
+     {img:'s03-fb2', t:'Choose what Resmara can access', d:'Their Page, Instagram and ad account, ticked.', go:'Continue'},
+     {img:'s03-fb2-personal', t:'Nothing to choose yet', d:'Personal Facebook only: no Pages, no business Instagram, no ad account. They carry on anyway.', go:'Continue'},
+     {img:'s03-fb3', t:'Review what Resmara can do', d:'Posting, ads, insights and messages, all on.', go:'Save'},
+     {img:'s03-fb4', t:'Linked to Resmara', d:'Facebook confirms the link.', go:'Got it: back to Resmara'} ] },
+ { id:'check', name:'Resmara checks Facebook and builds their brand', tag:'Engines 1 + 2', shot:'s04-checking', cap:'Live checklist, locked until it finishes',
+   lead:'One pop-up that can’t be closed: signing in, finding the Page, checking Instagram and the ad account, looking at their posts, researching them and their brokerage, building the brand kit.',
+   buttons:[],
+   branches:[
+     {img:'s04-several', t:'They manage two Pages', d:'“Which Page is your business?” They pick one; they can change it later in Accounts.', go:'Carries on to the finish'},
+     {img:'s04-taken', t:'Page already on another Resmara account', d:'Blocked: one Page, one account. No teams.', go:'Contact us · Log in with a different Facebook'} ] },
+ { id:'finish', name:'The finish pop-up', tag:'Sign-up tour', shot:'s05-finish-ready', cap:'Everything set up',
+   lead:'Information only: their brand and their Facebook status. Nothing to fix here and nothing blocks them. One button.',
+   buttons:[['Show me around','starts the tour',1]],
+   branches:[
+     {img:'s05-finish-personal', t:'Personal Facebook and Instagram only', d:'The most common start. Page, Instagram and ad account: “Not set up yet”.', go:'Show me around'},
+     {img:'s05-finish-noIg', t:'No Instagram at all', d:'Instagram: “No Instagram yet”.', go:'Show me around'},
+     {img:'s05-finish-igPers', t:'Instagram is personal', d:'Page ready; Instagram not set up yet.', go:'Show me around'},
+     {img:'s05-finish-noPage', t:'No business Page', d:'Instagram needs a Page first.', go:'Show me around'},
+     {img:'s05-finish-noAd', t:'No ad account', d:'Posts are fine; the ad isn’t ready.', go:'Show me around'},
+     {img:'s05-finish-noCard', t:'Ad account has no card', d:'Ad account: “No card on it”.', go:'Show me around'},
+     {img:'s05-finish-noLic', t:'License number not found', d:'Brand card says “License number not found yet”.', go:'Show me around'} ] },
+ { id:'fixfirst', name:'Tour, first stop: anything that needs fixing', tag:'Sign-up tour', shot:'s06-tour-personal', cap:'“First, let’s get you set up for business.”',
+   lead:'If something needs setting up, the robot takes them there first, before the look around. The menu item that needs it gets an orange mark.',
+   buttons:[['Walk me through it','opens the setup plan (stop 7)',1],['Do it with our team','books a Resmara setup session in Calendly'],['Next','leaves it for later; it waits on Accounts'],['Skip tour','ends the tour']],
+   branches:[
+     {img:'s06-tour-ready', t:'Nothing to fix', d:'The tour goes straight to the Campaign button.', go:'Stop 8'},
+     {img:'s06-tour-noIg', t:'No Instagram at all', d:'“You’re starting with a personal Facebook and no Instagram yet.”', go:'Walk me through it'},
+     {img:'s06-tour-igPers', t:'Instagram is personal', d:'“Your Instagram isn’t a business account, so posts go to Facebook only.”', go:'Walk me through it'},
+     {img:'s06-tour-noPage', t:'No business Page', d:'“There’s no Facebook business Page connected yet.”', go:'Walk me through it'},
+     {img:'s06-tour-noAd', t:'No ad account', d:'“Your ad account is missing, so your listing ad can’t run yet.”', go:'Walk me through it'},
+     {img:'s06-tour-noCard', t:'Ad account has no card', d:'“Your ad account has no card on it.”', go:'Walk me through it'},
+     {img:'s06-tour-noLic', t:'License number missing', d:'Stops on My Brand: “One thing is missing from your brand.”', go:'Add it now'},
+     {img:'t1-team-button-tour', t:'Do it with our team (the button)', d:'Next to Walk me through it on the tour’s first stop.', go:'Opens the booking pop-up'},
+     {img:'s07-team', t:'Booking pop-up', d:'Calendly booking for a 30-minute screen share with someone who knows Meta. (Resmara setup event still to create.)', go:'Continue the tour'} ] },
+ { id:'setup', name:'The setup plan', tag:'Sign-up tour', shot:'s07-plan-page', cap:'All three things on one pop-up',
+   lead:'Walk me through it opens one checklist: the business Page, Instagram, the ad account. Anything they already have shows ticked. The open item has its steps, a tutorial and Check again.',
+   buttons:[['Do it with our team','on the open step: Calendly booking pop-up'],['See the tutorial','opens that guide on the Setup page in a new tab, with an AI-made explainer video'],['Check again','Resmara asks Meta right then',1],['Later','bottom of the pop-up: back to the tour; the rest waits on Accounts']],
+   branches:[
+     {img:'s07-tutorial-page', t:'See the tutorial: business Page', d:'The Setup page, opened at that guide. Video at the top, written steps below.', go:'Opens in a new tab'},
+     {img:'s07-tutorial-instagram', t:'See the tutorial: Instagram', d:'Switching to a business account (or making one).', go:'Opens in a new tab'},
+     {img:'s07-tutorial-ads', t:'See the tutorial: ad account', d:'Ad account and payment method.', go:'Opens in a new tab'},
+     {img:'s07-plan-notyet', t:'Check again: not done yet', d:'“Not quite yet. Meta still shows the same thing.”', go:'Try again'},
+     {img:'s07-plan-ig-switch', t:'Page done: Instagram opens', d:'Page ticks “Done just now”; step 2 opens.', go:'Check again'},
+     {img:'s07-plan-ig-create', t:'No Instagram at all', d:'Step 2 becomes “Create your Instagram business account”.', go:'Check again'},
+     {img:'s07-plan-ig-only', t:'Only Instagram needed', d:'Page and ad account already ticked.', go:'Check again'},
+     {img:'s07-plan-ad', t:'Ad account step', d:'Create one in Ads Manager and add a card. Posts go out without it.', go:'Check again'},
+     {img:'s07-plan-ad-card', t:'Ad account without a card', d:'Add a payment method in Meta’s Billing & payments.', go:'Check again'},
+     {img:'t2-team-button-plan', t:'Do it with our team (the button)', d:'On the open step, next to See the tutorial and Check again.', go:'Opens the booking pop-up'},
+     {img:'s07-team', t:'Booking pop-up', d:'Calendly: a 30-minute screen share with someone who knows Meta.', go:'Continue the tour'},
+     {img:'s07-plan-done', t:'All done', d:'One celebration: “You’re set up for business, Jamie.”', go:'Continue the tour'},
+     {img:'s08-tour-resumes', t:'Back on the tour', d:'The orange mark on Accounts is gone; the tour carries on.', go:'Stop 8'},
+     {img:'s07-license', t:'License number', d:'Typed and saved right in the pop-up.', go:'Save it'},
+     {img:'s07-license-saved', t:'License saved', d:'“Saved. It’s on every post now.”', go:'Continue the tour'} ] },
+ { id:'around', name:'Tour: a quick look around', tag:'Sign-up tour', shot:'s08-look-0', cap:'The Campaign button',
+   lead:'Short stops on each part of the dashboard, with Back and Next.',
+   buttons:[['Next','next stop',1],['Back','previous stop']],
+   branches:[
+     {img:'s08-look-1', t:'Your campaigns', d:'Active and completed.', go:'Next'},
+     {img:'s08-look-2', t:'My Brand', d:'The brand Resmara built. They can change it any time.', go:'Next'},
+     {img:'s08-look-3', t:'Billing', d:'“You don’t need a card yet.”', go:'Next'},
+     {img:'s08-look-4', t:'Accounts', d:'Their Facebook, Instagram and ad account.', go:'Next'},
+     {img:'s08-look-5', t:'Support', d:'A real person reads every request.', go:'Next'} ] },
+ { id:'tourend', name:'Tour ends: “Let’s start your first campaign.”', tag:'Sign-up tour', shot:'s09-tour-end', cap:'All you need is your listing link',
+   lead:'The tour finishes on the Campaign button.',
+   buttons:[['Let’s start your first campaign','opens the campaign form',1],['Maybe later','closes the tour; their dashboard']],
+   branches:[] },
+ { id:'newcamp', name:'New campaign: listing link and permission', tag:'Engine 4', shot:'s10-new-campaign', cap:'No card asked for here',
+   lead:'They paste their MLS public listing link and tick that they have permission to use the photos.',
+   buttons:[['Check my link','checks the listing, then builds',1],['Cancel','back to the dashboard']],
+   branches:[
+     {img:'s12-one-at-a-time', t:'One locked campaign already', d:'“Unlock 905 Laurel Bend first.” Only one built-but-unpaid campaign at a time.', go:'Unlock · Replace it'} ] },
+ { id:'build', name:'Resmara builds the whole campaign', tag:'Engine 4', shot:'s11-building', cap:'Live checklist',
+   lead:'Reads the listing, picks the best 14 photos, writes 14 days of posts in their voice, designs them in their brand, builds the ad and the listing page.',
+   buttons:[], branches:[] },
+ { id:'unlock', name:'Pay to unlock', tag:'Billing', shot:'s12-gate', cap:'Built and blurred, with Stripe’s card form right in the card',
+   lead:'The campaign opens blurred behind one card. Stripe’s card form (with Apple Pay and Google Pay) is embedded in it, so they never leave the page. “Save this card for future campaigns” is ticked by default.',
+   buttons:[['Unlock my campaign for $49','pays, saves the card if ticked, and lifts the blur',1],['Later','back to My campaigns; the campaign stays locked']],
+   branches:[
+     {img:'s12-declined', t:'Card declined', d:'“Your payment didn’t go through. Please check your card and try again.” The form stays right there.', go:'Try again'},
+     {img:'s12-later-list', t:'Later', d:'The card on My campaigns is blurred and “Locked”. Opening it shows the same pay card. Nothing posts until it’s paid.', go:'Unlock my campaign'},
+     {img:'s14-next-campaign-paid', t:'Next campaign, card saved', d:'No pay card: charged to the saved card when the build finishes, and it opens unlocked.', go:'Review and launch'} ] },
+ { id:'launch', name:'Review and launch', tag:'PR #17', shot:'s13-unlocked', cap:'Confirm launch details, the calendar, then Ready to go',
+   lead:'Unlocked. They confirm the go-live date and ad budget, approve the 14-day calendar, and launch.',
+   buttons:[['Confirm details','then approve the calendar',1],['Launch','posts and the ad go out from the go-live date']],
+   branches:[] },
+ { id:'live', name:'Their first campaign is live', tag:'Engine 6', shot:'s15-running', cap:'Leads, posts, the ad and seller reports',
+   lead:'The campaign page shows leads as they come in, from the ad, the posts and the listing page, plus the day 7 and day 14 reports.',
+   buttons:[], branches:[] }
+];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+document.getElementById('jump').innerHTML = STOPS.map((s,i) => `<a href="#${s.id}">${i+1}. ${esc(s.name.split(':')[0])}</a>`).join('');
+document.getElementById('stops').innerHTML = STOPS.map((s,i) => `
+ <section class="station" id="${s.id}"><div class="dot">${i+1}</div><div class="body">
+  <div class="head"><h2>${esc(s.name)}</h2><span class="tag">${esc(s.tag)}</span></div>
+  <p class="lead">${esc(s.lead)}</p>
+  <div class="row">
+   <div><figure class="mainshot" data-src="${I(s.shot)}" data-cap="${esc(s.name)}"><img src="${I(s.shot)}" alt="${esc(s.cap)}" loading="lazy"><figcaption>${esc(s.cap)}</figcaption></figure>
+    ${s.buttons.length ? `<ul class="buttons">${s.buttons.map(b => `<li><b class="btn${b[2] ? ' o' : ''}">${esc(b[0])}</b><span>${esc(b[1])}</span></li>`).join('')}</ul>` : ''}</div>
+   ${s.branches.length ? `<div class="branches"><h3>BRANCHES · ${s.branches.length}</h3><div class="bgrid">${s.branches.map(b => b.text
+      ? `<div class="br text"><div class="t"><b>${esc(b.t)}</b><span>${esc(b.d)}</span><em>${esc(b.go)}</em></div></div>`
+      : `<div class="br"><img src="${I(b.img)}" alt="${esc(b.t)}" loading="lazy" data-src="${I(b.img)}" data-cap="${esc(b.t)}"><div class="t"><b>${esc(b.t)}</b><span>${esc(b.d)}</span><em>${esc(b.go)}</em></div></div>`).join('')}</div></div>` : '<div></div>'}
+  </div></div></section>`).join('');
+const lb = document.getElementById('lb');
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-src]'); if (!el) return;
+  lb.querySelector('img').src = el.dataset.src; lb.querySelector('figcaption').textContent = el.dataset.cap; lb.classList.add('on');
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') lb.classList.remove('on'); });
+</script>
+</body>
+</html>
