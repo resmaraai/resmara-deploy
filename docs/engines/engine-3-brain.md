@@ -1,6 +1,6 @@
 # Engine 3 brain: Listing link
 
-**Status:** written and greenlit with Adam, sent to Dan 22 Nov · **Builds in:** PR #(number) · **Started:** 22 Nov 2026
+**Status:** written and greenlit with Adam, sent to Dan 22 Nov · **Builds in:** PR #24 · **Started:** 22 Nov 2026
 **What exists today:** `listing-link-engine.md` (the 21 Nov build spec). This brain replaces its pay-before-build and other-agent parts.
 **Clickable mockup:** `engine-3-screens/mockup.js` (preview only, not for deploy)
 
