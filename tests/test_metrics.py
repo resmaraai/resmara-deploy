@@ -61,7 +61,7 @@ def build_db():
     db = sessionmaker(bind=engine)()
 
     # users: one fresh sign-in, one stale sign-in, one that never signed in
-    fresh = User(email="fresh@example.com", hashed_password="x", last_login=now() - timedelta(hours=2))
+    fresh = User(email="fresh@agent-realty.com", hashed_password="x", last_login=now() - timedelta(hours=2))
     stale = User(email="stale@example.com", hashed_password="x", last_login=now() - timedelta(hours=40))
     never = User(email="never@example.com", hashed_password="x", is_admin=True)
     gone = User(email="gone@example.com", hashed_password="x", is_active=False)
@@ -120,10 +120,10 @@ def build_db():
     db.add_all([
         # latest message is from the client -> the team owes them an answer
         SupportTicket(user_id=fresh.id, subject="Post failed", status="open",
-                      messages=[{"from": "fresh@example.com", "text": "help", "at": now().isoformat()}]),
+                      messages=[{"from": "fresh@agent-realty.com", "text": "help", "at": now().isoformat()}]),
         # already answered -> nothing owed
         SupportTicket(user_id=fresh.id, subject="Invoice", status="in_progress",
-                      messages=[{"from": "fresh@example.com", "text": "?", "at": now().isoformat()},
+                      messages=[{"from": "fresh@agent-realty.com", "text": "?", "at": now().isoformat()},
                                 {"from": "admin", "text": "on it", "at": now().isoformat()}]),
         SupportTicket(user_id=never.id, subject="Old one", status="resolved",
                       messages=[{"from": "admin", "text": "done", "at": now().isoformat()}]),

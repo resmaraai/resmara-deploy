@@ -94,6 +94,11 @@ const run = code => vm.runInContext(code, ctx);
 function flush() {
   while (timers.length) timers.shift()();
 }
+// The link check answers through a promise (the server's, or the review copy's stand-in), so a
+// check has settled once its timers and the promise steps between them have all run.
+async function settle() {
+  for (let i = 0; i < 40; i++) { flush(); await new Promise(r => setImmediate(r)); }
+}
 
 const URL_A = 'https://www.flexmls.com/share/EpNjd/892-Coggins-Street,-Redding,-CA-96003';
 const URL_B = 'https://www.flexmls.com/share/Qm4Tt/742-Evergreen-Terrace,-Springfield,-OR-97403';
@@ -148,12 +153,22 @@ console.log('\n[the typed address wins over the link slug]');
   ok('...and says the address came from the agent, not the link', d.addressSource === 'manual', d.addressSource);
 }
 
+console.log('\n[a link with no home on it is turned away, not green-lit]');
+{
+  const f = formWith('https://www.example.com/about-us');
+  run('draft = {}');
+  run('ncCheck')(f);
+  await settle();
+  ok('the form is not green', f.dataset.state === 'none', f.dataset.state);
+  ok('no draft is written for it', !run('draft').address, JSON.stringify(run('draft')));
+}
+
 console.log('\n[an empty address is filled from the link, and can still be edited]');
 {
   const f = formWith(URL_A);
   run('draft = {}');
   run('ncCheck')(f);
-  flush();
+  await settle();
   const d = run('draft');
   ok('the link slug becomes the address', /892 Coggins/.test(d.address || ''), d.address);
   ok('...and is shown in the fields so it can be corrected', /892 Coggins/.test(f.street.value), f.street.value);
@@ -173,12 +188,12 @@ console.log('\n[a check still waiting cannot paint over the link you replaced]')
   run('ncCheck')(f);                 // timers queued, nothing delivered yet
   f.url.value = URL_B;               // the person pastes the next listing
   run('ncReset')(f);                 // what the input handler does
-  flush();                           // the first check finally answers
+  await settle();                    // the first check finally answers
   const d = run('draft');
   ok('the replaced link writes no draft', !d || !d.address, JSON.stringify(d));
   ok('the form is not painted green for the old link', f.dataset.state === 'empty', f.dataset.state);
   run('ncCheck')(f);
-  flush();
+  await settle();
   ok('the new link checks on its own', /742 Evergreen|Springfield|OR/.test(run('draft').address || ''),
      run('draft').address);
 }

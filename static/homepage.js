@@ -1,20 +1,21 @@
-function home(){
+const GOOGLE_FONTS=["Playfair Display", "Jost", "Inter", "Roboto", "Open Sans", "Lato", "Montserrat", "Poppins", "Raleway", "Nunito", "Source Sans 3", "Work Sans", "DM Sans", "DM Serif Display", "Libre Baskerville", "Lora", "Merriweather", "Cormorant Garamond", "EB Garamond", "Crimson Text", "Cinzel", "Bodoni Moda", "Libre Caslon Text", "Spectral", "Prata", "Marcellus", "Italiana", "Josefin Sans", "Josefin Slab", "Archivo", "Archivo Black", "Manrope", "Outfit", "Plus Jakarta Sans", "Sora", "Urbanist", "Figtree", "Mulish", "Karla", "Rubik", "Barlow", "Barlow Condensed", "Oswald", "Bebas Neue", "Anton", "League Spartan", "Kumbh Sans", "Lexend", "Quicksand", "Cabin", "PT Sans", "PT Serif", "Noto Sans", "Noto Serif", "IBM Plex Sans", "IBM Plex Serif", "Fraunces", "Newsreader", "Syne", "Space Grotesk", "Red Hat Display", "Albert Sans", "Epilogue", "Hanken Grotesk", "Instrument Sans", "Instrument Serif", "Gilda Display", "Tenor Sans", "Forum", "Bellefair", "Cormorant", "Old Standard TT", "Abril Fatface", "Yeseva One", "Alegreya", "Alegreya Sans", "Vollkorn", "Cardo", "Domine", "Arvo", "Roboto Slab", "Zilla Slab", "Bitter", "Rokkitt", "Great Vibes", "Allura", "Parisienne", "Dancing Script", "Sacramento", "Pinyon Script", "Satisfy", "Kaushan Script", "Caveat", "Amatic SC", "Teko", "Exo 2", "Titillium Web", "Ubuntu", "Hind", "Assistant", "Heebo", "Varela Round", "Nanum Myeongjo", "Gloock", "Bricolage Grotesque", "Onest", "Geologica", "Golos Text", "Literata", "Petrona", "Young Serif"];
+function home(){if(typeof brandLeaveGuard==='function'&&brandLeaveGuard(()=>home()))return;
  if(window.stopResmaraGuide)stopResmaraGuide();
  location.hash='';document.title='Resmara — Your listing gets attention. Your clients get you.';
  app.innerHTML=`<div class="marketing-home">
  ${siteNav("home")}
  <main>
  <section class="home-hero">
-  <div class="home-hero-copy"><h1>More eyes on<br> your listing.<br><span>More time for<br> your clients.</span></h1><p>Resmara takes hours of marketing off your plate. It learns your brand, turns every listing into 14 days of designed posts and digital ads, then launches them, tracks social engagement and leads, and reports on it all for you. While you sleep and work, it keeps your listing in front of the market, so you can spend your time with your clients. And every campaign makes your next one better.</p><div class="home-actions"><button class="home-primary" onclick="newCampaign()">Let’s get started</button><a href="#home-how" onclick="document.querySelector('#home-how').scrollIntoView({behavior:'smooth'});return false">See how it works ↓</a></div></div>
+  <div class="home-hero-copy"><h1>More eyes on<br> your listing.<br><span>More time for<br> your clients.</span></h1><p>Resmara takes hours of marketing off your plate. It learns your brand, turns every listing into 14 days of designed posts and digital ads, then launches them, tracks social engagement and leads, and reports on it all for you. While you sleep and work, it keeps your listing in front of the market, so you can spend your time with your clients. And every campaign makes your next one better.</p><div class="home-actions"><button class="home-primary" onclick="newCampaign()">Let’s get started</button><a href="#home-how" onclick="document.querySelector('#home-how').scrollIntoView({behavior:'smooth'});return false">See how it works</a></div></div>
   <div class="home-visual"><div class="home-hello"><b>Hi, I’m Resmara.</b><span>Your Real Estate Social Marketing, Analytics &amp; Reporting Assistant.</span></div>${homeWorld()}</div>
  </section>
- <section class="home-workload"><div class="home-section home-workload-inner"><div><span class="home-kicker">THE PROBLEM</span><h2>You have clients.<br><span>Not hours to<br>make content.</span></h2><p>A new listing has a short window to get noticed. Doing it properly means two weeks of posts, branded creative, ad setup, scheduling, watching the numbers and reporting back to your seller.</p><p>Most agents don’t have those hours. So the listing gets one “Just listed” post, and the momentum fades.</p></div><div class="home-task-stack"><div><span>✎</span><b>Writing and designing posts</b><small>Every day, in your look, about this home.</small></div><div><span class="ico-trend"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></span><b>Running the ads</b><small>Setup, targeting, budget, housing rules.</small></div><div><span>▦</span><b>Reporting to your seller</b><small>“How’s the marketing going?”</small></div><p>RESMARA DOES ALL OF IT. YOU STAY WITH YOUR CLIENTS.</p></div></div></section>
+ <section class="home-workload"><div class="home-section home-workload-inner"><div><span class="home-kicker">THE PROBLEM</span><h2>You have clients.<br><span>Not hours to<br>make content.</span></h2><p>A new listing has a short window to get noticed. Doing it properly means two weeks of posts, branded creative, ad setup, scheduling, watching the numbers and reporting back to your seller.</p><p>Most agents don’t have those hours. So the listing gets one “Just listed” post, and the momentum fades.</p></div><div class="home-problem-video"><video src="video/resmara-new-listing-30s.mp4" poster="video/resmara-new-listing-30s.jpg" playsinline preload="metadata" aria-label="Resmara in 30 seconds: from a new listing to a running campaign" onended="this.removeAttribute('controls');this.load();this.nextElementSibling.hidden=false"></video><button type="button" class="hpv-play" aria-label="Play the 30-second video" onclick="const v=this.previousElementSibling;this.hidden=true;v.controls=true;v.play()"><span></span></button></div></div></section>
  <section class="home-section home-how" id="home-how"><div class="home-section-heading"><div><span class="home-kicker">WHAT RESMARA DOES FOR YOU</span><h2>Learn. Link. Build.<br><span>Manage.</span></h2></div></div>
   <ol class="home-steps">
-   <li><span class="home-step-num">1</span><small>ONCE</small><h3>It learns you</h3><p>Using AI, Resmara audits your business, your brand and your look and feel, and builds your brand kit for you. You just check it’s right.</p><a href="#home-brand" onclick="document.querySelector('#home-brand').scrollIntoView({behavior:'smooth'});return false">See a brand profile ↓</a></li>
-   <li class="home-step-you"><span class="home-step-num">2</span><small>YOU · 30 SECONDS</small><h3>You add your link</h3><p>Put in the link to your listing. Resmara checks it has everything it needs to go live. That’s your part.</p><a href="#home-link" onclick="document.querySelector('#home-link').scrollIntoView({behavior:'smooth'});return false">See how ↓</a></li>
-   <li><span class="home-step-num">3</span><small>MINUTES</small><h3>It builds the whole campaign</h3><p>It picks the best photos, writes one story about this home across 14 designed posts, and builds the ads. Change anything you like, or just hit go live.</p><a href="#home-campaign" onclick="document.querySelector('#home-campaign').scrollIntoView({behavior:'smooth'});return false">See a campaign ↓</a></li>
-   <li><span class="home-step-num">4</span><small>14 DAYS</small><h3>It launches, manages and reports</h3><p>Posts go out at the best times for your area, the ads run, buyer interest gets flagged for you, and you get day 7 and day 14 reports to share with your seller.</p><a href="#home-report" onclick="document.querySelector('#home-report').scrollIntoView({behavior:'smooth'});return false">See a report ↓</a></li>
+   <li><span class="home-step-num">1</span><small>ONCE</small><h3>It learns you</h3><p>Using AI, Resmara audits your business, your brand and your look and feel, and builds your brand kit for you. You just check it’s right.</p><a href="#home-brand" onclick="document.querySelector('#home-brand').scrollIntoView({behavior:'smooth'});return false">See a brand profile</a></li>
+   <li class="home-step-you"><span class="home-step-num">2</span><small>YOU · 30 SECONDS</small><h3>You add your link</h3><p>Put in the link to your listing. Resmara checks it has everything it needs to go live. That’s your part.</p><a href="#home-link" onclick="document.querySelector('#home-link').scrollIntoView({behavior:'smooth'});return false">See how</a></li>
+   <li><span class="home-step-num">3</span><small>MINUTES</small><h3>It builds the whole campaign</h3><p>It picks the best photos, writes one story about this home across 14 designed posts, and builds the ads. Change anything you like, or just hit go live.</p><a href="#home-campaign" onclick="document.querySelector('#home-campaign').scrollIntoView({behavior:'smooth'});return false">See a campaign</a></li>
+   <li><span class="home-step-num">4</span><small>14 DAYS</small><h3>It launches, manages and reports</h3><p>Posts go out at the best times for your area, the ads run, buyer interest gets flagged for you, and you get day 7 and day 14 reports to share with your seller.</p><a href="#home-report" onclick="document.querySelector('#home-report').scrollIntoView({behavior:'smooth'});return false">See a report</a></li>
   </ol>
  </section>
  <section class="home-section home-samples" id="home-brand"><div class="home-section-heading"><div><span class="home-kicker">STEP 1 · IT LEARNS YOU</span><h2>Your brand.<br><span>Down to the details.</span></h2></div><p>You don’t have to do a thing. Through the power of AI, Resmara audits who you are: your business, your brand, your look and your feel. It builds a complete brand kit for you, and every post and ad is made from it, so your content is custom and unique to you. You just make sure it’s right.</p></div><div class="home-sample-layout"><div class="home-brand-profile mb mb-preview"><div inert>${brandKitSections({...SAMPLE_BRAND,demo:true,logo:'',headshot:''})}<div class="mb-foot"><div class="mb-status"><span>✓ Researched ${esc(SAMPLE_BRAND.researched||'')}</span></div></div></div>${scrollHint('Scroll to see the whole brand kit')}</div><div class="home-brand-creative"><div class="sample-tabs" role="tablist" aria-label="Branded creative previews"><button role="tab" id="tab-social" aria-selected="true" aria-controls="sample-output" onclick="sampleOutput('social')">Social post</button><button role="tab" id="tab-ad" aria-selected="false" aria-controls="sample-output" onclick="sampleOutput('ad')">Digital ad</button></div><div id="sample-output" role="tabpanel" aria-labelledby="tab-social"></div></div></div></section>
@@ -25,14 +26,16 @@ function home(){
  <div class="home-control-row"><div><b>Change anything.</b><span>Open a post to swap the photo, rewrite the headline or caption, or move it to another day.</span></div><div><b>Or don’t.</b><span>Hit <em>Go live</em> and it runs exactly as built. Your choice, every campaign.</span></div><div><b>Pause in one click.</b><span>Went pending? Pause everything instantly, and turn it back on if it falls through.</span></div></div>
  <div class="home-leads-layout home-leads-in-campaign"><div><span class="home-ab">B</span><span class="home-kicker">WHILE IT RUNS · BUYER INTEREST</span><h3 class="home-leads-title">It tracks buyer interest. And tells you.</h3><p>While your campaign runs, Resmara watches every comment on your Facebook and Instagram posts and your ad. When one sounds like real interest, like a question about the price, a showing or “is it still available?”, it tags it as a lead.</p><ul class="home-leads-points"><li><b>On your campaign.</b> A “new leads” badge, with each person’s name, what they said and which post.</li><li><b>In your inbox.</b> An email the moment it happens, with a button to reply.</li><li><b>Your call.</b> Mark leads handled, remove ones that aren’t, or add your own.</li></ul></div>
 <div class="lead-mail home-lead-mail" aria-label="Sample lead alert email"><div class="lead-mail-meta"><div><b>From</b> Resmara &lt;support@resmara.com&gt;</div><div><b>Subject</b> New lead on The Oakridge House: Sarah Mitchell</div></div><div class="lead-mail-body"><div class="lead-mail-top"><img class="pr-logo" src="resmara-logo-white.png" alt="Resmara"><span>NEW SOCIAL LEAD</span></div><h3>Sarah Mitchell is interested in The Oakridge House.</h3><div class="lead-mail-quote"><p>“Is this still available? We’d love to see it this weekend.”</p><small>Instagram · on “Where summer actually happens”</small></div><p>Reply while they’re still looking. Resmara spotted this comment and thinks it shows real interest in the home.</p><div class="lead-mail-btns"><span class="lm-primary">Reply on Instagram</span><span class="lm-secondary">See all leads in Resmara</span></div></div></div></div>
+ <div class="home-leads-layout home-leads-in-campaign home-site"><div><span class="home-ab">C</span><span class="home-kicker">WHILE IT RUNS · YOUR LISTING WEBSITE</span><h3 class="home-leads-title">It builds the home its own website. And tracks every lead.</h3><p>Every campaign comes with a simple website for the home, made in your brand: the photos, the price, the details and you. Every post and your ad link straight to it, so you never have to find or paste a link.</p><ul class="home-leads-points"><li><b>Built for you.</b> Nothing to set up and no link to supply.</li><li><b>Leads straight to you.</b> When someone sends the form or taps Call, you get an email and they’re listed on your campaign.</li><li><b>In your reports.</b> Visits, form leads and calls, counted alongside your posts and ad.</li></ul></div>
+ <div class="home-site-preview"><div class="lp-frame"><div class="lp-bar">homes.resmara.com/1248-oakridge-drive</div><div class="lp-view" id="home-site-view"></div></div></div></div>
  </section>
  <section class="home-results" id="home-report"><div class="home-section home-results-layout"><div><span class="home-kicker">STEP 4 · CLEAR RESULTS. BETTER CONVERSATIONS.</span><h2>Go back to your<br><span>seller with confidence.</span></h2><p>“How’s the marketing going?” now has a real answer. On day 7 and day 14 you get clear reports that are easy to understand, for you and your client: how many people saw the home, which posts did best and how many people clicked through to the listing.</p><div class="home-report-moments"><div><span>07</span><div><h3>A confident check-in.</h3><p>Reach, engagement and listing clicks so far, plus your top posts.</p></div></div><div><span>14</span><div><h3>A clear way forward.</h3><p>The whole campaign in one place, and the option to run a fresh round if the home is still on the market.</p></div></div></div></div><div class="home-seller-preview"><div class="home-report-switch" role="tablist" aria-label="Seller report previews"><button role="tab" id="seller-tab-7" aria-selected="true" aria-controls="home-report-preview" onclick="homeSellerReport(7)">Day 7</button><button role="tab" id="seller-tab-14" aria-selected="false" aria-controls="home-report-preview" onclick="homeSellerReport(14)">Day 14</button></div><div id="home-report-preview" role="tabpanel" aria-labelledby="seller-tab-7"></div></div></div></section>
  <section class="home-learn"><div class="home-section home-learn-inner"><div><span class="home-kicker">WHAT MAKES RESMARA DIFFERENT</span><h2>The secret?<br><span>Every campaign makes the next one smarter.</span></h2><p>Resmara doesn’t start from scratch each time. It keeps learning what you like and what your audience responds to, so every listing you launch looks more like you and works harder than the last.</p><div class="home-learn-points"><div><span>✎</span><div><b>It learns from your edits</b><small>Shorten a caption or swap a twilight shot for daytime, and it remembers for next time.</small></div></div><div><span>↗</span><div><b>It learns from what performs</b><small>The posts and ads that get the most reach, saves and clicks shape what it makes next.</small></div></div><div><span>◷</span><div><b>It posts when your people are online</b><small>Posting times are tuned to when your audience is most active, and adjusted as the numbers come in.</small></div></div></div></div>
   <div class="home-learned-card"><div class="home-learned-head"><span class="robot-avatar" aria-hidden="true"></span><div><b>What Resmara learned about you</b><small>After 3 campaigns · you can change any of these</small></div></div><ul><li><i>✎</i>Keeps captions under 40 words</li><li><i>✎</i>Prefers daytime exteriors to twilight</li><li><i>✎</i>No emoji in captions</li><li><i>↗</i>Question posts get 2× the comments on your page</li><li><i>↗</i>Kitchen and pool photos lead to the most listing clicks</li><li><i>◷</i>Your audience is most active around 7:40 AM and 6:15 PM</li></ul><div class="home-learned-growth"><span>LISTING CLICKS PER CAMPAIGN</span><div><i style="--h:46%"><b>1st</b></i><i style="--h:68%"><b>2nd</b></i><i style="--h:92%"><b>3rd</b></i></div><small>Illustrative example</small></div></div></div></section>
- <section class="home-section home-price" id="home-pricing"><div><span class="home-kicker">DONE FOR YOU. ON YOUR TERMS.</span><h2>All that.<br>$49 per listing.<br><span>No subscription.</span></h2><p>One listing, one 14-day campaign, one price. You pay when the campaign is built, and nothing renews. Want another two weeks on the same home? A fresh round of all-new posts and a new ad is $39.</p></div><div class="home-price-detail"><h3>Every listing launch includes</h3><ul><li>Your brand profile, built and kept up to date</li><li>14 designed posts with captions and hashtags</li><li>A digital ad, set up and run for you</li><li>Posting at the best times for your area</li><li>Go live, review first, or pause anytime</li><li>Day 7 and day 14 seller reports</li></ul><p>You choose the ad budget ($50 suggested). Ad spend is paid to Meta from your own ad account, separate from your Resmara fee.</p><button class="home-primary" onclick="newCampaign()">Launch your next listing</button></div></section>
+<section class="home-section home-price" id="home-pricing"><div><span class="home-kicker">DONE FOR YOU. ON YOUR TERMS.</span><h2>All that.<br>$49 per listing.<br><span>No subscription.</span></h2><p>One listing, one 14-day campaign, one price. You pay when the campaign is built, and nothing renews. Want another two weeks on the same home? A fresh round of all-new posts and a new ad is $39.</p></div><div class="home-price-detail"><h3>Every listing launch includes</h3><ul><li>Your brand profile, built and kept up to date</li><li>14 designed posts with captions and hashtags</li><li>A digital ad, set up and run for you</li><li>Posting at the best times for your area</li><li>Go live, review first, or pause anytime</li><li>A website for the home that tracks its leads</li><li>Day 7 and day 14 seller reports</li></ul><p>You choose the ad budget ($50 suggested). Ad spend is paid to Meta from your own ad account, separate from your Resmara fee.</p><button class="home-primary" onclick="newCampaign()">Launch your next listing</button></div></section>
  <section class="home-finish"><span class="home-mini-robot" aria-hidden="true"></span><h2>Let’s give your next listing<br>a proper launch.</h2><button class="home-primary" onclick="newCampaign()">Let’s get started</button></section>
  </main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
- homeCalendarState={start:new Date('2026-11-02T12:00:00'),month:new Date('2026-11-01T12:00:00'),selected:0};renderHomeMonth();homeSellerReport(7);if(window.sampleOutput)sampleOutput('social');
+ homeCalendarState={start:new Date('2026-11-02T12:00:00'),month:new Date('2026-11-01T12:00:00'),selected:0};renderHomeMonth();homeSellerReport(7);homeSitePreview();if(window.sampleOutput)sampleOutput('social');
 }
 function homeWorld(){return `<div class="home-world" role="img" aria-label="Resmara orchestrating social posts, digital advertising, a campaign calendar and analytics around your property"><span class="home-world-card hw-social"></span><span class="home-world-card hw-ad"></span><span class="home-world-card hw-calendar"></span><span class="home-world-card hw-report"></span><img class="home-world-house" src="resmara-house-complete-v1.png" alt=""><img class="home-world-robot" src="resmara-robot-clean-v1.png" alt=""></div>`}
 let homeCalendarState;
@@ -66,7 +69,7 @@ function homeSellerReport(day){const target=document.querySelector('#home-report
  target.innerHTML=`<div class="pr-home">${propertyReportHTML(demoReportData({address:'The Oakridge House',area:'Austin, TX',image:'sample/post-01.jpg'},day))}</div>${scrollHint('Scroll to see the full report')}`;target.scrollTop=0;target.classList.remove('scrolled');armScrollHint(target)}
 
 function siteNav(active){
- const links=[];
+ const links=[['home','Home','home'],['setup-guides','Setup','setupGuides']];
  return `<header class="home-nav shared-nav">${logo}<nav aria-label="Main navigation">${links.map(([id,label,fn])=>`<a href="#${id==='home'?'':id}" ${active===id?'aria-current="page"':''} onclick="${fn}();return false">${label}</a>`).join('')}</nav><button class="alt" onclick="clientAccess()">${state.clientSignedIn?'My Dashboard':'Client Login'}</button></header>`;
 }
 function footerLinks(){
@@ -191,7 +194,7 @@ function submitTestClient(form,creating){
   // back from /api/boosts, so an empty local list here is never a lost listing.
   state={...state,name:(account&&account.name)||state.name||name,email,clientSignedIn:true,campaigns:priorOwner&&priorOwner!==email?[]:(state.campaigns||[]),connected:!!state.connected};
   try{localStorage.setItem('resmara',JSON.stringify(state))}catch{}
-  modal.close();if(creating){state.firstRun=true;state.metaRequired=true;persist();dashboard();setTimeout(()=>onboard(0),400)}else if(typeof metaNagging==='function'&&metaNagging()){dashboard('accounts');setTimeout(()=>onboard(0),400)}else{dashboard();if(state.firstRun&&!state.tourDone)setTimeout(()=>onboard(0),400);else toast('Signed in as '+email);}
+  modal.close();if(creating){state.firstRun=true;state.metaRequired=true;persist();dashboard();setTimeout(()=>onboard(0),400)}else if(typeof metaGateOnLogin==='function'){metaGateOnLogin();toast('Signed in as '+email)}else{dashboard();if(state.firstRun&&!state.tourDone)setTimeout(()=>onboard(0),400);else toast('Signed in as '+email);}
   if(window.RM&&RM.brandProfile){RM.brandProfile().then(remote=>{
     if(!remote||typeof remote!=='object')return;
     // The account's own profile, if it has one, is the copy to keep - it is the one that
@@ -276,20 +279,91 @@ function brandKitSections(k){
   <header class="mb-head"><div class="mb-id">${k.logo?`<img src="${esc(k.logo)}" alt="Logo">`:`<span class="mb-mono lg">${esc(initials)}</span>`}<div><b>${esc(k.brokerage||k.agent)}</b><small>${esc(k.agent)}${k.market?' · '+esc(k.market):''}</small></div></div><span class="mb-tag">BRAND KIT</span></header>
   <section class="mb-sec"><h4>YOU</h4><div class="mb-grid">${field('agent','Agent name',k.agent,'Website')}${field('company','Brokerage',k.brokerage,'Brokerage profile')}${field('license','License number',k.license,'Brokerage profile')}${field('website','Website',k.website,'','url')}${field('market','Markets you serve',k.market,'Your listings')}${field('brandLink','Instagram or brand guide',k.brandLink,'Found','url')}</div></section>
   <section class="mb-sec"><h4>LOGO &amp; HEADSHOT</h4><div class="mb-assets">${img('logo','Logo',k.logo,'Found on your website')}${img('headshot','Headshot',k.headshot,'Found on your brokerage profile')}</div></section>
-  <section class="mb-sec"><h4>COLOURS</h4><div class="mb-swatches">${k.palette.map(([role,hex],i)=>`<label class="mb-sw"><input type="color" value="${esc(hex)}" oninput="this.nextElementSibling.querySelector('code').textContent=this.value.toUpperCase();brandColoursSync(this.form)"><span><b>${esc(role)}</b><code>${esc(hex.toUpperCase())}</code></span></label>`).join('')}</div><input type="hidden" name="colours" value="${esc(k.palette.map(p=>p[1]).join(', '))}"></section>
-  <div class="mb-two"><section class="mb-sec"><h4>TYPOGRAPHY</h4><p class="mb-type-h" style="font-family:'${esc(k.fonts[0])}',serif">The long view</p><small>Headlines · ${esc(k.fonts[0])}</small><p class="mb-type-b" style="font-family:'${esc(k.fonts[1])}',sans-serif">Morning light, wide oak floors and room to breathe.</p><small>Body · ${esc(k.fonts[1])}</small></section>
+  <section class="mb-sec"><h4>COLOURS</h4><div class="mb-swatches">${k.palette.map(([role,hex],i)=>`<label class="mb-sw"><input type="color" value="${esc(hex)}" oninput="this.nextElementSibling.querySelector('code').textContent=this.value.toUpperCase();brandColoursSync(this.form)"><span><b>${esc(role)}</b><code>${esc(hex.toUpperCase())}</code></span></label>`).join('')}</div><small>Click a colour to change it.</small><input type="hidden" name="colours" value="${esc(k.palette.map(p=>p[1]).join(', '))}"></section>
+  <div class="mb-two"><section class="mb-sec"><h4>TYPOGRAPHY</h4><p class="mb-type-h" style="font-family:'${esc(k.fonts[0])}',serif">The long view</p>${fontPicker('fontHead','Headlines',k.fonts[0],'.mb-type-h')}<p class="mb-type-b" style="font-family:'${esc(k.fonts[1])}',sans-serif">Morning light, wide oak floors and room to breathe.</p>${fontPicker('fontBody','Body',k.fonts[1],'.mb-type-b')}<small>Resmara picked these to match your brand. Change either one any time.</small></section>
   <section class="mb-sec"><h4>VOICE</h4><textarea name="voice" rows="2">${esc(k.voice)}</textarea><div class="mb-chips">${k.use.map(w=>`<span class="ok">“${esc(w)}”</span>`).join('')}${k.avoid.map(w=>`<span class="no">${esc(w)}</span>`).join('')}</div></section></div>
-  <div class="mb-two"><section class="mb-sec"><h4>YOUR LOOK</h4><div class="mb-looks">${['Modern','Classic','Rustic','Match my brand'].map(t=>`<button type="button" class="${t===k.theme?'on':''}" onclick="state.brand={...state.brand,theme:'${t}'};persist();this.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===this))">${t}</button>`).join('')}</div><small>Change your look any time. New campaigns use it.</small></section>
+  <div class="mb-two"><section class="mb-sec"><h4>YOUR LOOK</h4><input type="hidden" name="theme" value="${esc(k.theme)}"><div class="mb-looks">${['Modern','Classic','Rustic','Match my brand'].map(t=>`<button type="button" class="${t===k.theme?'on':''}" onclick="const f=this.form;f.elements.theme.value='${t}';this.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===this));brandMarkDirty()">${t}</button>`).join('')}</div><small>Change your look any time. New campaigns use it once you save.</small></section>
   <section class="mb-sec"><h4>ON EVERY POST</h4><ul class="mb-legal">${k.legal.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><small>Your brokerage’s rules, checked.</small></section></div>
   <section class="mb-sec"><h4>WHERE RESMARA LOOKED</h4><div class="mb-sources">${k.sources.map(([t,v])=>`<span>✓ <b>${esc(t)}</b> ${esc(v)}</span>`).join('')}</div></section>
   `}
 function myBrand(){
  const k=brandKitData();
  $('#content').innerHTML=`<div class="welcome mb-page-head"><h1>My Brand</h1></div><div class="notice page-intro">This is the brand kit Resmara built from your website, socials and brokerage. Every post and ad follows it, so check it over, fix anything that’s off and save.</div>
- <form class="mb" onsubmit="saveBrandProfile(event,this,false)">${brandKitSections(k)}<p class="fine" data-brand-error role="alert"></p>
-  <div class="mb-foot"><div class="mb-status"><button class="mb-research" type="button" onclick="toast('Resmara is researching your brand again. This takes a minute.')">Research again</button><button class="mb-research" type="button" onclick="brandFromPage(this)">Build from my Facebook Page</button><span>✓ Researched ${esc(k.researched||'from your website')}</span></div><button class="campaign-primary">Save my brand</button></div>
+ <form class="mb" onsubmit="saveBrandProfile(event,this,false)" oninput="brandMarkDirty()" onchange="brandMarkDirty()">${brandKitSections(k)}<p class="fine" data-brand-error role="alert"></p>
+  <div class="mb-foot"><div class="mb-status"><button class="mb-research" type="button" onclick="brandResearchAgain(this)">Research again</button><span>✓ Researched ${esc(k.researched||'from your website')}</span><span class="mb-unsaved" hidden>Unsaved changes</span></div><button class="campaign-primary">Save my brand</button></div>
  </form>`;
+ window.brandDirty=false;
+ [k.fonts[0],k.fonts[1]].forEach(loadGoogleFont);
 }
+// ---- My Brand: fonts, unsaved changes ------------------------------------------------------
+// Any Google font: the name is loaded from Google Fonts on the fly so the preview shows it.
+function loadGoogleFont(name){
+ name=String(name||'').trim();if(!name)return;const id='gf-'+name.replace(/\W+/g,'-').toLowerCase();if(document.getElementById(id))return;
+ const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family='+encodeURIComponent(name).replace(/%20/g,'+')+':wght@400;600;700&display=swap';document.head.appendChild(l);
+}
+// A font picker that looks like our drop-downs: the button shows the current font in itself;
+// the list shows every font written in its own typeface with a short sample, with a search box.
+// Any Google font can be used: type its name and choose "Use … from Google Fonts".
+function fontPicker(name,label,value,target){
+ return `<div class="mb-font"><span>${label}</span><input type="hidden" name="${name}" value="${esc(value)}"><button type="button" class="mb-fontpick" data-target="${target}" onclick="openFontPicker(this)" style="font-family:'${esc(value)}',${target==='.mb-type-h'?'serif':'sans-serif'}"><b>${esc(value)}</b><i class="mb-fontpick-chev" aria-hidden="true"></i></button></div>`;
+}
+function loadFontBatch(names,sample){
+ const fresh=names.filter(n=>!loadFontBatch.done.has(n));if(!fresh.length)return;fresh.forEach(n=>loadFontBatch.done.add(n));
+ for(let i=0;i<fresh.length;i+=20){
+  const fam=fresh.slice(i,i+20).map(n=>'family='+encodeURIComponent(n).replace(/%20/g,'+')).join('&');
+  const chars=[...new Set((fresh.slice(i,i+20).join('')+sample+'0123456789').split(''))].join('');
+  const l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?'+fam+'&display=swap&text='+encodeURIComponent(chars);document.head.appendChild(l);
+ }
+}
+loadFontBatch.done=new Set();
+function openFontPicker(btn){
+ closeFontPicker();
+ const wrap=btn.closest('.mb-font'),input=wrap.querySelector('input[type=hidden]'),head=btn.dataset.target==='.mb-type-h';
+ const sample=head?'The long view':'Morning light and room to breathe.';
+ loadFontBatch(GOOGLE_FONTS,sample+'Use from Google Fonts');
+ const panel=document.createElement('div');panel.className='mb-fontlist';
+ panel.innerHTML=`<input type="search" class="mb-fontsearch" placeholder="Search Google fonts" aria-label="Search fonts"><div class="mb-fontopts" role="listbox"></div>`;
+ document.body.appendChild(panel);panel.dataset.for=input.name;
+ // Fixed to the button, so the brand kit's rounded card can't clip it.
+ const place=()=>{const r=btn.getBoundingClientRect(),below=window.innerHeight-r.bottom;panel.style.left=r.left+'px';panel.style.width=r.width+'px';
+  if(below<300&&r.top>below){panel.style.top='';panel.style.bottom=(window.innerHeight-r.top+6)+'px'}else{panel.style.bottom='';panel.style.top=(r.bottom+6)+'px'}};
+ place();panel._place=place;
+ const opts=panel.querySelector('.mb-fontopts'),search=panel.querySelector('.mb-fontsearch');
+ const draw=()=>{
+  const q=search.value.trim().toLowerCase();
+  const list=GOOGLE_FONTS.filter(f=>!q||f.toLowerCase().includes(q));
+  opts.innerHTML=list.map(f=>`<button type="button" role="option" class="mb-fontopt${f===input.value?' on':''}" data-font="${esc(f)}" style="font-family:'${esc(f)}',${head?'serif':'sans-serif'}"><b>${esc(f)}</b><span>${esc(sample)}</span></button>`).join('')+
+   (q&&!list.length?`<button type="button" class="mb-fontopt use" data-font="${esc(search.value.trim())}"><b>Use “${esc(search.value.trim())}” from Google Fonts</b><span>Any font on fonts.google.com works</span></button>`:'')+
+   (!list.length&&!q?'<p class="fine">No fonts.</p>':'');
+ };
+ draw();search.addEventListener('input',draw);
+ opts.addEventListener('click',e=>{const o=e.target.closest('.mb-fontopt');if(!o)return;const f=o.dataset.font;input.value=f;loadGoogleFont(f);
+  btn.querySelector('b').textContent=f;btn.style.fontFamily="'"+f.replace(/'/g,'')+"',"+(head?'serif':'sans-serif');
+  const prev=btn.form&&btn.form.querySelector(btn.dataset.target);if(prev)prev.style.fontFamily=btn.style.fontFamily;
+  brandMarkDirty();closeFontPicker();});
+ setTimeout(()=>{search.focus();opts.querySelector('.on')?.scrollIntoView({block:'nearest'})},0);
+}
+function closeFontPicker(){document.querySelectorAll('.mb-fontlist').forEach(p=>p.remove())}
+document.addEventListener('click',e=>{if(!e.target.closest('.mb-fontlist')&&!e.target.closest('.mb-fontpick'))closeFontPicker()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeFontPicker()});
+window.addEventListener('scroll',()=>document.querySelectorAll('.mb-fontlist').forEach(p=>p._place&&p._place()),true);window.addEventListener('resize',closeFontPicker);
+function brandMarkDirty(){window.brandDirty=true;const u=document.querySelector('.mb-unsaved');if(u)u.hidden=false}
+// Research again rebuilds the kit from the agent's Facebook Page and website. What they typed is
+// kept; Meta's facts only fill empty fields (brandFromPage).
+function brandResearchAgain(btn){
+ if(window.RM&&RM.brandFromMeta&&(state.metaConnected||(state.connected&&state.connected.meta)))return brandFromPage(btn);
+ toast('Resmara is researching your brand again. This takes a minute.');
+}
+// Leaving My Brand with unsaved changes asks first. Returns true when it stopped the move.
+let brandAfterSave=null;
+function brandLeaveGuard(go){
+ if(!window.brandDirty||!document.querySelector('form.mb'))return false;
+ show(`<span class="eyebrow">MY BRAND</span><h2>Save your changes before you leave?</h2><p>You changed your brand kit but haven’t saved it. New campaigns only use what’s saved.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="window.brandDirty=false;modal.close();brandPendingGo()">Leave without saving</button><button type="button" class="campaign-primary" onclick="modal.close();brandSaveThenGo()">Save changes</button></div>`);
+ brandLeaveGuard.go=go;return true;
+}
+function brandPendingGo(){const go=brandLeaveGuard.go;brandLeaveGuard.go=null;if(go)go()}
+function brandSaveThenGo(){const f=document.querySelector('form.mb');if(!f)return brandPendingGo();brandAfterSave=brandLeaveGuard.go;brandLeaveGuard.go=null;f.requestSubmit()}
+window.addEventListener('beforeunload',e=>{if(window.brandDirty&&document.querySelector('form.mb')){e.preventDefault();e.returnValue=''}});
 // Brand Engine section 4: the kit is built from the Page the agent connected. Meta's facts fill
 // only the fields that are empty - the agent's own words are never overwritten - and the model's
 // suggestions are shown for a yes/no, not applied silently.
@@ -371,6 +445,9 @@ async function saveBrandProfile(event,form,onboarding){
   const name=fields.agent.value.trim(),company=fields.company.value.trim(),market=fields.market.value.trim();
   if(!name)throw new Error('Enter your agent name.');
   const brand={...state.brand,website,brandLink,market,license:fields.license.value.trim(),colours:fields.colours.value.trim(),voice:fields.voice.value.trim()};
+  if(fields.fontHead&&fields.fontBody)brand.fonts=[fields.fontHead.value.trim()||'Playfair Display',fields.fontBody.value.trim()||'Jost'];
+  if(fields.theme)brand.theme=fields.theme.value;
+  if(fields.colours&&form.querySelector('.mb-sw'))brand.palette=[...form.querySelectorAll('.mb-sw')].map(l=>[l.querySelector('b').textContent,l.querySelector('input').value.toUpperCase()]);
   delete brand.suggestion;
   brand.colour=brand.colours;
   const brandMedia={...state.brandMedia};
@@ -384,8 +461,9 @@ async function saveBrandProfile(event,form,onboarding){
   try{localStorage.setItem('resmara',JSON.stringify(next))}catch{throw new Error('This browser couldn’t save the profile. Try smaller images or use the Chrome preview.')}
   Object.assign(state,next);
   const synced=await pushBrandToAccount(brand,name,company);
-  if(onboarding)onboard(1);else{myBrand();toast(synced?'Brand profile saved to your account.':'Brand profile saved in this browser — sign in to keep it on your account.')}
- }catch(e){error.textContent=e.message}finally{button.disabled=false}
+  window.brandDirty=false;
+  if(onboarding)onboard(1);else{const go=brandAfterSave;brandAfterSave=null;myBrand();toast(synced?'Brand saved. New campaigns use it.':'Brand saved in this browser — sign in to keep it on your account.');if(go)go()}
+ }catch(e){brandAfterSave=null;error.textContent=e.message}finally{button.disabled=false}
 }
 function runMetaAudit(scenario){
  show(`<span class="eyebrow">FIRST CAMPAIGN · STEP 3 OF 3</span><h2>Resmara is checking your setup.</h2><div class="audit-track"><span class="robot-avatar" aria-hidden="true"></span></div><p role="status">Checking business access, Page permissions and ad account readiness…</p><p class="fine">Simulated check. No access to your Meta account.</p>`);
@@ -425,7 +503,7 @@ function confirmMockHelp(slot){
 function pricing(){
  if(typeof stopResmaraGuide==='function')stopResmaraGuide();
  location.hash='pricing';document.title='Pricing — Resmara';
- app.innerHTML=`<div class="marketing-home">${siteNav('pricing')}<main><section class="home-section package-page"><div><span class="home-kicker">$49 PER CAMPAIGN</span><h1>One listing.<br><span>One campaign.</span><br>Forty-nine dollars.</h1><p>A 14-day branded campaign for one property: the creative, the calendar, the publishing and the day 7 and day 14 seller reports.</p><p>No subscription, no packs, nothing to top up. You pay the $49 when the campaign is ready to build, through Stripe Checkout. Meta ad spend is separate and goes to your own ad account.</p><p class="fine">Preparing a campaign — the scope, the captions, the calendar — costs nothing. You only pay to build it.</p></div><div class="home-price-detail"><h3>What the $49 buys</h3><ul><li>A 14-day social campaign for that listing</li><li>Caption and photo pairings from your own gallery</li><li>Digital ad creative and campaign setup</li><li>Your calendar, review and approval</li><li>Scheduled social publishing</li><li>Day 7 and day 14 seller reports</li></ul><button class="home-primary" onclick="newCampaign()">Start a campaign</button></div></section></main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
+ app.innerHTML=`<div class="marketing-home">${siteNav('pricing')}<main><section class="home-section package-page"><div><span class="home-kicker">$49 PER CAMPAIGN</span><h1>One listing.<br><span>One campaign.</span><br>Forty-nine dollars.</h1><p>A 14-day branded campaign for one property: the creative, the calendar, the publishing and the day 7 and day 14 seller reports.</p><p>No subscription, no packs, nothing to top up. You pay the $49 when the campaign is ready to build, through Stripe Checkout. Meta ad spend is separate and goes to your own ad account.</p><p class="fine">Preparing a campaign — the scope, the captions, the calendar — costs nothing. You only pay to build it.</p></div><div class="home-price-detail"><h3>What the $49 buys</h3><ul><li>A 14-day social campaign for that listing</li><li>Caption and photo pairings from your own gallery</li><li>Digital ad creative and campaign setup</li><li>Your calendar, review and approval</li><li>Scheduled social publishing</li><li>A website for the home that tracks its leads</li><li>Day 7 and day 14 seller reports</li></ul><button class="home-primary" onclick="newCampaign()">Start a campaign</button></div></section></main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
  window.scrollTo(0,0);
 }
 let workspaceTourCleanup;
@@ -481,3 +559,67 @@ new MutationObserver(()=>{document.querySelectorAll('#home-brand .mb-preview,#ho
 // Light / dark for the agent dashboard. Each person's choice is remembered on their device.
 function themeToggle(){const dark=document.documentElement.classList.contains('dark');return `<button class="theme-toggle" role="switch" aria-checked="${dark}" onclick="toggleTheme()"><span>Dark mode</span><i></i></button>`}
 function toggleTheme(){const dark=!document.documentElement.classList.contains('dark');document.documentElement.classList.toggle('dark',dark);try{localStorage.setItem('resmara_theme',dark?'dark':'light')}catch{}const b=document.querySelector('.theme-toggle');if(b){b.setAttribute('aria-checked',String(dark));0}}
+
+// ---- Setup guides: how to get Facebook, Instagram and the ad account ready for Resmara ---------
+// One page, one short guide per piece. The onboarding screens and the red box link straight to the
+// guide they need (setupGuides('instagram') opens that one).
+const SETUP_GUIDES = [
+ { id: 'facebook', title: 'Create a Facebook account', need: 'Required', time: '5 minutes',
+   why: 'Every Facebook business Page is run from a personal account. Your personal posts and details never show on your Page.',
+   steps: ['Go to facebook.com and click Create new account.', 'Use your real name and an email or phone number you check.', 'Confirm the code Facebook sends you.'],
+   link: ['Open Facebook', 'https://www.facebook.com/'] },
+ { id: 'page', title: 'Create your Facebook business Page', need: 'Required', time: '10 minutes',
+   why: 'Resmara posts your listings to a business Page, never to your personal profile.',
+   steps: ['On a computer, log in to Facebook and open Pages in the left menu, then Create Page.', 'Use your business name, for example “Jamie Carter, Realtor”, and pick the Real Estate Agent category.', 'Add a headshot or logo, a cover photo, and your website, phone and email.'],
+   link: ['Create a Page', 'https://www.facebook.com/pages/create'] },
+ { id: 'admin', title: 'Make sure you have full control of your Page', need: 'Required', time: '2 minutes',
+   why: 'Resmara can only post to a Page you fully control. Pages made by a brokerage, an old assistant or a marketing company are often owned by someone else.',
+   steps: ['On Facebook, switch into your Page.', 'Open Settings, then Page access.', 'Check your name is listed with full control. If it isn’t, ask whoever is listed to give you full control.'] },
+ { id: 'instagram', title: 'Switch your Instagram to a business account', need: 'Recommended', time: '1 minute',
+   why: 'Meta only lets apps like Resmara post to business (Professional) Instagram accounts. It’s free, and you keep all your posts and followers. Your account becomes public.',
+   steps: ['In the Instagram app, go to your profile and open the menu.', 'Under For professionals, tap Account type and tools, then Switch to professional account.', 'Pick a category such as Real Estate Agent, choose Business and tap Next.'],
+   note: 'No Instagram yet? Make one in the Instagram app first. Without Instagram, Resmara posts to your Facebook Page only.' },
+ { id: 'link', title: 'Link your Instagram to your Facebook Page', need: 'Recommended', time: '2 minutes',
+   why: 'Resmara finds your Instagram through your Facebook Page, so the two have to be linked.',
+   steps: ['On Facebook, switch into your Page and open Settings.', 'Open Linked accounts, then Instagram, and click Connect account.', 'Log in to your Instagram and confirm. If it’s still a personal account, Facebook offers to switch it to business right here.'],
+   note: 'An Instagram can be linked to one Page at a time. If it’s linked to an old Page, disconnect it there first.',
+   link: ['Open linked accounts', 'https://www.facebook.com/settings/?tab=linked_instagram'] },
+ { id: 'ads', title: 'Set up your ad account and payment method', need: 'Recommended', time: '5 minutes',
+   why: 'Your listing ad runs from your own Meta ad account. Meta bills your ad budget to your card directly. Resmara never charges or keeps any of it.',
+   steps: ['Open Meta Business Suite, then Settings, Accounts and Ad accounts.', 'Click Add, then Create a new ad account. Enter a name, your time zone and currency, and give yourself full control.', 'In Ads Manager, open Billing & payments and add a card or PayPal.'],
+   note: 'Without an ad account your posts still go out. Only the listing ad is off.',
+   link: ['Open Meta Business Suite', 'https://business.facebook.com/'] },
+ { id: 'connect', title: 'Connect it all to Resmara', need: 'Last step', time: '1 minute',
+   why: 'One Facebook login gives Resmara your Page, Instagram and ad account.',
+   steps: ['In your Resmara dashboard, open Accounts and click Connect your Meta account.', 'Log in with Facebook and choose your Page, your Instagram and your ad account.', 'Resmara checks everything. If anything still needs fixing, it tells you what, and you click Check again once it’s done.'] }
+];
+function setupGuides(open) {
+ if (typeof stopResmaraGuide === 'function') stopResmaraGuide();
+ if (typeof modal !== 'undefined' && modal.open) modal.close();
+ location.hash = 'setup-guides'; document.title = 'Setup — Resmara';
+ const jump = id => `document.getElementById('sg-${id}').scrollIntoView({behavior:'smooth',block:'start'});return false`;
+ const card = (g, n) => `<li class="sg-card" id="sg-${g.id}"><span class="home-step-num">${n + 1}</span><small>${g.need.toUpperCase()} · ${g.time.toUpperCase()}</small><h3>${g.title}</h3><p>${g.why}</p>
+  <ol class="sg-steps">${g.steps.map(t => `<li>${t}</li>`).join('')}</ol>${g.note ? `<p class="sg-note">${g.note}</p>` : ''}${g.link ? `<a class="home-primary sg-btn" href="${g.link[1]}" target="_blank" rel="noopener">${g.link[0]}</a>` : ''}</li>`;
+ app.innerHTML = `<div class="marketing-home">${siteNav('setup-guides')}<main>
+  <section class="home-section sg-hero"><div class="home-section-heading"><div><span class="home-kicker">SETUP</span><h2>Set up once.<br><span>Resmara does the rest.</span></h2></div><p>Resmara posts, advertises and reports through your own Facebook Page, Instagram and Meta ad account. Get these three ready and your campaigns run in full from day one. Each step below takes a few minutes.</p></div>
+   <ol class="home-steps sg-need">
+    <li><span class="home-step-num">1</span><small>REQUIRED</small><h3>A Facebook business Page</h3><p>That you fully control. Resmara posts your listings here.</p><a href="#sg-page" onclick="${jump('page')}">See how</a></li>
+    <li><span class="home-step-num">2</span><small>RECOMMENDED</small><h3>A business Instagram</h3><p>Linked to your Page. Without it, posts go to Facebook only.</p><a href="#sg-instagram" onclick="${jump('instagram')}">See how</a></li>
+    <li><span class="home-step-num">3</span><small>RECOMMENDED</small><h3>A Meta ad account</h3><p>With a payment method. Without it, your posts run but your listing ad is off.</p><a href="#sg-ads" onclick="${jump('ads')}">See how</a></li>
+   </ol></section>
+  <section class="home-section sg-guides"><div class="home-section-heading"><div><span class="home-kicker">STEP BY STEP</span><h2>Seven quick steps.<br><span>About 25 minutes in all.</span></h2></div><p>Already have some of these? Skip to the ones you need. When you’re done, connect in your Resmara dashboard and it checks everything for you.</p></div>
+   <ol class="sg-grid">${SETUP_GUIDES.map(card).join('')}</ol></section>
+  <section class="home-finish"><span class="home-mini-robot" aria-hidden="true"></span><h2>Rather do it together?</h2><p>Book a free 30-minute setup call and one of our team will set it all up with you.</p><button type="button" class="home-primary" onclick="obBook(true)">Book a free setup call</button></section>
+ </main><footer class="home-footer">${logo}<span>Your expertise. Superpowered.</span>${footerLinks()}</footer></div>`;
+ const el = open && document.getElementById('sg-' + open);
+ if (el) setTimeout(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50); else window.scrollTo(0, 0);
+}
+
+// Section C on the homepage: the sample listing website, the same page agents get, read-only.
+function homeSitePreview(){
+ const box=document.querySelector('#home-site-view');if(!box||typeof listingSiteHTML!=='function')return;
+ const c=examples.find(e=>e.address==='1248 Oakridge Drive')||{address:'1248 Oakridge Drive',area:'Austin, TX · $845,000',image:'sample/card-1.jpg'};
+ box.innerHTML=`<div inert>${listingSiteHTML(c,0)}</div>${scrollHint('Scroll to see the whole website')}`;
+ if(typeof loadListingFonts==='function'&&typeof listingSiteData==='function')loadListingFonts(listingSiteData(c).fonts||[]);
+ armScrollHint(box);
+}

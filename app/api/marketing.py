@@ -20,6 +20,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.testdata import test_user_ids
 from app.db.session import AdAccount, Boost, Post, User, get_db
 from app.services import analytics, team_access
 
@@ -70,8 +71,10 @@ def marketing(days: int = Query(30, ge=1, le=180),
     account = _resmara_ad_account(db)
     operators = _operator_emails()
 
+    tests = test_user_ids(db)
     agents = [u for u in db.query(User).all()
-              if (u.email or "").lower() not in operators and (u.name or "").lower() != "test"]
+              if (u.email or "").lower() not in operators and (u.name or "").lower() != "test"
+              and u.id not in tests]
     def _created(user: User) -> Optional[datetime]:
         value = user.created_at
         return value.replace(tzinfo=None) if isinstance(value, datetime) else None
@@ -81,6 +84,7 @@ def marketing(days: int = Query(30, ge=1, le=180),
         db.query(func.count(func.distinct(Boost.user_id)))
         .filter(Boost.paid_at.isnot(None))
         .filter(Boost.paid_at >= start)
+        .filter(~Boost.user_id.in_(tests or {-1}))
         .scalar() or 0
     )
 

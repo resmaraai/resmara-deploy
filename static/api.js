@@ -339,6 +339,16 @@
     });
   }
 
+  // Open a listing link before a campaign is built: the home, its photo count and any video.
+  // Take one scheduled post off a live campaign (the rest keeps running).
+  function withdrawPost(postId) {
+    return request('/api/posts/' + segment(postId) + '/withdraw', { method: 'PATCH' });
+  }
+
+  function checkListing(url) {
+    return json('/api/content/listing/check', 'POST', { url: url });
+  }
+
   function tagAssets(boostId) {
     return request('/api/content/assets/' + segment(boostId) + '/tag', { method: 'POST' });
   }
@@ -598,6 +608,10 @@
     return json('/api/leads/' + segment(leadId), 'PATCH', { status: status });
   }
 
+  function setLeadNote(leadId, note) {
+    return json('/api/leads/' + segment(leadId), 'PATCH', { note: note || '' });
+  }
+
   function removeLead(leadId) {
     return request('/api/leads/' + segment(leadId), { method: 'DELETE' });
   }
@@ -657,11 +671,14 @@
     leads: leads,
     addLead: addLead,
     setLeadStatus: setLeadStatus,
+    setLeadNote: setLeadNote,
     removeLead: removeLead,
     scanLeads: scanLeads,
     photoIndex: photoIndex,
     gallery: gallery,
     importPhotos: importPhotos,
+    checkListing: checkListing,
+    withdrawPost: withdrawPost,
     tagAssets: tagAssets,
     createTicket: createTicket,
     tickets: tickets,

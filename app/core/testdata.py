@@ -32,3 +32,20 @@ def is_test_advertiser(advertiser_id: str | None) -> bool:
     """True for the demo/smoke ad accounts the prototype and suites connect."""
     adv = (advertiser_id or "").strip().lower()
     return adv.startswith(("act_smoke", "act_demo", "act_test")) or adv in ("demo_token", "act_demo_12345")
+
+
+def is_test_user(user) -> bool:
+    """True for an account a test run made (email rule) or the team marked as a test account.
+
+    The one test every count in the Team room uses, so a demo client marked once in Accounts
+    drops out of Growth, Marketing, Finance and Overview together.
+    """
+    if user is None:
+        return False
+    return bool(getattr(user, "is_test", False)) or is_test_email(getattr(user, "email", None))
+
+
+def test_user_ids(db) -> set:
+    """Ids of every test account, by either rule."""
+    from app.db.session import User
+    return {u.id for u in db.query(User).all() if is_test_user(u)}

@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import Text, func, or_
 
 from app.core.config import settings
-from app.core.testdata import is_test_email
+from app.core.testdata import is_test_email, test_user_ids
 from app.db.session import AdAccount, Asset, Boost, Event, Order, Post, SupportTicket, User
 from app.services.ad_platforms import is_simulated_account
 
@@ -71,8 +71,8 @@ def _count(db, model, *filters) -> int:
 
 
 def _test_user_ids(db) -> set:
-    """Account ids a test run registered - the rule itself lives in app.core.testdata."""
-    return {u.id for u in db.query(User).all() if is_test_email(u.email)}
+    """Test account ids (test emails and team-marked ones) - the rule lives in app.core.testdata."""
+    return test_user_ids(db)
 
 
 def _test_post_ids(db, ids) -> set:
@@ -92,8 +92,8 @@ def _test_share(db, model, ids, *filters) -> int:
 
 
 def _test_user_ids(db) -> set:
-    """Account ids a test run registered - the rule itself lives in app.core.testdata."""
-    return {u.id for u in db.query(User).all() if is_test_email(u.email)}
+    """Test account ids (test emails and team-marked ones) - the rule lives in app.core.testdata."""
+    return test_user_ids(db)
 
 
 def _test_post_ids(db, ids) -> set:
@@ -233,8 +233,11 @@ def empty_plan_clause():
 
 
 def _campaigns(db, ids) -> Dict[str, Any]:
+    # Stage counts, live and launched are real campaigns only: a test account's campaigns
+    # (test email or team-marked) never show as live work.
+    real = ~Boost.user_id.in_(ids) if ids else Boost.id.isnot(None)
     by_stage: Dict[str, int] = {}
-    for stage, n in db.query(Boost.stage, func.count(Boost.id)).group_by(Boost.stage).all():
+    for stage, n in db.query(Boost.stage, func.count(Boost.id)).filter(real).group_by(Boost.stage).all():
         by_stage[str(stage or "UNKNOWN")] = int(n)
     empty_plan = empty_plan_clause()
     total, test = _count(db, Boost), _test_share(db, Boost, ids)
@@ -243,8 +246,8 @@ def _campaigns(db, ids) -> Dict[str, Any]:
         "real": total - test,
         "test_campaigns": test,
         "by_stage": by_stage,
-        "live": _count(db, Boost, Boost.stage == "LIVE"),
-        "launched": _count(db, Boost, Boost.launched_at.isnot(None)),
+        "live": _count(db, Boost, Boost.stage == "LIVE", real),
+        "launched": _count(db, Boost, Boost.launched_at.isnot(None), real),
         "awaiting_build": _count(db, Boost, empty_plan),
         "awaiting_build_test": _test_share(db, Boost, ids, empty_plan),
         "budget_configured_usd": round(
@@ -360,7 +363,8 @@ def _revenue(db) -> Dict[str, Any]:
     """
     from app.services.billing import price_cents, secret_key
 
-    orders = db.query(Order).all()
+    tests = test_user_ids(db)   # test accounts' orders are never revenue
+    orders = [o for o in db.query(Order).all() if o.user_id not in tests]
     paid = [o for o in orders if (o.status or "") == "paid"]
     paid_cents = sum(int(o.amount_cents or 0) for o in paid)
     return {
