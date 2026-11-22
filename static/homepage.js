@@ -586,9 +586,9 @@ const SETUP_GUIDES = [
    link: ['Open linked accounts', 'https://www.facebook.com/settings/?tab=linked_instagram'] },
  { id: 'ads', video: true, title: 'Set up your ad account and payment method', need: 'Recommended', time: '5 minutes',
    why: 'Your listing ad runs from your own Meta ad account. Meta bills your ad budget to your card directly. Resmara never charges or keeps any of it.',
-   steps: ['Open Meta Business Suite, then Settings, Accounts and Ad accounts.', 'Click Add, then Create a new ad account. Enter a name, your time zone and currency, and give yourself full control.', 'In Ads Manager, open Billing & payments and add a card or PayPal.'],
-   note: 'Without an ad account your posts still go out. Only the listing ad is off.',
-   link: ['Open Meta Business Suite', 'https://business.facebook.com/'] },
+   steps: ['Every Facebook account already comes with an ad account. Go to adsmanager.facebook.com to open yours.', 'In the left menu, open Billing & payments, then Payment settings, and click Add payment method. Check your country and currency are right first: they can’t be changed later.', 'Enter your card and click Save. Meta may place a small temporary charge to check the card. That’s normal.'],
+   note: 'Without a card on your ad account your posts still go out. Only the listing ad is off.',
+   link: ['Open Ads Manager', 'https://adsmanager.facebook.com/'] },
  { id: 'connect', title: 'Connect it all to Resmara', need: 'Last step', time: '1 minute',
    why: 'One Facebook login gives Resmara your Page, Instagram and ad account.',
    steps: ['In your Resmara dashboard, open Accounts and click Connect your Meta account.', 'Log in with Facebook and choose your Page, your Instagram and your ad account.', 'Resmara checks everything. If anything still needs fixing, it tells you what, and you click Check again once it’s done.'] }
