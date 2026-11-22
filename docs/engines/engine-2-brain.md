@@ -1,14 +1,13 @@
-# Engine 2 brain: Brand, and the Resmara onboarding
+# Engine 2 brain: Brand
 
 **Status:** written and greenlit with Adam, sent to Dan 22 Nov · **Builds in:** PR #22 · **Started:** 22 Nov 2026
 **Detailed spec (14 Nov):** the Brand Engine spec v1.0 in the Resmara Buildout project (the proven Boost prompts
 are in its Appendix B and are the starting point for the AI steps below)
 
-This deployment has two parts:
-
-- **Part A: the Brand engine** (sections 1 to 8). The investigation that builds the brand kit.
-- **Part B: the Resmara onboarding** (section 9). The robot that guides a new agent from sign-up
-  to their first campaign: one onboarding, the tour, problems on the menu, and step-by-step fixes.
+**Scope (Adam, 22 Nov):** this engine only researches the agent and builds their brand page. It is
+baked into the new client sign-up (Engine 1): it runs in the background during sign-up and is done
+by the time they reach the finish pop-up. The sign-up itself is Engine 1, which ends at **Show me
+around**; the tour and any fixes after that are the **Resmara sign-up tour engine**.
 
 ## 1. Job (Adam, 22 Nov)
 
@@ -20,11 +19,11 @@ career**, then turn what it finds into their brand kit.
    Realtor.com, their brokerage's site, the state license lookup).
 2. **Build the brand kit** from what it found: logo, names, license numbers, phones, brokerage,
    colours, fonts, a look and a brand voice that fit *them*.
-3. **Put it on My Brand**, finished, as part of onboarding. The agent adjusts anything they don't
+3. **Put it on My Brand**, finished, as part of sign-up. The agent adjusts anything they don't
    like, any time.
 
-**Quick, and part of onboarding.** It starts the moment they sign in with Facebook and runs in the
-background while the robot works through the onboarding checks. A few minutes at most.
+**Quick, and part of sign-up.** It starts the moment they sign in with Facebook and runs in the
+background while the robot works through the sign-up checks. A few minutes at most.
 
 Every later engine (posts, ad, website, reports) builds from this kit.
 
@@ -58,8 +57,8 @@ around, follow leads, compare what it finds, and come back with a judgement.
 Meta doesn't let apps read a personal profile's posts or a personal Instagram. For these agents
 the investigation can't study their feed at first. It builds from what's public instead: their
 website, their brokerage's brand, Google, Zillow and Realtor.com, and the license lookup. They
-still get a real brand kit on day one. Once their business Page and Instagram are connected
-(Part B), Resmara reruns the investigation and the kit gets sharper.
+still get a real brand kit on day one. Once their business Page and Instagram are connected,
+Resmara reruns the investigation and the kit gets sharper.
 
 **What it works out**
 
@@ -115,7 +114,7 @@ it marks it as chosen so they can change it.
 4. **Build the brand kit** from what it found, write the **Voice of the client**, and save both
    to My Brand.
 
-Speed: quick and brief, a few minutes at most, finished inside onboarding (section 3a).
+Speed: quick and brief, a few minutes at most, finished inside sign-up (section 3a).
 
 ## 3. No separate case file
 
@@ -131,10 +130,12 @@ Nobody needs to read a case file. The brand kit on My Brand is the one record, a
 the current one: whatever the agent changes (fonts, colours, voice, tone) is what every campaign
 uses next.
 
-## 3a. Where it fits in onboarding
+## 3a. Where it fits in sign-up
 
-The brand build runs inside the Resmara onboarding (Part B, section 9): it starts the moment they
-sign in with Facebook and is finished by the time the robot reaches the end.
+It starts the moment they sign in with Facebook (Engine 1) and runs alongside the Facebook checks
+on the sign-up pop-up ("Looking at your posts", "Researching you and your brokerage", "Building
+your brand kit"). The finish pop-up shows the brand it built. If anything essential is missing
+(like the license number), it's logged on My Brand for the sign-up tour to point out.
 
 ## 4. The brand kit (what lands on My Brand)
 
@@ -227,7 +228,7 @@ engine), not here.
 
 ## 6a. Missing phone, license or brokerage (Campaign build engine)
 
-The kit never stops onboarding. The check happens when it matters: when they start a campaign.
+The kit never holds up sign-up. The check happens when it matters: when they start a campaign.
 
 1. They click **+ Campaign**.
 2. Resmara checks the kit has a phone number, license number and brokerage.
@@ -252,9 +253,8 @@ The kit never stops onboarding. The check happens when it matters: when they sta
   graphics, then their brokerage's brand.
 - Their license number and photo are the reference points for "is this really them".
 - Persona can shape the voice; nothing personal goes in the kit.
-- Quick, part of onboarding (Part B): locked until done, a positive finish, the tour, problems as
-  marks on the menu, and Resmara walking them through each fix with "Do it with our team" always
-  there.
+- Quick, and baked into the new client sign-up (Engine 1). The sign-up, its finish pop-up and the
+  tour are not part of this engine.
 - Missing phone, license or brokerage is checked when they start a campaign and asked for right
   there.
 - No separate case file; what matters lives in the brand kit.
@@ -265,162 +265,13 @@ The kit never stops onboarding. The check happens when it matters: when they sta
   are always positive and professional.
 - **Your look** keeps all four choices and defaults to **Match my brand**. The guidelines for
   Modern, Classic and Rustic are written with the Campaign build engine, not here.
-- Card: asked for at the first campaign, not during onboarding.
-- Most agents start personal-only; setup is a guided track with "Do it with our team" offered at
-  every step. No Meta business account needed.
-
----
-
-## Part B: The Resmara onboarding (section 9)
-
-**Job (Adam, 22 Nov):** keep the excitement and make the journey as simple as possible, so agents
-don't drop off at onboarding. Signing up, building the brand and getting set up should never feel
-like a complicated system. Resmara, the robot, is the guide the whole way.
-
-### 9.1 Assume they're starting from scratch
-
-Most agents start with **a personal Facebook and a personal Instagram**: no business Page, no
-business Instagram, no ad account. That's the normal path, not an edge case. Some have it all set
-up; the onboarding works for both.
-
-To post and run ads for them, Resmara needs three things, and **none of them is a Meta business
-account** (business portfolio), so it's never mentioned:
-
-1. **A Facebook business Page** they manage (about 5 minutes to make).
-2. **Their Instagram switched to a business account** and linked to that Page (about 2 minutes,
-   free, nothing lost).
-3. **An ad account with a card** (every Facebook user can have one). This one can wait: posts work
-   without it.
-
-Resmara can't do these for them (Meta doesn't allow it), so each one gets a walkthrough **and the
-offer of a person** with equal weight: **"Do it with our team"** books a setup session.
-
-### 9.2 Only two gates
-
-1. **Sign up with Facebook.** One click; the audit and brand build start straight away.
-2. **Pay when they build their first campaign.** No card at onboarding: they pay at the moment
-   they want something, after Resmara has pulled their listing (Campaign build engine).
-
-Everything else helps, never blocks. No Page yet: they can still build a campaign and download
-the posts (download mode). No ad account: posts go out, the ad waits. Missing license number:
-asked for in the campaign flow.
-
-### 9.3 One onboarding, locked until done
-
-The robot works through it on one pop-up:
-
-1. Signing you in with Facebook
-2. Finding your Facebook Page
-3. Checking your Instagram
-4. Checking your ad account
-5. Looking at your posts (or your website and public profiles, if they're personal-only)
-6. Researching you and your brokerage
-7. Building your brand kit
-
-The pop-up can't be closed and has no buttons that lead elsewhere, so nobody gets lost halfway.
-If they close the browser, signing back in picks up where they left off.
-
-### 9.4 A positive finish
-
-*"You're all set up, Jamie."* Their brand kit (logo, fonts, colours, the start of their Voice of
-the client) and one button, **Show me around**. No list of problems. For a personal-only agent it
-adds: *"Next, I'll help you set up your business Page and Instagram so I can post for you."*
-
-### 9.5 The tour (built in PR #17, new words)
-
-1. **+ Campaign:** where you create new campaigns.
-2. **Your campaigns:** active and completed.
-3. **My Brand:** "This is the brand we built for you… You can change it any time." Mentions
-   anything missing, like the license number.
-4. **Billing:** "Your receipts and your card live here. You don't need a card yet: you'll add one
-   when you build your first campaign."
-5. **Accounts:** "This is your Facebook connection." For a personal-only agent: "Like most agents,
-   you're starting with a personal Facebook and Instagram. I'll walk you through setting up your
-   business Page and Instagram, about 10 minutes, or our team can do it with you."
-6. **Support.**
-7. Back to **+ Campaign**.
-
-### 9.6 Problems live on the menu, and Resmara offers to help
-
-- **An orange mark** on the menu item that needs it: **Accounts** (Facebook setup) or **My Brand**
-  (something missing). Billing gets no mark: the card isn't needed until the first campaign.
-- **One line from Resmara** at the top of My campaigns. Personal-only: *"Let's get you set up for
-  business. 3 quick steps so I can post and run ads for you. About 10 minutes."* with **Let's do
-  it** and **Do it with our team**. Otherwise: *"A few things need your attention. Want me to walk
-  you through them?"*
-- **Accounts** shows the setup to-do list (Engine 1), each item with **Walk me through it** and
-  **Do it with our team**.
-- Each mark disappears once that item is sorted.
-
-### 9.7 The walkthrough, one step at a time
-
-- One pop-up per step: *"Getting you set up, 1 of 3"*. Resmara says what to do and why in one line,
-  then numbered steps with a link to the exact Meta page. Buttons: **Check again** · **Later** ·
-  **Do it with our team**.
-- **Check again:** Resmara asks Meta right then.
-  - Fixed: *"Congratulations, your Page is connected!"*, then *"Next, let's switch your Instagram
-    to a business account"* and **Let's go**.
-  - Not yet: *"Not quite yet. Meta still shows the same thing; sometimes it takes a few minutes."*
-    The steps again, **Try again** and **Do it with our team**.
-- **The license number** is typed and saved right in the pop-up.
-- **The end:** *"That's everything. You're ready to build your first campaign."*
-- **Every one of Engine 1's 19 Meta situations** gets its own walkthrough (message, steps, link,
-  what Check again looks for). Anything Resmara can't walk them through ends in **Do it with our
-  team**.
-
-### 9.8 A person when they need one
-
-- **Do it with our team** is on every step, not hidden as a last resort.
-- The Team room lists every agent still on the setup track and which step they're on, so someone
-  can reach out personally. The day 3 and 7 emails (Engine 1) offer the session too.
-
-### 9.9 How we'll know it works
-
-- A personal-only agent goes from sign-up to the finish screen without seeing a problem list.
-- The tour mentions only real problems; Billing never asks for a card during onboarding.
-- Each walkthrough's Check again ticks the step off when Meta confirms it, and moves to the next.
-- An agent with no Page can still build a campaign and download the posts.
-- Agents stuck on setup show in the Team room with their step.
+- Most agents start with a personal Facebook and Instagram, so the first kit often comes from
+  public sources and gets sharper once their Page and business Instagram are connected.
 
 ---
 
 ## Screens (what it should look like)
 
-From the clickable mockup Adam reviewed on 22 Nov (`engine-2-screens/mockup.js`, preview only, not
-for deploy). The example agent starts with a personal Facebook and Instagram, the most common case.
-Facebook's own window is drawn to show the journey; the real one is Facebook's.
-
-1. **Create your account: Facebook first, email as the fallback**
-   ![Create your account: Facebook first, email as the fallback](engine-2-screens/01-create.png)
-2. **Facebook's window for a personal-only agent: no Pages, Instagram or ad accounts yet**
-   ![Facebook's window for a personal-only agent: no Pages, Instagram or ad accounts yet](engine-2-screens/02-fb-access.png)
-3. **The positive finish: brand kit built, then Show me around**
-   ![The positive finish: brand kit built, then Show me around](engine-2-screens/03-finish.png)
-4. **The tour starts on a clean dashboard**
-   ![The tour starts on a clean dashboard](engine-2-screens/04-tour1.png)
-5. **Tour: This is the brand we built for you**
-   ![Tour: This is the brand we built for you](engine-2-screens/05-tour-brand.png)
-6. **Tour: Billing, no card needed yet**
-   ![Tour: Billing, no card needed yet](engine-2-screens/06-tour-billing.png)
-7. **Tour: Accounts, the personal-only setup offer**
-   ![Tour: Accounts, the personal-only setup offer](engine-2-screens/07-tour-accounts.png)
-8. **My campaigns: Resmara's one line, Let's do it or Do it with our team; mark on Accounts**
-   ![My campaigns: Resmara's one line, Let's do it or Do it with our team; mark on Accounts](engine-2-screens/08-dashboard.png)
-9. **Walkthrough 1 of 3: set up your Facebook business Page**
-   ![Walkthrough 1 of 3: set up your Facebook business Page](engine-2-screens/09-guide-page.png)
-10. **Check again: Congratulations, your Page is connected**
-   ![Check again: Congratulations, your Page is connected](engine-2-screens/10-win-page.png)
-11. **Walkthrough 2 of 3: switch your Instagram to a business account**
-   ![Walkthrough 2 of 3: switch your Instagram to a business account](engine-2-screens/11-guide-ig.png)
-12. **Check again when it isn't fixed yet: Try again or Do it with our team**
-   ![Check again when it isn't fixed yet: Try again or Do it with our team](engine-2-screens/12-not-yet.png)
-13. **Accounts: the setup to-do list with Walk me through it**
-   ![Accounts: the setup to-do list with Walk me through it](engine-2-screens/13-accounts.png)
-14. **My Brand: phone, broker license and the Voice of the client**
-   ![My Brand: phone, broker license and the Voice of the client](engine-2-screens/14-my-brand.png)
-15. **My Brand with a missing license number: mark, Resmara's line, field highlighted**
-   ![My Brand with a missing license number: mark, Resmara's line, field highlighted](engine-2-screens/15-brand-missing.png)
-16. **The license number, typed and saved in the pop-up**
-   ![The license number, typed and saved in the pop-up](engine-2-screens/16-guide-license.png)
-17. **Done: ready to build your first campaign**
-   ![Done: ready to build your first campaign](engine-2-screens/17-done.png)
+1. **My Brand, as the brand engine fills it in:** phone and broker license number in You, with
+   where each was found, and the Voice of the client section.
+   ![My Brand](engine-2-screens/my-brand.png)
