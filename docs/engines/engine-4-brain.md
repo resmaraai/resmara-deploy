@@ -1,6 +1,6 @@
 # Engine 4 brain: Campaign build
 
-**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #(filled in when opened) · **Started:** 22 Nov 2026
+**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #26 · **Started:** 22 Nov 2026
 **Existing spec:** `engine-specs/resmara-post-engine-spec.md` (14 Nov: plan, layouts, Art Director check, edit log, learner). This brain sets the direction; where they differ, this brain wins.
 
 ---
