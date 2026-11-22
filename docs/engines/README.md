@@ -9,7 +9,8 @@ out, understood and adjusted without reading the whole app.
 
 | # | Engine | Runs when | Doc | Status |
 |---|--------|-----------|-----|--------|
-| 1 | **Login** | An agent signs up, signs in, connects Meta, and goes through onboarding | `login-engine.md`, brain: `engine-1-brain.md` (PR #18) | Written |
+| 1 | **Login** | An agent logs in with Facebook (new or returning) and connects Meta | `login-engine.md`, brain: `engine-1-brain.md` (PR #18) | Written |
+| 1b | **Sign-up tour** | From Show me around to the first campaign unlocked: finish pop-up, setup plan, tour, pay to unlock | `resmara-signup-tour-engine.md` | Brain written (22 Nov) |
 | 2 | **Brand** | During the new client sign-up, right after the Facebook sign-in; Research again on My Brand | `engine-2-brain.md` | Brain written (22 Nov) |
 | 3 | **Campaign** | From **+ Campaign** to **Approve and launch**: link check, payment, build, review | `campaign-engine.md` | To write (specs: Listing Link Engine, Post Engine, Ad Engine) |
 | 4 | **Active campaign** | From launch to sold or ended: publishing, the ad, the listing watch, leads, reports, Run until sold | `active-campaign-engine.md` | To write |
