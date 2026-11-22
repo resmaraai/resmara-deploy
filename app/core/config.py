@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     # A free PageSpeed Insights key: anonymous calls are rate-limited to the point of a 429.
     PAGESPEED_KEY: str = os.getenv("RESMARA_PAGESPEED_KEY", "")
     GITHUB_API_BASE: str = os.getenv("RESMARA_GITHUB_API_BASE", "https://api.github.com")
+    # Pull-request preview environments are created by Render for pull requests opened against
+    # the repository the Blueprint is linked to — which is the code repo, not the deploy mirror.
+    # The build room's Preview button asks GitHub for the deployment on the PR's head commit, and
+    # a preview link is short-lived, so the answer is cached for a minute rather than trusted.
+    PREVIEW_REPO: str = os.getenv("RESMARA_PREVIEW_REPO", "resmaraai/resmara")
+    PREVIEW_CACHE_SECONDS: int = int(os.getenv("RESMARA_PREVIEW_CACHE_SECONDS", "60"))
 
     # Models that must not be used for this workload, whatever the env says. glm-5.3 spent its
     # entire output budget on the trace and returned empty content on the hosted endpoint, and
