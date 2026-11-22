@@ -14,7 +14,7 @@ Each engine also has a Build room ticket in the Team room. **Started:** 21 Nov 2
 | **Engine 2 · Brand** (quick AI investigation during sign-up that researches the agent and builds their brand page) | ✅ Done | ✅ Greenlit | ✅ **PR #22**, 22 Nov (merged) | `engines/engine-2-brain.md` |
 | **Resmara sign-up tour** (finish pop-up, fixes first, one setup plan, tour, first campaign: build then pay to unlock; carries Engine 1's Facebook-only log-in and no teams) | ✅ Done | ✅ Greenlit | ✅ **PR #23**, 22 Nov (merged) | `engines/resmara-signup-tour-engine.md` |
 | **Engine 3 · Listing link** (the link identifies the house; AI builds the home's file from every source; the gate for the build; plus the one-box Accounts setup) | ✅ Done | ✅ Greenlit | ✅ **PR #24**, 22 Nov | `engines/engine-3-brain.md` |
-| **Engine 4 · Campaign build** (photos, posts, post design) | Not started | — | — | — |
+| **Engine 4 · Campaign build** (14 one-of-a-kind posts and the ad from the brand kit, the home's file, the style profile and the trend brief; learns from 👍 / 👎, edits and results) | ✅ Done | ✅ Greenlit | ✅ **PR #26**, 22 Nov | `engines/engine-4-brain.md` |
 | **Engine 5 · Website** | Not started | — | — | — |
 | **Engine 6 · Active campaign** (ad, publishing, leads, reports) | Not started | — | — | — |
 | **Engine 7 · Marketing** | Not started | — | — | — |
@@ -31,8 +31,8 @@ the sign-up tour PR, under `docs/journey/`.
 
 ## Up next
 
-1. **Engine 4 · Campaign build** (next).
-2. Engines 5–8 in order.
+1. **Engine 5 · Website** (next): the shareable listing link with Copy link.
+2. Engines 6–8 in order.
 3. Engine 9 · Email campaigns, Digital ads and the Marketing overview.
 4. Not engines, after them: the AI tutorial videos for the Setup page (Build room ticket, 22 Nov) and the Resmara setup session in Calendly.
 
@@ -59,7 +59,7 @@ the sign-up tour PR, under `docs/journey/`.
   - One locked (built, unpaid) campaign per account at a time.
   - If a saved card is declined: nothing is charged, the campaign stays locked, and it says "Your payment
     didn't go through. Please check your card and try again," with Try again and Use another card.
-  - Write design guidelines for each look (Modern, Classic, Rustic; Match my brand is the default).
+  - Looks (Modern, Classic, Rustic, Match my brand) are dropped: post styles instead (Engine 4 brain, section 4).
   - The post writer reads the agent's Voice of the client.
 - **Engine 5 · Website (and the campaign page):** a shareable link to the listing's website
   page, shown on the campaign with a **Copy link** button (Adam, 22 Nov). Agents who post it
