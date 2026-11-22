@@ -1,6 +1,6 @@
 # Engine 2 brain: Brand, and the Resmara onboarding
 
-**Status:** written and greenlit with Adam, sent to Dan 22 Nov · **Builds in:** its own PR (number filled in when it opens) · **Started:** 22 Nov 2026
+**Status:** written and greenlit with Adam, sent to Dan 22 Nov · **Builds in:** PR #22 · **Started:** 22 Nov 2026
 **Detailed spec (14 Nov):** the Brand Engine spec v1.0 in the Resmara Buildout project (the proven Boost prompts
 are in its Appendix B and are the starting point for the AI steps below)
 
