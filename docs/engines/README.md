@@ -10,7 +10,7 @@ out, understood and adjusted without reading the whole app.
 | # | Engine | Runs when | Doc | Status |
 |---|--------|-----------|-----|--------|
 | 1 | **Login** | An agent signs up, signs in, connects Meta, and goes through onboarding | `login-engine.md`, brain: `engine-1-brain.md` (PR #18) | Written |
-| 2 | **Brand** | Right after Meta connects; whenever the agent edits My Brand; every 90 days | `brand-engine.md` | To write (spec: Brand Engine spec) |
+| 2 | **Brand** | During the new client sign-up, right after the Facebook sign-in; Research again on My Brand | `engine-2-brain.md` | Brain written (22 Nov) |
 | 3 | **Campaign** | From **+ Campaign** to **Approve and launch**: link check, payment, build, review | `campaign-engine.md` | To write (specs: Listing Link Engine, Post Engine, Ad Engine) |
 | 4 | **Active campaign** | From launch to sold or ended: publishing, the ad, the listing watch, leads, reports, Run until sold | `active-campaign-engine.md` | To write |
 | 5 | **Billing** | Adding a card, charging a campaign, renewals, refunds | `billing-engine.md` | To write |
