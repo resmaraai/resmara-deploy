@@ -9,7 +9,7 @@ the face on top.
 
 | # | Step | Engine | AI used | Ready? | Build room ticket |
 |---|------|--------|---------|--------|-------------------|
-| 1 | Sign up and connect Meta | **Login and Meta integration** | None needed: facts come straight from Meta. AI only explains unusual errors | **Partly.** Screens done. Server bug: nothing is saved without an ad account, and reconnecting doesn't update the Page or Instagram | Engine: Login and Meta integration |
+| 1 | Sign up and connect Meta | **Login and Meta integration** | None needed: facts come straight from Meta. AI only explains unusual errors | **Partly.** Screens done. Server bug: nothing is saved without an ad account, and reconnecting doesn't update the Page or Instagram. Brain written for PR #18 (account, Meta connection, audit, setup to-do list) | Engine: Login and Meta integration |
 | 2 | Build their brand | **Brand** | Should study their Instagram, website and brokerage | **No.** Only a basic version exists; the onboarding step is an animation | Engine: Brand |
 | 3 | Paste the listing link | **Listing link** | Should read the page and research the home by address | **Partly.** Opening the link, finding photos and catching sold or pending listings work. No AI read of the page; research only runs after payment | Engine: Listing link |
 | 4 | Pick the 14 photos | **Photo selection** (Campaign engine) | Vision AI scores every photo and rules out clutter, dark shots, bathrooms and mess | **Yes** | Engine: Campaign build |
@@ -25,8 +25,8 @@ the face on top.
 
 | PR | What |
 |----|------|
-| #17 | The whole front end: look, feel, pop-ups and workflow, including the new campaign page. Deploy first. |
-| #18 | Engine 1 · Login and Meta integration. Built as far as possible; the last piece plugs in once the Meta app review is approved |
+| #17 | The whole front end: look, feel, pop-ups and workflow, including the new campaign page. **Merged 22 Nov 2026.** |
+| #18 | Engine 1 · Login and Meta integration: account, Meta connection, the audit and the setup to-do list. Brain written (`engines/engine-1-brain.md`), waiting for Adam's greenlight. Built as far as possible; the last piece plugs in once the Meta app review is approved |
 | #19 | Engine 2 · Brand |
 | #20 | Engine 3 · Listing link |
 | then | Engine 4 · Campaign build, Engine 5 · Website, Engine 6 · Active campaign, Engine 7 · Marketing, Engine 8 · Run it until it sells, each its own PR |
