@@ -1,7 +1,9 @@
 # Engine 1 brain: Login and Meta integration
 
-**Status:** written, reviewed with Adam 22 Nov; this PR is the brain and screens, the build follows on this branch · **Builds in:** PR #18 · **Started:** 21 Nov 2026
-**Technical doc (what exists today):** `engines/login-engine.md` · **Meta spec:** `engines/meta-integration-engine.md`
+**Status:** greenlit, sent to Dan and merged (PR #18, 22 Nov) · **Started:** 21 Nov 2026
+**Changed 22 Nov, after the merge:** Facebook is the only way in, and there are no teams or
+brokerage accounts (see Part A, 10b). These changes ship in the Resmara sign-up tour engine's PR.
+**Technical doc (what exists today):** `engines/login-engine.md` · **Meta spec:** `engine-specs/resmara-meta-integration-engine-spec.md`
 
 Engine 1 has two halves that run back to back:
 
@@ -27,20 +29,19 @@ license, phone) comes later, from Meta and My Brand.
 
 ### 2. Ways in
 
-| Way | What it asks | What happens next |
-|-----|--------------|-------------------|
-| **Continue with Facebook** | Nothing (Facebook's own pop-up) | Creates the account **and starts the Meta connection in the same step**. Best path: it skips Part B's separate Connect step. |
-| **Email and password** (the fallback) | Name, email, password | Confirmation email, then sign in; Part B (Connect Meta) next. |
+**One way in: Continue with Facebook** (Adam, 22 Nov). Resmara runs everything through Meta, so a
+Facebook account is required. A personal account is fine; a business Page is not needed to sign up.
 
-- **Facebook is the way we push.** It's the big button at the top. Email is a small fallback
-  underneath, for anyone who won't use Facebook to sign in (and for team members later).
-- **No Google sign-in.** Resmara needs their Meta account anyway, so Google would only add a
-  step before the one that matters.
+- **One door for new and returning clients.** The top-right **Client Login** and the homepage's
+  **Let's get started** open the same pop-up, "Log in with Facebook". If that Facebook account is
+  already on Resmara it signs them in; if not, it creates the account and starts the Meta
+  connection in the same step.
+- **No Facebook account:** "You'll need one to use Resmara. It's free: create one on Facebook,
+  then come back here."
+- **No email and password sign-up, and no Google sign-in.**
 - No phone number and no brokerage at sign-up: either one makes people stop.
 - If Facebook doesn't give us an email (some accounts hide it), ask for it once, then confirm it.
-- One account per email. If someone signs in with Facebook using an email that already has an
-  account, it's the **same account**: the new sign-in method is linked to it, never a
-  second account.
+  The email is for receipts and updates, not for signing in.
 - The Facebook window asks for everything at once: name and email, plus the Page, Instagram and
   ad permissions. Those last three need Meta App Review. Until it's approved, Facebook sign-up
   creates the account from name and email, and a short Connect step follows; once approved,
@@ -50,35 +51,25 @@ license, phone) comes later, from Meta and My Brand.
 
 All of these, quietly, without slowing a real person down:
 
-1. **Invisible bot check** on sign-up, sign-in and Forgot password (Cloudflare Turnstile: free,
-   usually no puzzle for a real person).
-2. **Email confirmation** before an email-and-password account can do anything (built).
-   Facebook sign-ins are already confirmed by Meta.
-3. **Limits on tries:** too many sign-ups from one place, or too many wrong passwords on one
-   account, and it waits (for example 5 wrong passwords = a 15-minute pause, and an email to the
-   agent).
-4. **Throwaway email domains refused** (the known disposable-inbox services).
-5. **Beta invite code (optional switch).** While it's on, sign-up asks for a code we hand out
+1. **Invisible bot check** on the log-in pop-up (Cloudflare Turnstile: free, usually no puzzle
+   for a real person).
+2. **Real Facebook accounts only.** Every sign-in is confirmed by Meta.
+3. **Limits on tries:** too many sign-ups from one place and it waits.
+4. **Beta invite code (optional switch).** While it's on, sign-up asks for a code we hand out
    (for example to Founding Agents or a coach's group). No code, no account. Turn it off for
    public launch. *Already built on the server (`RESMARA_SIGNUP_CODE`); needs the sign-up screen
    to show the field when it's on.*
-6. **No campaign without a card and a real Facebook login.** A bot can't spend money or post,
+5. **No campaign without a card and a real Facebook login.** A bot can't spend money or post,
    because a campaign needs a confirmed card and a real Meta connection.
 
-### 4. One person, one account (and teams later)
+### 4. One person, one account (no teams)
 
-- **The account holder is one person**: the one who pays and approves campaigns. One email,
-  one account.
-- **Teams (after the first sign-in, not at sign-up):** a light question once they're in:
-  *"Will you run campaigns yourself, or with a team?"* If a team, the account holder adds
-  team members' emails.
-  - Team members sign in with their own email and work in the same account (campaigns, leads,
-    My Brand).
-  - **Only the account holder pays and gives the final Approve and launch.** Team members can
-    build, review and edit, but the Approve and launch button only works for the account holder.
-  - Several agents sharing one Facebook Page: that's a team on one account, not several
-    accounts fighting over one Page. A second account that tries to connect a Page already
-    connected elsewhere is blocked (Part B).
+- **Every account is one agent**: the one who signs in with their Facebook, pays and approves
+  campaigns. No teams, no team members, no brokerage accounts (Adam, 22 Nov).
+- If a brokerage wants to pay for an agent, the agent pays and gets reimbursed by their brokerage.
+  A brokerage solution is **phase 2**, after launch.
+- **One Facebook Page, one Resmara account.** A second account that tries to connect a Page
+  already connected elsewhere is blocked (Part B).
 
 ### 5. Closing and coming back
 
@@ -86,7 +77,7 @@ Two different things, kept apart:
 
 | Action | What happens | Coming back |
 |--------|--------------|-------------|
-| **Close my account** | Signs them out everywhere, stops anything scheduled, stops all emails. Their campaigns, leads and reports are kept. | Signing in says **"This account has been closed. Would you like to reactivate it?"** One click brings it all back. |
+| **Close my account** | Signs them out everywhere, stops anything scheduled, stops all emails. Their campaigns, leads and reports are kept. | Logging in says **"This account has been closed. Would you like to reactivate it?"** One click brings it all back. |
 | **Delete my data** | Permanent: personal details, brand kit, Meta connection and tokens are removed (their legal right, and Meta requires it). Payment records are kept, as the law requires. | Can't be undone. They'd sign up fresh. |
 
 *Today the site only has the permanent version (called "close"). It needs splitting into these two.*
@@ -109,7 +100,7 @@ like this: enough to help, not enough to annoy.
 
 **The day-3 check-in picks one situation** (the first that's true):
 
-1. Hasn't signed in since signing up → "Looks like you haven't been back yet. Need a hand getting started?"
+1. Hasn't logged in since signing up → "Looks like you haven't been back yet. Need a hand getting started?"
 2. Meta not connected → "Connecting Facebook is the one step left. It takes two minutes, or I can do it with you."
 3. Meta connected but something's missing (no Page, no ad account, personal Instagram) →
    names the exact thing, links the setup guide, offers a quick call.
@@ -128,9 +119,8 @@ like this: enough to help, not enough to annoy.
 
 ### 7. Who gets told
 
-- **Every new sign-up: Adam gets an email**, with their name, email, how they signed up and
-  whether Meta connected. Nothing else (no Google Chat, no new Team room list; they already
-  show in Accounts).
+- **Every new sign-up: Adam gets an email**, with their name, email and whether Meta connected.
+  Nothing else (no Google Chat, no new Team room list; they already show in Accounts).
 - If sign-ups ever get busy enough to be noise, Adam can switch it to one daily summary.
 - Test accounts never trigger the email.
 
@@ -138,49 +128,54 @@ like this: enough to help, not enough to annoy.
 
 | Job | Given | Must return | Guardrail |
 |-----|-------|-------------|-----------|
-| Write the welcome email | Name, sign-up method, Meta status | Subject plus a short email in Adam's voice | Facts only; fixed links (book a call, setup guides) inserted by the system, never invented |
-| Pick and write the day-3 check-in | The account facts (sign-ins, Meta checks, campaigns, leads) | Which situation (1 to 6) plus subject and email | Must name a listed situation; if not, the plain check-in |
+| Write the welcome email | Name, Meta status | Subject plus a short email in Adam's voice | Facts only; fixed links (book a call, setup guides) inserted by the system, never invented |
+| Pick and write the day-3 check-in | The account facts (log-ins, Meta checks, campaigns, leads) | Which situation (1 to 6) plus subject and email | Must name a listed situation; if not, the plain check-in |
 | Write the day-7 and day-14 notes | The same account facts | Subject plus a short email, or "skip" if a campaign has launched | Never sent once a campaign has launched |
 
-Everything else in Part A (who you are, passwords, bot checks) is decided by code, never by AI.
+Everything else in Part A (who you are, bot checks) is decided by code, never by AI.
 
 ### 9. Outcomes (what the agent sees)
 
 | Situation | Message |
 |-----------|---------|
-| Signed up with email | "Check your inbox. We sent a link to confirm your email." |
-| Signed in with Facebook | Straight into the audit (Part C) |
-| Facebook sign-in hid the email | "One more thing: what email should we use for your account?" |
-| Email already has an account | "You already have an account with this email. Sign in instead?" (offers the right method) |
-| Too many wrong passwords | "Too many tries. Wait 15 minutes or reset your password." |
+| New, logged in with Facebook | Straight into the audit (Part C) |
+| Returning, logged in with Facebook | Straight to their dashboard |
+| Facebook log-in hid the email | "One more thing: what email should we use for your receipts and updates?" |
+| No Facebook account | "You'll need one to use Resmara. It's free: create one on Facebook, then come back here." |
 | Bot check failed | "We couldn't confirm you're a person. Try again." |
 | Beta code missing or wrong | "Resmara is invite-only right now. Enter your invite code." |
-| Closed account signs in | "This account has been closed. Would you like to reactivate it?" |
+| Closed account logs in | "This account has been closed. Would you like to reactivate it?" |
 
 ### 10. How we'll know it works
 
-- Sign-up to first sign-in: under a minute with Facebook.
+- Sign-up to first sign-in: under a minute.
+- The same Facebook account logging in twice gets the same Resmara account, never a second one.
 - A scripted bot run can't create accounts (bot check plus limits).
-- Same email through Facebook and email sign-up ends up as one account.
 - Close, then reactivate: everything is back. Delete: personal data gone, payments kept.
 - The day-3 email picks the right situation for each test account setup, and never emails a
   test or closed account.
 - An account that launches a campaign gets no day-7 or day-14 email.
-- A team member can't press Approve and launch; the account holder can.
 
 ### 10a. Decided with Adam (21 Nov 2026)
 
 - Onboarding emails: welcome, day 3, day 7 and day 14, stopping as soon as a campaign launches.
 - Sign-up alerts: an email to Adam for every sign-up.
-- Only the account holder can Approve and launch.
-- Ways in (22 Nov): Facebook first, email as the fallback. No Google sign-in.
+- No Google sign-in (22 Nov).
+
+### 10b. Changed with Adam (22 Nov 2026, after PR #18 merged)
+
+- **Facebook only.** A Facebook account is the gate to sign up; the email and password way in
+  is removed. One "Log in with Facebook" pop-up for new and returning clients.
+- **No teams and no brokerage accounts.** One agent per account. Brokerages that want to pay can
+  reimburse the agent; a brokerage solution is phase 2, after launch.
+- Both ship in the Resmara sign-up tour engine's PR.
 
 ---
 
 ## Part B: Meta connection
 
 The full technical detail is already written in the Meta spec
-(`docs/engines/meta-integration-engine.md`, 20 Nov). This part is the short
+(`engine-specs/resmara-meta-integration-engine-spec.md`, 20 Nov). This part is the short
 version of what it must do, so Adam can greenlight it. Dan builds from the spec.
 
 ### 1. Job
@@ -200,7 +195,7 @@ never locks the agent out.
 | Page, no business Instagram | Post to Facebook and run the ad |
 | Page, no ad account (or no card on it) | Post to Facebook and Instagram, no ad |
 | Facebook login but no usable Page | **Download mode**: everything is built, they download and post it themselves |
-| No Facebook at all | Can't start a campaign; "You'll need a Facebook account first" with the setup guide |
+| No Facebook at all | Can't sign up: "You'll need a Facebook account to use Resmara" |
 
 The price is the same either way. Nothing here touches billing.
 
@@ -215,8 +210,8 @@ The price is the same either way. Nothing here touches billing.
 - If they have several Pages, one question: **"Which Page is your business?"** They can change
   it later in Accounts.
 - **One Page, one Resmara account.** If a Page is already connected to another account, it's
-  blocked: *"This Page is already connected to another Resmara account. Ask the account holder
-  to add you to their team."*
+  blocked: *"This Page is already connected to another Resmara account. If that account is
+  yours, log in with the Facebook you used for it. If not, contact us and we'll sort it out."*
 - **Brokerage-owned ad accounts:** if Meta lets us see and use the agent's ad account (even one
   owned by their brokerage's business account), it just works. If not, it's treated like no ad
   account: posts still go out, the ad is off, and they're offered the setup guide and a call.
@@ -226,7 +221,7 @@ The price is the same either way. Nothing here touches billing.
 Connections break (passwords change, logins expire, ad accounts get disabled), so Resmara
 re-checks:
 
-- on every sign-in;
+- on every log-in;
 - every night, for anyone with a live campaign;
 - right before every post and every ad launch;
 - whenever they press **Check again**.
@@ -252,7 +247,7 @@ them. Past posts are never sent late.
 - If Meta is down, nothing changes for the agent and no alarm is shown. Resmara retries quietly,
   and only the Team room hears about it after 6 hours.
 - Login tokens are stored encrypted, never shown, never emailed.
-- Facebook sign-in from Part A and Connect Meta are the same connection, never two.
+- Facebook log-in from Part A and Connect Meta are the same connection, never two.
 
 ### 7. What the AI does in Part B
 
@@ -287,14 +282,16 @@ them. Past posts are never sent late.
 - Each of the 19 situations shows the right message and the right Fix it now.
 - An agent with no ad account still posts to Facebook and Instagram.
 - Reconnecting changes the Page and picks up a newly linked Instagram.
-- A second account can't connect a Page that's already connected; it sees the team message.
+- A second account can't connect a Page that's already connected; it sees the "already
+  connected" message.
 - A broken login holds posts; reconnecting sends them; nothing past-due goes out late.
 - Meta's own test users (all set up, no ad account, no Page, personal Instagram, no card) all
   pass before every release that touches this engine.
 
-### 9a. Decided with Adam (21 Nov 2026)
+### 9a. Decided with Adam (21–22 Nov 2026)
 
-- Same Page, two accounts: blocked, with "Ask the account holder to add you to their team."
+- Same Page, two accounts: blocked, with "If that account is yours, log in with the Facebook you
+  used for it. If not, contact us." (22 Nov: no teams, so no "add you to their team".)
 - Brokerage-owned ad accounts: used if Meta lists them; otherwise no ad, plus the setup guide
   and a call.
 
@@ -314,7 +311,6 @@ Then hand what it found to the Brand engine, so nobody has to type what Meta alr
 
 - **Straight after Continue with Facebook** (Part A). Sign-up and audit are one step, so a
   Facebook sign-up never sees a separate "Connect Meta" screen.
-- After Connect Meta, for email sign-ups.
 - Again whenever they press **Check again** or **Reconnect**, and quietly on the schedule in
   Part B, section 4.
 
@@ -363,13 +359,17 @@ Then a result screen that **names what it found**, with photos, not codes:
 > ✓ **Instagram:** @adamfrenchrealty (photo)
 > • **Ad account:** Adam French Realty, needs a payment method
 
+*22 Nov: this result screen is replaced by the sign-up tour engine's finish pop-up (their brand
+and Facebook status, information only, with Show me around). Anything that needs fixing is
+handled in the tour.*
+
 | Result | Headline | Buttons |
 |--------|----------|---------|
 | Everything works | "You're all set. Resmara can post and run your ads." | **Build my brand** |
 | Works, with limits | "You're ready to go. A couple of things will make it better." Each limit says what it means ("No ad until your ad account has a payment method") | **Build my brand** · Fix it now |
 | No usable Page | "Resmara can build everything, but can't post for you yet." Download mode explained in one line | **Fix it now** · Book a call · Continue anyway |
 | Several Pages | "Which Page is your business?" (photos and names, "has Instagram" tag) | Pick one, then the result |
-| Page already used by another account | The team message from Part B | Sign out · Book a call |
+| Page already used by another account | The "already connected" message from Part B | Log in with a different Facebook · Contact us |
 
 **Rules for this screen**
 
@@ -400,7 +400,7 @@ account, that everything else reads.
 - **What's on it:** one item per thing that isn't working, in order of importance (login, then
   Page, then Instagram, then the ad account), each with what it means for their campaign,
   **Fix it now** and **Book a call**. Done items stay below with a tick and when they were done.
-- **How items tick off:** never by hand. The next check that passes (sign-in, Check again,
+- **How items tick off:** never by hand. The next check that passes (log-in, Check again,
   the nightly check, or before a post) ticks it off and records when. If something breaks later,
   it comes back onto the list.
 - **Where the agent sees it:** **Accounts → Your setup** ("One thing left to set up"), with the
@@ -439,9 +439,9 @@ helps when Meta returns an error we haven't seen, as in Part B.)
 - The Weekly Meta review card shows last week's unknown errors, and Approve puts a suggestion
   on Dan's list.
 
----
-
 ## Screens (what it should look like)
+
+*22 Nov: screens 1 and 7–10 are replaced by the sign-up tour engine (Facebook-only log-in, and the finish pop-up instead of "Here's what we found"). See `resmara-signup-tour-engine.md`.*
 
 From the clickable mockup Adam reviewed on 22 Nov (`engine-1-screens/mockup.js`, preview only, not
 for deploy). Facebook's own window is drawn to show the journey; the real one is Facebook's.
