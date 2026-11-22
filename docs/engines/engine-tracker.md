@@ -59,7 +59,7 @@ the sign-up tour PR, under `docs/journey/`.
   - One locked (built, unpaid) campaign per account at a time.
   - If a saved card is declined: nothing is charged, the campaign stays locked, and it says "Your payment
     didn't go through. Please check your card and try again," with Try again and Use another card.
-  - Write design guidelines for each look (Modern, Classic, Rustic; Match my brand is the default).
+  - Looks (Modern, Classic, Rustic, Match my brand) are dropped: post styles instead (Engine 4 brain, section 4).
   - The post writer reads the agent's Voice of the client.
 - **Engine 5 · Website (and the campaign page):** a shareable link to the listing's website
   page, shown on the campaign with a **Copy link** button (Adam, 22 Nov). Agents who post it
