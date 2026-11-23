@@ -56,7 +56,8 @@ Agents whose campaign ends **without** it turned on get the **Run it again · $3
 - **An open house** added to the listing becomes a post and the website's open house band.
 - **Pricing (Adam, 22 Nov):** Resmara stays away from promoting prices. **Only if a price change is
   validated** (the same new price on the agent's listing and at least one other source, read from
-  the listing's price field, never guessed), the next round can lead with it, worded only as
+  the listing's price field, never guessed; the agent's own "Price improved" post counts as a signal,
+  Engine 6), the next round can lead with it, worded only as
   **"Improved price"** or **"Updated pricing"**. **Never a number, never "price reduction" or "price
   drop"**, never the old price. If the price can't be validated, the round says nothing about price.
 
@@ -141,5 +142,8 @@ from). Mockups only: the brain above is what to build. The emails go out from Re
 | `04-email-card-declined.png` | Card declined after 3 tries: Check billing |
 | `05-email-run-it-again-day-12.png` | Campaigns without it on: Run it again · $39 or Run it until it sells |
 | `06-card-renewal-on-hold.png` | The campaign card when a renewal is on hold |
+| `07-email-new-price.png` | We noticed a price change: Set a new price or Don't show a price (Engine 5, section 3a) |
+| `08-new-price-page.png` | Set a new price: one box, Current list price, and Save |
+| `09-no-price-done.png` | Don't show a price: "Got it. No price on this listing." |
 
 Live preview: https://claude.ai/artifact/Lip2AN9HQZuLf4J5AsP8Vy#emails

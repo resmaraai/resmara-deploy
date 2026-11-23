@@ -1368,9 +1368,29 @@
       ${mail('3 · Back on the market', to, '1248 Oakridge Drive is back on the market. Your campaign is running again', '1248 Oakridge Drive is back on the market.', ['The listing shows for sale again with you as the listing agent, so your campaign is running again: your ad and the rest of this round’s posts picked up where they left off, and the renewals continue.', 'Your website is taking showing requests again.'], btn('See the campaign'))}
       ${mail('4 · The card is declined (after 3 tries)', to, 'We couldn’t renew your campaign for 1248 Oakridge Drive', 'We couldn’t renew your campaign.', ['Round 4 for 1248 Oakridge Drive is built and ready, but your card was declined, so nothing was charged and it hasn’t gone live.', 'Please check your billing on Resmara. As soon as your card works, round 4 goes live on its own.'], btn('Check billing'), 'We tried your card 3 times, once a day. Your current round finished as planned.')}
       ${mail('5 · Campaigns without it turned on: day 12', to, 'Keep the momentum going on 1248 Oakridge Drive', 'Keep the momentum going.', ['Your campaign for 1248 Oakridge Drive ends in 2 days. Run it again for a fresh 14 days of new posts and new ads, built from what worked this time.', 'Or turn on Run it until it sells, and we’ll keep it going every 2 weeks until it sells.'], btn('Run it again · $39') + btn('Run it until it sells', true), 'Run it again is $39 for 14 days. Your ad budget is billed separately by Meta.', 'Day 12 of 14')}
+      ${mail('6 · A price change we can\u2019t read', to, 'We noticed a price change on 1248 Oakridge Drive', 'We noticed a price change on 1248 Oakridge Drive.', ['Your post on Instagram says the price on this home has improved, but we can\u2019t find the new price online yet, so your website isn\u2019t showing a price right now.', '<b>Would you like us to update it?</b> Pick one. Either way, your website and the posts that haven\u2019t gone out yet are updated right away.'], `<a class="e8-btn" href="#" onclick="e8Price();return false">Set a new price</a><a class="e8-btn navy" href="#" onclick="e8Price(true);return false">Don\u2019t show a price</a>`, 'These buttons are just for you and this home, and work for 7 days. No sign-in needed.', 'Your listing website')}
+      <section id="e8-price-page"></section>
       <section><div class="e8-label">On the campaign card: renewal on hold</div><article class="card" style="max-width:360px"><img src="sample/photo-01.jpg" alt="" style="width:100%;height:170px;object-fit:cover;border-radius:16px 16px 0 0"><div style="padding:14px"><h3 style="margin:0;color:#12354d">1248 Oakridge Drive</h3><p style="margin:2px 0 0;color:#12354d">Austin, TX · Round 3, day 14 of 14</p><div class="e8-card-hold"><span>Renewal on hold: card declined</span><button onclick="dashboard('billing')">Check billing</button></div></div></article></section>
     </div>`;
     window.scrollTo(0, 0);
+  };
+  window.e8PriceDone = function (v) {
+    const f = document.getElementById('e8-pf'); if (!f) return;
+    const n = String(v || '').replace(/[^0-9]/g, '');
+    f.outerHTML = n ? `<p><b>Saved. Your website now shows Listed at $${Number(n).toLocaleString('en-US')}</b>, and the posts that haven\u2019t gone out yet are updated.</p>`
+      : `<p><b>Done. Your website won\u2019t show a price for this home</b>, and we won\u2019t ask again for this listing. Visitors see \u201cAsk Morgan about pricing\u201d instead.</p>`;
+  };
+  window.e8Price = function (noPrice) {
+    const box = document.getElementById('e8-price-page');
+    box.innerHTML = `<div class="e8-label">${noPrice ? 'After Don\u2019t show a price: one tap, done' : 'The page Set a new price opens'}</div><article class="e8-mail"><div class="e8-head"><img src="resmara-logo-white.png" alt="Resmara"></div>
+      <div class="e8-body"><h2>What\u2019s the right price?</h2>${home('Your listing website')}
+      <p>Please type in the current list price for this home. We\u2019ll update your website and the posts that haven\u2019t gone out yet.</p>
+      <form id="e8-pf" onsubmit="event.preventDefault();e8PriceDone(this.p.value)">
+        <label style="display:block;font-weight:700;margin:6px 0">Current list price</label>
+        <input name="p" required inputmode="numeric" placeholder="$830,000" style="width:100%;max-width:320px;border:1px solid #d8effd;border-radius:12px;padding:12px 14px;font:600 18px 'DM Sans',sans-serif;color:#12354d">
+        <div style="margin-top:12px"><button class="e8-btn" style="border:0;cursor:pointer">Save</button></div></form></div></article>`;
+    if (noPrice) { const h = box.querySelector('h2'); if (h) h.textContent = 'Got it. No price on this listing.'; box.querySelector('.e8-body > p').remove(); e8PriceDone(''); }
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
   const h8 = window.__previewHash || location.hash;
   if (h8 === '#emails') setTimeout(() => { history.replaceState(null, '', location.pathname + '#emails'); state.clientSignedIn = true; dashboard('campaigns'); e8Emails(); }, 90);

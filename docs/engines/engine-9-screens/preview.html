@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Resmara Team room · Marketing preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:'DM Sans',Arial,sans-serif;background:#f4f9fc;color:#12354d}
+.wrap{display:flex;min-height:100vh}
+aside{width:244px;flex:0 0 244px;background:#12354d;color:#fff;padding:26px 18px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{font-family:'Archivo Black','Arial Black',sans-serif;font-size:30px;text-align:center;letter-spacing:-.5px}
+.logo small{display:block;font:700 10px 'DM Sans',sans-serif;letter-spacing:3px;margin-top:2px}
+.grp{font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin:18px 12px 4px}
+aside a{display:block;color:#fff;text-decoration:none;font-size:14px;padding:8px 16px;border-radius:999px;cursor:pointer;opacity:.55}
+aside a.live{opacity:1}
+aside a.live:hover{background:rgba(255,255,255,.08)}
+aside a.sub{padding-left:30px;font-size:13.5px}
+aside a.on{background:#fff;color:#12354d;font-weight:700;opacity:1}
+main{flex:1;padding:22px 48px 60px;max-width:1240px}
+.top{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.crumb b{font-weight:700}
+.pill{display:inline-block;background:#d94c0d;color:#fff;border-radius:999px;padding:6px 12px;font-weight:700;font-size:12px}
+.head{display:flex;justify-content:space-between;align-items:baseline;margin:26px 0 18px}
+h1{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:30px;letter-spacing:-.8px;margin:0}
+.head span{font-size:13px}
+.hero{background:#12354d;color:#fff;border-radius:22px;padding:26px 28px}
+.eb{font-size:11px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase}
+.big{font-family:'Archivo Black','Arial Black',sans-serif;font-size:40px;letter-spacing:-1px;margin:6px 0 0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.big small{font:400 18px 'DM Sans',sans-serif}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:22px}
+.step{background:rgba(255,255,255,.1);border-radius:14px;padding:14px 16px}
+.step b{display:block;font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:28px}
+.step span{display:block;font-weight:700;margin-top:4px}.step small{display:block;font-size:12.5px;margin-top:3px}
+.card{background:#fff;border:1px solid #dcebf5;border-radius:18px;padding:22px 24px;margin:18px 0 0}
+.ct{font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:18px;letter-spacing:-.6px;margin:0 0 12px}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid #d8effd}
+.tbl td{padding:11px 10px;border-bottom:1px solid #eef5fa;vertical-align:top}
+.tbl .n{text-align:right;white-space:nowrap}
+.tbl tr.tot td{font-weight:800;border-top:2px solid #12354d;border-bottom:0}
+.tbl tr.click{cursor:pointer}.tbl tr.click:hover td{background:#f2f8fc}
+.tbl tr.camp td{background:#f2f8fc}
+.tbl tr.sub td{font-size:13px}.tbl tr.sub td:first-child{padding-left:28px}
+.tbl small{font-size:12px}
+.tag{display:inline-block;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:800;background:#12354d;color:#fff;white-space:nowrap}
+.tag.soft{background:#e2f0f8;color:#12354d}.tag.no{background:#d94c0d}
+.note{font-size:13px;margin:12px 0 0;line-height:1.5}
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.how div{background:#f2f8fc;border-radius:14px;padding:14px;font-size:13.5px;line-height:1.45}
+.how b{display:block;font-size:14px;margin-bottom:4px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:0;border-radius:999px;padding:10px 16px;font:700 14px 'DM Sans',sans-serif;cursor:pointer;background:#d94c0d;color:#fff}
+.btn.soft{background:#e2f0f8;color:#12354d}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}.row p{margin:0}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.tiles div{background:#f2f8fc;border-radius:14px;padding:14px}
+.tiles b{display:block;font:800 24px 'DM Sans',sans-serif}.tiles span{font-size:13px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}.two .card{margin-top:18px}
+.seg{display:inline-flex;background:#e2f0f8;border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;border-radius:999px;padding:6px 14px;font:700 13px 'DM Sans',sans-serif;color:#12354d;cursor:pointer}
+.seg button.on{background:#12354d;color:#fff}
+.funnel{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.funnel div{background:#f2f8fc;border-radius:14px;padding:14px}
+.funnel b{display:block;font-family:'Archivo Black','Arial Black',sans-serif;font-weight:400;font-size:24px}
+.funnel span{display:block;font-weight:700;font-size:13.5px;margin-top:4px}.funnel small{font-size:12px}
+.chev{display:inline-block;width:14px;transition:transform .15s}.open .chev{transform:rotate(90deg)}
+.banner{background:#e2f0f8;border-radius:14px;padding:10px 16px;font-size:13px;margin-bottom:18px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#12354d;color:#fff;padding:12px 18px;border-radius:999px;font-size:14px;font-weight:700;display:none}
+@media(max-width:900px){aside{display:none}main{padding:18px}.steps,.tiles,.how,.funnel{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}.tbl{font-size:12.5px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<aside>
+  <div class="logo">RESMARA<small>TEAM ROOM</small></div>
+  <a>Overview</a>
+  <div class="grp">Build</div><a>Build room</a><a>Releases</a>
+  <div class="grp">Agents</div><a>Accounts</a><a>Support</a><a>Connections</a>
+  <div class="grp">Campaigns</div><a>Campaigns</a>
+  <div class="grp">Money</div><a>Finance</a><a>Start-up costs</a><a>Filings &amp; deadlines</a>
+  <div class="grp">Business</div><a>Growth</a>
+  <a class="live" data-go="marketing">Marketing</a>
+  <a class="live sub" data-go="website">Website</a>
+  <a class="live sub" data-go="email">Email campaigns</a>
+  <a class="live sub" data-go="ads">Digital ads</a>
+  <div class="grp">System</div><a>Health</a><a>Activity</a><a>Settings</a>
+</aside>
+<main>
+  <div class="top"><div class="crumb">Team room / <b id="crumb">Marketing</b></div><span class="pill">Preview · sample numbers</span></div>
+  <div id="page"></div>
+</main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+// Sample data, last 30 days. Every page reads from this one object, so the pages always agree.
+const PRICE = 49;
+const D = {
+  ads:{cost:412.5, signups:38, paying:11, campaigns:16},
+  email:{cost:45, signups:0, paying:11, campaigns:14},
+  website:{cost:25, signups:22, paying:5, campaigns:6},
+  weeks:[{w:'Oct 26',ads:2,email:2,web:1,spentAds:96.2},{w:'Nov 2',ads:3,email:3,web:1,spentAds:101.4},{w:'Nov 9',ads:3,email:3,web:1,spentAds:104.9},{w:'Nov 16',ads:3,email:3,web:2,spentAds:110}],
+  adCampaigns:[
+    {name:'Agent sign-ups · November', ads:[
+      {name:'"Paste a link. Get 14 days of posts." · video', where:'Facebook, Instagram', spend:188.4, clicks:612, signups:19, paying:6, campaigns:9, running:true},
+      {name:'"Your listing, marketed until it sells" · photos', where:'Facebook, Instagram', spend:141.1, clicks:455, signups:13, paying:4, campaigns:6, running:true}]},
+    {name:'Seller story test', ads:[
+      {name:'"What your seller sees" · carousel', where:'Instagram', spend:83, clicks:223, signups:6, paying:1, campaigns:1, running:false}]}]
+};
+const money = n => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const whole = n => '$' + Math.round(n).toLocaleString('en-US');
+const back = c => c.campaigns * PRICE;
+const verdict = c => back(c) >= c.cost ? '<span class="tag">Working</span>' : '<span class="tag no">Not working</span>';
+const hero = (eb, big, small, steps) => `<div class="hero"><div class="eb">${eb}</div><div class="big">${big} <small>${small}</small></div><div class="steps">${steps.map(s=>`<div class="step"><b>${s[0]}</b><span>${s[1]}</span>${s[2]?`<small>${s[2]}</small>`:''}</div>`).join('')}</div></div>`;
+const head = (t, s) => `<div class="head"><h1>${t}</h1><span>${s}</span></div>`;
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2200);}
+
+function marketing(){
+  const ch=[['ads','Digital ads','Meta ad spend, read on its own'],['email','Email campaigns','Mailchimp plan, $45 a month'],['website','Website','People who came on their own · hosting $25 a month']];
+  const T={cost:0,signups:0,paying:0,campaigns:0}; ch.forEach(([k])=>Object.keys(T).forEach(f=>T[f]+=D[k][f]));
+  const rows = ch.map(([k,n,s])=>{const c=D[k];return `<tr class="click" data-go="${k}" title="Open ${n}"><td><b>${n}</b><br><small>${s}</small></td><td class="n">${money(c.cost)}</td><td class="n">${c.signups||'—'}</td><td class="n">${c.paying}</td><td class="n">${money(c.cost/c.paying)}</td><td class="n">${whole(back(c))}</td><td class="n">${money(back(c)/c.cost)}</td><td class="n">${verdict(c)}</td></tr>`}).join('');
+  const wk = D.weeks.map(w=>{const sp=w.spentAds+(D.email.cost+D.website.cost)/4;return `<tr><td>${w.w}</td><td class="n">${w.ads}</td><td class="n">${w.email}</td><td class="n">${w.web}</td><td class="n"><b>${w.ads+w.email+w.web}</b></td><td class="n">${money(sp)}</td></tr>`}).join('');
+  return head('Marketing', `${money(T.cost)} spent · ${T.paying} paying agents`) +
+    hero('Marketing · all channels · last 30 days', money(T.cost), 'spent on marketing',
+      [[T.signups,'Sign-ups','new accounts'],[T.paying,'Paying agents','bought a campaign'],[money(T.cost/T.paying),'Per paying agent',`${money(T.cost)} ÷ ${T.paying}`],[whole(T.campaigns*PRICE),'Money back',`${T.campaigns} campaigns × $${PRICE}`]]) +
+    `<div class="card"><h3 class="ct">Is each channel paying for itself?</h3>
+      <table class="tbl"><tr><th>Channel</th><th class="n">Cost</th><th class="n">Sign-ups</th><th class="n">Paying agents</th><th class="n">Per paying agent</th><th class="n">Money back</th><th class="n">Back for every $1</th><th class="n">Verdict</th></tr>${rows}
+      <tr class="tot"><td>All marketing</td><td class="n">${money(T.cost)}</td><td class="n">${T.signups}</td><td class="n">${T.paying}</td><td class="n">${money(T.cost/T.paying)}</td><td class="n">${whole(T.campaigns*PRICE)}</td><td class="n">${money(T.campaigns*PRICE/T.cost)}</td><td></td></tr></table>
+      <p class="note"><b>Working</b> = the agents it brought in paid more than it cost. <b>Not working</b> = it cost more than it brought back. Click a channel to see what's behind its row.</p></div>
+    <div class="card"><h3 class="ct">Paying agents each week</h3><table class="tbl"><tr><th>Week of</th><th class="n">Digital ads</th><th class="n">Email</th><th class="n">Website</th><th class="n">Total</th><th class="n">Spent</th></tr>${wk}</table></div>
+    <div class="card"><h3 class="ct">How the numbers are counted</h3><div class="how">
+      <div><b>Every sign-up is stamped</b>Each one is stamped with where it came from: the ad they clicked, or the website on its own. That's the Sign-ups column.</div>
+      <div><b>Each paying agent counts once</b>It counts for the last thing that got them to buy. Signed up from an ad, then bought from the day 5 email? That counts for Email. Nothing is counted twice, so the rows add up to the total.</div>
+      <div><b>Money back</b>It's every campaign those agents bought in the 30 days ($${PRICE} each). Ad cost comes from Meta on its own. The Mailchimp and hosting costs are typed in once, in Settings.</div></div></div>`;
+}
+
+function ads(){
+  const a=D.ads, sum=(list,f)=>list.reduce((t,x)=>t+x[f],0);
+  const camp = D.adCampaigns.map((c,i)=>{
+    const t={spend:sum(c.ads,'spend'),clicks:sum(c.ads,'clicks'),signups:sum(c.ads,'signups'),paying:sum(c.ads,'paying'),campaigns:sum(c.ads,'campaigns')};
+    const running=c.ads.some(x=>x.running);
+    const head=`<tr class="camp click open" data-camp="${i}"><td><span class="chev">›</span> <b>${c.name}</b><br><small>${c.ads.length} ad${c.ads.length>1?'s':''} · click to open or close</small></td><td></td><td class="n"><b>${money(t.spend)}</b></td><td class="n">${t.clicks.toLocaleString()}</td><td class="n">${t.signups}</td><td class="n">${t.paying}</td><td class="n">${money(t.spend/t.paying)}</td><td class="n">${whole(t.campaigns*PRICE)}</td><td class="n"><span class="tag${running?'':' soft'}">${running?'Running':'Paused'}</span></td></tr>`;
+    const kids=c.ads.map((x,j)=>`<tr class="sub" data-of="${i}"><td>${x.name}</td><td>${x.where}</td><td class="n">${money(x.spend)}</td><td class="n">${x.clicks}</td><td class="n">${x.signups}</td><td class="n">${x.paying}</td><td class="n">${money(x.spend/x.paying)}</td><td class="n">${whole(x.campaigns*PRICE)}</td><td class="n"><button class="tag${x.running?'':' soft'}" style="border:0;cursor:pointer" data-toggle="${i},${j}" title="Click to ${x.running?'pause':'run'}">${x.running?'Running':'Paused'}</button> ${verdict({campaigns:x.campaigns,cost:x.spend})}</td></tr>`).join('');
+    return head+kids;}).join('');
+  const all=D.adCampaigns.flatMap(c=>c.ads), clicks=sum(all,'clicks');
+  return head('Digital ads', `${money(a.cost)} spent · ${a.paying} paying agents`) +
+    hero('Digital ads · last 30 days', money(a.cost/a.paying), 'per new paying agent',
+      [[money(a.cost),'Ad spend',`${all.filter(x=>x.running).length} ads running`],['61','Leads','people who started signing up'],['$6.76','Cost per lead',''],[a.paying,'New paying agents','paid for a first campaign']]) +
+    `<div class="card"><h3 class="ct">Every campaign and ad we're running</h3>
+      <table class="tbl"><tr><th>Campaign and ad</th><th>Where</th><th class="n">Spend</th><th class="n">Clicks</th><th class="n">Sign-ups</th><th class="n">Paying agents</th><th class="n">Per paying agent</th><th class="n">Money back</th><th class="n">Status</th></tr>${camp}
+      <tr class="tot"><td>All ads</td><td></td><td class="n">${money(a.cost)}</td><td class="n">${clicks.toLocaleString()}</td><td class="n">${a.signups}</td><td class="n">${a.paying}</td><td class="n">${money(a.cost/a.paying)}</td><td class="n">${whole(back(a))}</td><td></td></tr></table>
+      <p class="note">Read from Resmara's own Meta ad account. The "What your seller sees" ad cost $83 and brought back $49, so it's marked Not working. Click any ad's Running or Paused button to switch it. The All ads row is the Digital ads row on the <a href="#" data-go="marketing" style="color:#12354d;font-weight:700">Marketing</a> page.</p></div>
+    <div class="card"><h3 class="ct">From ad to paying agent</h3><div class="funnel">
+      <div><b>48,210</b><span>Saw an ad</span></div><div><b>1,290</b><span>Clicked</span><small>2.7% of the step before</small></div><div><b>61</b><span>Started signing up</span><small>4.7% of the step before</small></div><div><b>38</b><span>Made an account</span><small>62.3% of the step before</small></div><div><b>11</b><span>Paid for a campaign</span><small>28.9% of the step before</small></div></div></div>
+    <div class="card"><h3 class="ct">Each week</h3><table class="tbl"><tr><th>Week of</th><th class="n">Spent on ads</th><th class="n">Paying agents from ads</th></tr>${D.weeks.map(w=>`<tr><td>${w.w}</td><td class="n">${money(w.spentAds)}</td><td class="n">${w.ads}</td></tr>`).join('')}</table></div>`;
+}
+
+function email(){
+  const e=D.email;
+  const r=(n,d,s,o,c)=>`<tr class="sub"><td>${n}</td><td>${d}</td><td class="n">${s}</td><td class="n">${o}</td><td class="n">${c}</td><td></td></tr>`;
+  const ser=(n,who,when,s,o,c)=>`<tr class="camp"><td><b>${n}</b><br><small>${who}</small></td><td>${when}</td><td class="n">${s}</td><td class="n">${o}</td><td class="n">${c}</td><td class="n"><span class="tag">On</span></td></tr>`;
+  return head('Email campaigns', `214 on the list · ${e.paying} paying agents`) +
+    hero('Email campaigns · last 30 days','214','people on the Resmara list',[['46%','Opened','all marketing emails'],['9%','Clicked','opened and clicked'],[e.paying,'Paying agents','bought after an email'],['3','Unsubscribed','never emailed again']]) +
+    `<div class="card"><h3 class="ct">Mailchimp</h3><div class="row"><p><b>Connected</b> · audience "Resmara clients" · 214 contacts · synced 10 minutes ago. New accounts are added on their own; unsubscribes and closed accounts come off.</p>
+      <div class="btns"><button class="btn soft" data-t="The CSV of all 214 contacts would download here.">Export emails (CSV)</button><button class="btn" data-t="This would open Resmara's Mailchimp account.">Open Mailchimp</button></div></div></div>
+    <div class="card"><h3 class="ct">Every email we're running</h3><table class="tbl"><tr><th>Series and email</th><th>When</th><th class="n">Sent</th><th class="n">Opened</th><th class="n">Clicked</th><th></th></tr>
+      ${ser('Welcome','Everyone who signs up','Day 0, 3, 7, 14',152,'58%','14%')}${r('Welcome to Resmara','Day 0',38,'71%','22%')}${r('Your brand is ready','Day 3',38,'60%','15%')}${r('How agents use their listing website','Day 7',38,'52%','11%')}${r('Run it until it sells','Day 14',38,'49%','9%')}
+      ${ser('Start your first campaign','Signed up, no campaign yet','Day 2, 5, 10',63,'41%','11%')}${r('Paste a link, get 14 days of posts','Day 2',23,'48%','14%')}${r('What your seller sees','Day 5',21,'39%','10%')}${r('Your first campaign is one link away','Day 10',19,'35%','8%')}
+      ${ser('Tips and updates','Current clients','Every 2 weeks',398,'39%','6%')}${r('Nov 18 · 3 photos that stop the scroll','',143,'41%','7%')}${r('Nov 4 · Reading your day 7 report','',129,'37%','5%')}</table>
+      <p class="note">Every email is written once, approved by Adam and built in Mailchimp in Resmara's look. Campaign emails (leads, renewals, reports, price changes) aren't here: the app sends those itself.</p></div>
+    <div class="card"><h3 class="ct">What the emails brought in</h3><table class="tbl"><tr><th>Series</th><th class="n">Paying agents</th><th class="n">Campaigns bought</th><th class="n">Money back</th></tr>
+      <tr><td>Start your first campaign</td><td class="n">8</td><td class="n">8</td><td class="n">$392</td></tr><tr><td>Welcome</td><td class="n">3</td><td class="n">3</td><td class="n">$147</td></tr><tr><td>Tips and updates (ran another campaign)</td><td class="n">—</td><td class="n">3</td><td class="n">$147</td></tr>
+      <tr class="tot"><td>All emails</td><td class="n">${e.paying}</td><td class="n">${e.campaigns}</td><td class="n">${whole(back(e))}</td></tr></table>
+      <p class="note">The All emails row is the Email campaigns row on the <a href="#" data-go="marketing" style="color:#12354d;font-weight:700">Marketing</a> page. Cost is the Mailchimp plan, $45 a month.</p></div>
+    <div class="card"><h3 class="ct">Who's on the list</h3><div class="tiles"><div><b>38</b><span>Signed up, no campaign yet</span></div><div><b>143</b><span>Have run a campaign</span></div><div><b>27</b><span>Run it until it sells on</span></div><div><b>6</b><span>Unsubscribed (kept off)</span></div></div></div>`;
+}
+
+function website(){
+  const w=D.website;
+  return head('Website', '3,120 visitors · 60 sign-ups') +
+    hero('resmara.com · last 30 days','3,120','visitors',[['60','Sign-ups','every sign-up happens here'],['1.9%','Visitors who sign up','60 of 3,120'],[w.signups,'Came on their own','not from an ad or email'],[w.paying,'Paying agents','credited to the website']]) +
+    `<div class="card"><h3 class="ct">Who came, and where they're counted</h3><table class="tbl"><tr><th>Visitors who…</th><th class="n">Visitors</th><th class="n">Sign-ups</th><th class="n">Paying agents</th><th>Counted under</th></tr>
+      <tr class="click" data-go="ads"><td>Clicked an ad</td><td class="n">1,290</td><td class="n">38</td><td class="n">11</td><td>Digital ads</td></tr>
+      <tr><td>Came on their own (Google, typed it in, shared links)</td><td class="n">1,620</td><td class="n">22</td><td class="n">5</td><td><b>Website</b></td></tr>
+      <tr class="click" data-go="email"><td>Clicked an email (already have an account)</td><td class="n">210</td><td class="n">—</td><td class="n">11</td><td>Email campaigns</td></tr></table>
+      <p class="note">Everyone lands on the site, so this page shows all of it. The Website row on the <a href="#" data-go="marketing" style="color:#12354d;font-weight:700">Marketing</a> page only counts the people who came on their own. Click a row to jump to that channel.</p></div>
+    <div class="two"><div class="card"><h3 class="ct">Where visitors come from</h3><table class="tbl"><tr><td>Meta ads</td><td class="n">1,290</td></tr><tr><td>Google search</td><td class="n">960</td></tr><tr><td>Typed it in</td><td class="n">510</td></tr><tr><td>Mailchimp emails</td><td class="n">210</td></tr><tr><td>Shared links and other</td><td class="n">150</td></tr></table></div>
+      <div class="card"><h3 class="ct">Top pages</h3><table class="tbl"><tr><th>Page</th><th class="n">Visitors</th><th class="n">Sign-ups</th></tr><tr><td>Home</td><td class="n">2,140</td><td class="n">41</td></tr><tr><td>How it works</td><td class="n">610</td><td class="n">12</td></tr><tr><td>Pricing</td><td class="n">370</td><td class="n">7</td></tr></table></div></div>
+    <div class="card"><div class="row"><div><h3 class="ct">Heat maps and recordings</h3><p class="note" style="margin:0">See where people click, scroll and give up, in Microsoft Clarity.</p></div><button class="btn soft" data-t="This would open Microsoft Clarity.">Open Clarity</button></div></div>`;
+}
+
+const PAGES={marketing:['Marketing',marketing],ads:['Digital ads',ads],email:['Email campaigns',email],website:['Website',website]};
+function show(k){
+  if(!PAGES[k]) k='marketing';
+  document.getElementById('page').innerHTML=PAGES[k][1]();
+  document.getElementById('crumb').textContent=PAGES[k][0];
+  document.querySelectorAll('aside a[data-go]').forEach(a=>a.classList.toggle('on',a.dataset.go===k));
+  try{history.replaceState(null,'','#'+k)}catch(e){}
+  window.scrollTo(0,0);
+}
+document.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]'); if(g){e.preventDefault();show(g.dataset.go);return;}
+  const tg=e.target.closest('[data-toggle]'); if(tg){const [i,j]=tg.dataset.toggle.split(',');const x=D.adCampaigns[i].ads[j];x.running=!x.running;show('ads');toast(x.running?'Ad running again':'Ad paused');return;}
+  const c=e.target.closest('[data-camp]'); if(c){c.classList.toggle('open');document.querySelectorAll('[data-of="'+c.dataset.camp+'"]').forEach(r=>r.style.display=c.classList.contains('open')?'':'none');return;}
+  const t=e.target.closest('[data-t]'); if(t) toast(t.dataset.t);
+});
+document.querySelectorAll('aside a:not(.live)').forEach(a=>a.title='Not part of this preview');
+show((location.hash||'').slice(1));
+</script>
+</body>
+</html>
