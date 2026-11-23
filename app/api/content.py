@@ -402,7 +402,9 @@ async def publish_boost(boost_id: int, current_user: User = Depends(get_current_
                         db: Session = Depends(get_db)):
     """Publish this boost's due posts now (the button in the UI)."""
     from app.services.publisher import publish_due
+    from app.api.billing import require_unlocked
     boost = _owned_boost(boost_id, current_user, db)
+    require_unlocked(boost, current_user, db)
     return await publish_due(db, boost_id=boost.id)
 
 

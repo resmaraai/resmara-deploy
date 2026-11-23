@@ -108,7 +108,7 @@ def round_of(boost) -> int:
 
 def checkout_payload(boost_id: int, user_id: int, address: str, base_url: str,
                      cents: int | None = None, customer_id: str | None = None,
-                     save_card: bool = True, round_no: int = 0) -> list:
+                     save_card: bool = True, round_no: int = 0, embedded: bool = False) -> list:
     """The form-encoded body for POST /v1/checkout/sessions, as a list of pairs.
 
     A list (not a dict) because Stripe's bracket notation repeats keys; httpx preserves the
@@ -129,10 +129,19 @@ def checkout_payload(boost_id: int, user_id: int, address: str, base_url: str,
     name = "Resmara campaign — %s" % (address or "your listing")
     if round_no:
         name += " · round %d" % (round_no + 1)
+    if embedded:
+        # Stripe's form inside our pop-up (the sign-up tour engine, section 9): no jump to a
+        # hosted page. Stripe comes back to return_url only for redirect-based methods.
+        urls = [("ui_mode", "embedded"),
+                ("return_url", "%s/?checkout=done&boost=%d&session_id={CHECKOUT_SESSION_ID}"
+                 % (base_url.rstrip("/"), boost_id)),
+                ("redirect_on_completion", "if_required")]
+    else:
+        urls = [("success_url", _success_url(base_url, boost_id)),
+                ("cancel_url", _cancel_url(base_url, boost_id))]
     pairs = [
         ("mode", "payment"),
-        ("success_url", _success_url(base_url, boost_id)),
-        ("cancel_url", _cancel_url(base_url, boost_id)),
+        *urls,
         ("client_reference_id", str(boost_id)),
         ("line_items[0][quantity]", "1"),
         ("line_items[0][price_data][currency]", CURRENCY),
@@ -161,6 +170,20 @@ def checkout_payload(boost_id: int, user_id: int, address: str, base_url: str,
     return pairs
 
 
+async def retrieve_session(session_id: str, client: httpx.AsyncClient | None = None) -> dict:
+    """Read one Checkout session back from Stripe (the embedded form's completion check)."""
+    owns = client is None
+    client = client or httpx.AsyncClient(timeout=30)
+    try:
+        resp = await client.get("%s/checkout/sessions/%s" % (STRIPE_API, session_id),
+                                headers={"Authorization": "Bearer %s" % secret_key()})
+        resp.raise_for_status()
+        return resp.json()
+    finally:
+        if owns:
+            await client.aclose()
+
+
 def form_body(pairs: list) -> tuple[bytes, dict]:
     """(body, headers) for a Stripe POST that repeats keys.
 
@@ -178,7 +201,7 @@ def form_body(pairs: list) -> tuple[bytes, dict]:
 async def create_checkout_session(boost_id: int, user_id: int, address: str, base_url: str,
                                   cents: int | None = None, client: httpx.AsyncClient | None = None,
                                   customer_id: str | None = None, save_card: bool = True,
-                                  round_no: int = 0) -> dict:
+                                  round_no: int = 0, embedded: bool = False) -> dict:
     """Create a Stripe Checkout session and return its JSON (id + url).
 
     Raises httpx.HTTPStatusError on a refusal so the caller can surface Stripe's own message
@@ -187,7 +210,8 @@ async def create_checkout_session(boost_id: int, user_id: int, address: str, bas
     if not billing_enabled():
         raise RuntimeError("Stripe is not configured: set STRIPE_SECRET_KEY on the service.")
     data = checkout_payload(boost_id, user_id, address, base_url, cents,
-                            customer_id=customer_id, save_card=save_card, round_no=round_no)
+                            customer_id=customer_id, save_card=save_card, round_no=round_no,
+                            embedded=embedded)
     body, headers = form_body(data)
     owns = client is None
     client = client or httpx.AsyncClient(timeout=30)

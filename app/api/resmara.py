@@ -394,6 +394,8 @@ def get_posts(boost_id: int, current_user=Depends(get_current_user), db: Session
     boost = db.query(Boost).filter(Boost.id == boost_id).first()
     if not boost or (boost.user_id != current_user.id and not current_user.is_admin):
         raise HTTPException(status_code=404, detail="Boost not found")
+    from app.api.billing import require_unlocked
+    require_unlocked(boost, current_user, db)
     return db.query(Post).filter(Post.boost_id == boost_id).order_by(Post.day, Post.slot).all()
 
 @router.patch("/posts/{post_id}/approve")
@@ -405,6 +407,8 @@ def approve_post(post_id: int, current_user=Depends(get_current_user), db: Sessi
     boost = db.query(Boost).filter(Boost.id == post.boost_id).first()
     if not boost or (boost.user_id != current_user.id and not current_user.is_admin):
         raise HTTPException(status_code=404, detail="Post not found")
+    from app.api.billing import require_unlocked
+    require_unlocked(boost, current_user, db)
     post.client_status = "approved"
     db.commit()
     return {"status": "approved", "post_id": post.id}

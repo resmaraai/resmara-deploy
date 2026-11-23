@@ -84,6 +84,111 @@ def require_paid(boost: Boost, user: User, db: Session) -> None:
     })
 
 
+# --- Build first, then pay to unlock (sign-up tour engine, section 5) -------------------------
+def is_built(boost: Boost, db: Session) -> bool:
+    """The build finished and left posts behind."""
+    from app.db.session import Post
+    return db.query(Post).filter(Post.boost_id == boost.id).first() is not None
+
+
+def is_locked(boost: Boost, user: User, db: Session) -> bool:
+    """Built and not paid: nothing can be reviewed, edited, downloaded or launched, and nothing posts."""
+    if getattr(user, "is_admin", False) or getattr(boost, "hidden", False):
+        return False
+    return is_built(boost, db) and not boost_is_paid(boost, db)
+
+
+def waiting_to_unlock(user: User, db: Session, *, exclude_id: int | None = None) -> Boost | None:
+    """The agent's campaign that's built and waiting for payment, if there is one."""
+    q = db.query(Boost).filter(Boost.user_id == user.id, Boost.paid_at.is_(None))
+    if exclude_id is not None:
+        q = q.filter(Boost.id != exclude_id)
+    for boost in q.order_by(Boost.id.desc()).all():
+        if is_locked(boost, user, db):
+            return boost
+    return None
+
+
+def allow_build(boost: Boost, user: User, db: Session) -> None:
+    """The build no longer asks for a card first. Two rules instead:
+
+    * one locked campaign at a time: another built-and-unpaid campaign must be unlocked (or
+      replaced) before a new one builds;
+    * rebuilding a campaign that's built and still locked needs paying first (it costs a build).
+    A credit left from an old pack still pays for the campaign up front, as before.
+    """
+    if getattr(user, "is_admin", False) or boost_is_paid(boost, db):
+        return
+    other = waiting_to_unlock(user, db, exclude_id=boost.id)
+    if other is not None:
+        raise HTTPException(status_code=409, detail={
+            "error": "unlock_first", "boost_id": other.id, "address": other.address,
+            "message": (f"Unlock {other.address} first. Your campaign for {other.address} is built and "
+                        "waiting. Unlock it to start another, or replace it with a new listing.")})
+    if int(getattr(user, "campaign_credits", 0) or 0) > 0 and consume_credit(boost, user, db):
+        return
+    if is_built(boost, db):
+        require_paid(boost, user, db)
+
+
+def require_unlocked(boost: Boost, user: User, db: Session) -> None:
+    """Review, edits, downloads and launch all wait until the campaign is paid for."""
+    if is_locked(boost, user, db):
+        raise HTTPException(status_code=402, detail={
+            "error": "locked", "boost_id": boost.id, "price_cents": billing.price_for(boost),
+            "price_label": billing.price_label(billing.price_for(boost)),
+            "message": (f"{boost.address} is built. Pay {billing.price_label(billing.price_for(boost))} "
+                        "to unlock it, then review and launch.")})
+
+
+def record_paid(db: Session, boost: Boost, user: User, cents: int, *, via: str, payment_intent=None,
+                session_id=None, card_label=None) -> Order:
+    now = datetime.utcnow()
+    order = Order(user_id=user.id, boost_id=boost.id, amount_cents=cents, currency=billing.CURRENCY,
+                  status="paid", paid_at=now, stripe_payment_intent=payment_intent,
+                  stripe_session_id=session_id)
+    db.add(order)
+    boost.paid_at = now
+    boost.paid_amount_cents = cents
+    from app.services import attribution
+    attribution.record_purchase(db, boost, now)
+    db.add(Event(user_id=user.id, boost_id=boost.id, event_type="campaign_paid",
+                 payload={"payment_intent": payment_intent, "amount_cents": cents, "via": via,
+                          "card": card_label}))
+    db.commit()
+    return order
+
+
+async def charge_saved(db: Session, boost: Boost, user: User) -> dict:
+    """Charge the saved card for one campaign. {"status": paid|no_card|declined|off, ...}."""
+    if boost_is_paid(boost, db):
+        return {"status": "paid", "already": True}
+    if not billing.billing_enabled():
+        return {"status": "off"}
+    cards = []
+    if user.stripe_customer_id:
+        try:
+            cards = await billing.list_cards(user.stripe_customer_id)
+        except Exception:  # noqa: BLE001 - an unreadable card list is no card
+            cards = []
+    if not cards:
+        return {"status": "no_card"}
+    card = cards[0]
+    cents = billing.price_for(boost)
+    result = await billing.charge_saved_card(
+        customer_id=user.stripe_customer_id, payment_method_id=card["id"], cents=cents,
+        boost_id=boost.id, user_id=user.id, address=boost.address or "", round_no=billing.round_of(boost))
+    if not result.get("paid"):
+        db.add(Event(user_id=user.id, boost_id=boost.id, event_type="card_charge_failed",
+                     payload={"payment_intent": result.get("payment_intent"),
+                              "message": result.get("message"), "amount_cents": cents}))
+        db.commit()
+        return {"status": "declined", "message": result.get("message"), "card": card.get("label")}
+    record_paid(db, boost, user, cents, via="saved_card", payment_intent=result.get("payment_intent"),
+                card_label=card.get("label"))
+    return {"status": "paid", "amount_cents": cents, "card": card.get("label")}
+
+
 async def customer_for(user: User, db: Session) -> str:
     """The Stripe Customer for this account, created on first use.
 
@@ -127,6 +232,10 @@ def billing_config():
 
 class CheckoutRequest(BaseModel):
     boost_id: int
+    # Stripe's form inside the pop-up (the unlock card). The hosted page stays for old links.
+    embedded: bool = False
+    # "Save this card for future campaigns", ticked by default.
+    save_card: bool = True
 
 
 @router.post("/billing/checkout")
@@ -154,7 +263,7 @@ async def create_checkout(body: CheckoutRequest, current_user: User = Depends(ge
                 .filter(Order.boost_id == boost.id, Order.status == "pending",
                         Order.checkout_url.isnot(None))
                 .order_by(Order.id.desc()).first())
-    if existing:
+    if existing and not body.embedded:
         return {"status": "pending", "boost_id": boost.id, "url": existing.checkout_url,
                 "session_id": existing.stripe_session_id, "price_cents": existing.amount_cents}
 
@@ -165,8 +274,8 @@ async def create_checkout(body: CheckoutRequest, current_user: User = Depends(ge
     try:
         session = await billing.create_checkout_session(
             boost_id=boost.id, user_id=current_user.id, address=boost.address,
-            base_url=settings.PUBLIC_BASE_URL, customer_id=customer_id, save_card=True,
-            cents=billing.price_for(boost), round_no=billing.round_of(boost))
+            base_url=settings.PUBLIC_BASE_URL, customer_id=customer_id, save_card=body.save_card,
+            cents=billing.price_for(boost), round_no=billing.round_of(boost), embedded=body.embedded)
     except httpx.HTTPStatusError as e:
         detail = "Stripe refused the checkout"
         try:
@@ -186,7 +295,37 @@ async def create_checkout(body: CheckoutRequest, current_user: User = Depends(ge
                  payload={"session_id": session.get("id"), "amount_cents": order.amount_cents}))
     db.commit()
     return {"status": "pending", "boost_id": boost.id, "url": session.get("url"),
-            "session_id": session.get("id"), "price_cents": order.amount_cents}
+            "session_id": session.get("id"), "price_cents": order.amount_cents,
+            "client_secret": session.get("client_secret"),
+            "publishable_key": billing.publishable_key() if body.embedded else None}
+
+
+@router.get("/billing/checkout/{session_id}/status")
+async def checkout_status(session_id: str, current_user: User = Depends(get_current_user),
+                          db: Session = Depends(get_db)):
+    """The embedded form finished: ask Stripe, and unlock the campaign straight away when it's paid.
+
+    The webhook does the same thing; whichever arrives first settles it, the other is a no-op.
+    """
+    order = db.query(Order).filter(Order.stripe_session_id == session_id).first()
+    if order is None or (order.user_id != current_user.id and not current_user.is_admin):
+        raise HTTPException(status_code=404, detail="Checkout not found")
+    if order.status == "paid":
+        return {"status": "paid", "boost_id": order.boost_id}
+    try:
+        session = await billing.retrieve_session(session_id)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Stripe did not answer ({type(exc).__name__})")
+    outcome = billing.checkout_outcome({"type": "checkout.session.completed", "data": {"object": session}})
+    if session.get("status") == "complete" and outcome.get("paid"):
+        settle_checkout(outcome, db)
+        return {"status": "paid", "boost_id": order.boost_id}
+    if session.get("status") == "expired":
+        return {"status": "expired", "boost_id": order.boost_id}
+    return {"status": "declined" if session.get("status") == "open" else (session.get("status") or "open"),
+            "boost_id": order.boost_id,
+            "message": "Your payment didn't go through. Please check your card and try again. Nothing was "
+                       "charged, and your campaign is saved right here."}
 
 
 @router.get("/billing/balance")
@@ -295,6 +434,11 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     if outcome.get("kind") == "card_setup":
         return {"received": True, "status": "card_saved"}
 
+    return settle_checkout(outcome, db)
+
+
+def settle_checkout(outcome: dict, db: Session) -> dict:
+    """A finished Checkout session, from the webhook or the embedded form's status check."""
     order = None
     if outcome.get("session_id"):
         order = db.query(Order).filter(Order.stripe_session_id == outcome["session_id"]).first()
@@ -502,6 +646,7 @@ def boost_billing(boost_id: int, current_user: User = Depends(get_current_user),
     return {
         "boost_id": boost.id,
         "paid": bool(boost.paid_at) or (order is not None and order.status == "paid"),
+        "locked": is_locked(boost, current_user, db),
         "exempt": bool(current_user.is_admin),
         "price_cents": billing.price_cents(),
         "price_label": billing.price_label(),

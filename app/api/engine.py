@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from app.db.session import get_db, SessionLocal, User, Boost, AdAccount, Asset, Post, Event
 from app.core.security import get_current_user
 from app.services.credits import CampaignStage, CampaignAction
-from app.api.billing import require_paid
+from app.api.billing import allow_build, charge_saved, is_locked, require_paid, require_unlocked
 
 router = APIRouter()
 
@@ -113,6 +113,13 @@ async def _run_build(boost_id: int, user_id: int, force: bool, openings: Optiona
             "tokens": spent.get("total_tokens"), "calls": spent.get("calls"),
         })
         db.commit()
+        # A saved card unlocks the campaign as soon as it's built; without one (or declined) it
+        # opens locked with the pay card on top.
+        if result.get("posts_created") and is_locked(boost, user, db):
+            try:
+                state["unlock"] = await charge_saved(db, boost, user)
+            except Exception as exc:  # noqa: BLE001 - a failed charge leaves it locked, never broken
+                state["unlock"] = {"status": "declined", "message": type(exc).__name__}
     except Exception as e:  # noqa: BLE001 - the build may fail for a dozen reasons; record it
         db.rollback()
         state.update({"status": "error", "error": str(e)[:400]})
@@ -152,7 +159,8 @@ async def build_campaign(boost_id: int, body: BuildRequest = BuildRequest(),
     outcome. Four model calls take minutes, which no hosted proxy will hold open.
     """
     boost = _owned_boost(boost_id, current_user, db)
-    require_paid(boost, current_user, db)
+    # Build first, then pay to unlock: no card is asked for before the build.
+    allow_build(boost, current_user, db)
     if body.photo_permission and not boost.photo_permission_at:
         # Stored, not just acknowledged: the timestamp is the record, and it is taken once so
         # a later build cannot move it.
@@ -322,12 +330,21 @@ def build_status(boost_id: int, current_user: User = Depends(get_current_user),
     started = state.get("started_at")
     if started:
         state["seconds"] = round(time.time() - started, 1)
+    # Built and waiting for payment: the campaign opens blurred with the pay card on top.
+    if state.get("status") == "done":
+        state["locked"] = is_locked(boost, current_user, db)
+        if run.get("unlock"):
+            state["unlock"] = run["unlock"]
     return state
 
 
 @router.get("/boosts/{boost_id}/plan")
 def get_plan(boost_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     boost = _owned_boost(boost_id, current_user, db)
+    if is_locked(boost, current_user, db):
+        return {"boost_id": boost.id, "address": boost.address, "stage": boost.stage,
+                "main_status": boost.main_status, "locked": True, "plan": {}, "brand_profile": {},
+                "ad_brief": {}}
     return {
         "boost_id": boost.id,
         "address": boost.address,
@@ -349,6 +366,12 @@ def list_posts(boost_id: int, current_user: User = Depends(get_current_user), db
     from app.services.post_retry import failure_payload
     boost = _owned_boost(boost_id, current_user, db)
     posts = db.query(Post).filter(Post.boost_id == boost.id).order_by(Post.day, Post.slot).all()
+    if is_locked(boost, current_user, db):
+        # Locked: the blurred preview gets three pictures and nothing to read or download.
+        return [{"id": p.id, "day": p.day, "slot": p.slot, "kind": p.kind, "locked": True,
+                 "image_url": p.image_url if i < 3 else None, "caption": None,
+                 "client_status": p.client_status, "publish_status": p.publish_status}
+                for i, p in enumerate(posts)]
     return [{
         "id": p.id, "day": p.day, "slot": p.slot, "kind": p.kind, "caption": p.caption,
         "hashtags": p.hashtags, "cta": p.cta, "image_url": p.image_url,
@@ -368,6 +391,7 @@ def approve_campaign(boost_id: int, body: dict = None,
     """Client approval. Approving the posts is what unblocks the publisher, so this is the
     copy-approval half of the two-layer gate."""
     boost = _owned_boost(boost_id, current_user, db)
+    require_unlocked(boost, current_user, db)
     body = body or {}
     # "No go-live without review" (owner's item 20). The UI knows which posts were actually
     # opened; if it says something on screen was never read, approval needs a second answer.
