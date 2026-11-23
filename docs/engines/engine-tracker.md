@@ -17,9 +17,9 @@ Each engine also has a Build room ticket in the Team room. **Started:** 21 Nov 2
 | **Engine 4 · Campaign build** (14 one-of-a-kind posts and the ad from the brand kit, the home's file, the style profile and the trend brief; learns from 👍 / 👎, edits and results) | ✅ Done | ✅ Greenlit | ✅ **PR #26**, 22 Nov | `engines/engine-4-brain.md` |
 | **Engine 5 · Website** (a beautiful page for every home in the agent's brand, where the ad and posts send people; Preview, Copy link and Share in section 3 of the campaign) | ✅ Done | ✅ Greenlit | ✅ **PR #27**, 22 Nov | `engines/engine-5-brain.md` |
 | **Engine 6 · Active campaign** (posting, the live ad audit, comment and website leads, the listing watcher, pause, the agent report and the seller version) | ✅ Done | ✅ Greenlit | ✅ **PR #28**, 22 Nov (merged) | `engines/engine-6-brain.md` |
-| **Engine 7 · Marketing** (on hold: scope to be defined with Adam) | Not started | — | — | — |
+| **Engine 7 · Marketing** (folded into Engine 9, Adam 22 Nov) | — | — | — | — |
 | **Engine 8 · Run it until it sells** (set it and forget it: a fresh 14 days every 2 weeks for $39 until it sells, emails at every turn, Run it again for everyone else) | ✅ Done | ✅ Greenlit | ✅ **PR #29**, 22 Nov | `engines/engine-8-brain.md` |
-| **Engine 9 · Email campaigns, Digital ads and the Marketing overview** (Team room; moved to the end, Adam 22 Nov) | 📝 Logged | — | — | Notes below |
+| **Engine 9 · Marketing: Website, Email campaigns and Digital ads** (Team room: Marketing is the parent page that says whether each channel pays for itself; Website, Email campaigns and Digital ads under it, each tracking every visitor, email or ad; Mailchimp through its API; includes what was Engine 7) | ✅ Done | ✅ Greenlit | ✅ **PR #31**, 22 Nov | `engines/engine-9-brain.md` |
 
 PR numbers are filled in only once the PR is opened, never planned ahead (Adam, 22 Nov).
 
@@ -31,9 +31,7 @@ the sign-up tour PR, under `docs/journey/`.
 
 ## Up next
 
-1. Engine 7 · Marketing (on hold until Adam defines it).
-2. Engine 9 · Email campaigns, Digital ads and the Marketing overview.
-3. Not engines, after them: the AI tutorial videos for the Setup page (Build room ticket, 22 Nov) and the Resmara setup session in Calendly.
+1. Not engines, after them: the AI tutorial videos for the Setup page (Build room ticket, 22 Nov) and the Resmara setup session in Calendly.
 
 ## The new agent's path (decided 22 Nov)
 
@@ -75,24 +73,10 @@ the sign-up tour PR, under `docs/journey/`.
   pending or sold. If the $39 is declined, the next round doesn't start, the agent gets an email
   and a notice on the campaign with Update card, and it retries once the card works.
 
-## Planned: Engine 9 · Email campaigns and the Marketing overview (Adam, 22 Nov)
+## Engine 9 · Marketing (Adam, 22 Nov)
 
-**Two new pages in the Team room's Business menu**, next to Growth, Marketing and Website:
-
-1. **Email campaigns** (everything email lives here, not on Accounts):
-   - **Export emails:** one button that downloads every client's email as a CSV. Test and closed
-     accounts left out, unsubscribes marked.
-   - **Mailchimp connected**, so its campaigns report here.
-   - **Tracks:** new client onboarding emails (welcome, day 3, 7, 14: sent and opened), nurture
-     emails every two weeks for current clients, and acquisition emails to agents who haven't
-     signed up.
-2. **Digital ads:** Resmara's own ad spend and how it's performing.
-
-**Marketing becomes the overview:** Email campaigns, Digital ads and Website all report into it.
-
-**Marketing consent:** one line at sign-up ("Resmara will send you tips and updates now and then.
-Unsubscribe any time."), an on/off setting on each account, and an unsubscribe link in every
-marketing email.
+Written up in full in `engines/engine-9-brain.md` (Marketing as the parent page, Website, Email
+campaigns and Digital ads under it, how each number is counted).
 
 ## Other PRs (not engines)
 

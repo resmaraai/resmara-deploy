@@ -118,7 +118,13 @@ for the agent to confirm.
    stop marketing immediately. It pauses everything the same way.
 5. **How often:** **every hour** (today it's every 6 hours), so a pending home stops within the hour.
    This runs on Render's scheduled jobs (see "The clock" below; decided with Adam, 22 Nov).
-6. **Later iteration (not now):** an MLS feed gives the true status straight from the source.
+6. **The agent's own posts (Adam, 22 Nov).** Agents often announce first on their own socials. Once a
+   day Resmara reads the new posts on the agent's **business Facebook Page and Instagram** (through
+   their Meta connection) and the AI looks for posts about **this home** (its address or street, its
+   own photos or the listing link): "Under contract!" or "Just sold!" pauses everything the same way;
+   "Price improved" takes the price off the website (Engine 5, section 3a). It must quote the post it
+   found; a post about another home never counts. Personal profiles can't be read.
+7. **Later iteration (not now):** an MLS feed gives the true status straight from the source.
 
 **Self-healing: how it finds the status when the usual way fails (Adam, 22 Nov).** The check
 tries each layer in order and stops at the first clear answer:
@@ -189,9 +195,10 @@ while another says sold, it shows **Pending** until a clear Sold status appears.
    Nothing ever restarts on its own.
 
 **The clock that runs all of this:** today posting, comment leads and the listing check are run by a
-timer on a Mac Mini, because Render's free plan has no scheduled jobs. If that computer sleeps or goes
-offline, nothing posts and nothing is checked. **Move the timer onto Render** (a paid plan includes
-scheduled jobs) before launch.
+timer on Dan's Mac Mini (`scripts/resmara_clock.sh`, written when Render was on the free plan). If that
+computer sleeps or goes offline, nothing posts and nothing is checked. Render is on a paid plan now
+(Adam, 22 Nov), so **move the timer onto Render's scheduled jobs** before launch, if Dan hasn't
+already.
 
 ## 8. Pause and Resume
 
@@ -248,6 +255,7 @@ style profile (Engine 4).
 - The Pause pop-up keeps It's pending and It sold as the agent's fail-safe.
 - Move the scheduler (posting, leads, listing checks) from the Mac Mini onto Render's scheduled jobs.
 - MLS feed: a later iteration.
+- The agent's own business Page and Instagram are read daily for pending, sold and price-change posts about this home.
 
 ## Screens
 
