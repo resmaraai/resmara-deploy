@@ -20,6 +20,8 @@ Each engine also has a Build room ticket in the Team room. **Started:** 21 Nov 2
 | **Engine 7 · Marketing** (folded into Engine 9, Adam 22 Nov) | — | — | — | — |
 | **Engine 8 · Run it until it sells** (set it and forget it: a fresh 14 days every 2 weeks for $39 until it sells, emails at every turn, Run it again for everyone else) | ✅ Done | ✅ Greenlit | ✅ **PR #29**, 22 Nov | `engines/engine-8-brain.md` |
 | **Engine 9 · Marketing: Website, Email campaigns and Digital ads** (Team room: Marketing is the parent page that says whether each channel pays for itself; Website, Email campaigns and Digital ads under it, each tracking every visitor, email or ad; Mailchimp through its API; includes what was Engine 7) | ✅ Done | ✅ Greenlit | ✅ **PR #31**, 22 Nov | `engines/engine-9-brain.md` |
+| **Engine 10 · Billing** (one card, Stripe's card form in the pop-up, prices in one place, Stripe Tax, Coming up with Turn off, receipts, refunds and chargebacks, closing an account stops everything) | ✅ Done | ✅ Greenlit | ✅ **PR #(opening)**, 22 Nov | `engines/engine-10-brain.md` |
+| **Engine 11 · Support** (Ask Resmara says it's AI, Support page with Which listing? and the 1 business day promise, one shared inbox support@resmara.com, reply-by times, the Resmara setup session) | ✅ Done | ✅ Greenlit | ✅ **PR #(opening)**, 22 Nov | `engines/engine-11-brain.md` |
 
 PR numbers are filled in only once the PR is opened, never planned ahead (Adam, 22 Nov).
 
@@ -31,7 +33,8 @@ the sign-up tour PR, under `docs/journey/`.
 
 ## Up next
 
-1. Not engines, after them: the AI tutorial videos for the Setup page (Build room ticket, 22 Nov) and the Resmara setup session in Calendly.
+1. Not engines: the Resmara setup session in Calendly, the support@resmara.com inbox, and turning on Stripe Tax (Adam). The AI tutorial videos are done (PRs #25 and #30).
+2. Later: the growth plan engine (Founding Agents, coach codes).
 
 ## The new agent's path (decided 22 Nov)
 

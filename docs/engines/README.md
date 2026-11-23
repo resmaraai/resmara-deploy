@@ -18,8 +18,8 @@ out, understood and adjusted without reading the whole app.
 | 6 | **Active campaign** | From Approve and launch to the end: posting, the live ad audit, comment and website leads, pending and sold (pauses right away), pause, the agent report and the seller version | `engine-6-brain.md` (PR #28) | Brain written (22 Nov) |
 | 8 | **Run it until it sells** | Set it and forget it: a fresh 14 days every 2 weeks for $39 (built, then charged, then live automatically) until it sells; pending pauses it, back on the market picks it up, emails at every turn; Run it again · $39 for everyone else | `engine-8-brain.md` (PR #29) | Brain written (22 Nov) |
 | 9 | **Marketing** | Team room: Marketing is the parent page (is each channel paying for itself?), with Website, Email campaigns (Mailchimp) and Digital ads (every campaign and ad) under it; every sign-up stamped with its source, each paying agent counted once | `engine-9-brain.md` (PR #31) | Brain written (22 Nov) |
-| 5 | **Billing** | Adding a card, charging a campaign, renewals, refunds | `billing-engine.md` | To write |
-| 6 | **Support** | The Ask Resmara help chat, setup calls, emails to the agent | `support-engine.md` | To write (spec: Ask Resmara spec) |
+| 10 | **Billing** | Every money rule in one place: one card (Stripe's form in the pop-up), $49 / $39 prices from the server, Stripe Tax, Coming up and Turn off, receipts, refunds, chargebacks, Close my account stops everything | `engine-10-brain.md` (PR #(opening)) | Brain written (22 Nov) |
+| 11 | **Support** | Ask Resmara (AI, says so), the Support page (Which listing?, 1 business day), one shared inbox support@resmara.com, the Team room's Support with reply-by times, the Resmara setup session | `engine-11-brain.md` (PR #(opening)) | Brain written (22 Nov) |
 | 7 | **Team room** | Operator console: accounts, releases, system checks | `team-room-engine.md` | To write |
 
 How they hand off:
