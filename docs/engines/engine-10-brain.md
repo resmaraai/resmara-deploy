@@ -1,6 +1,6 @@
 # Engine 10 brain: Billing
 
-**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #(filled in when opened) · **Started:** 22 Nov 2026
+**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #35 · **Started:** 22 Nov 2026
 **Existing:** `app/services/billing.py`, `app/api/billing.py`, `static/billing.js` (Dan and Adam), Engine 4 (build first, then pay to unlock), Engine 8 (Run it until it sells, declined cards), Terms of Service §7, §8 and §18 (PR #33). This brain pulls every money rule into one place; where it differs from the code, this brain wins.
 
 ---
