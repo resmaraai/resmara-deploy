@@ -166,19 +166,20 @@ services:
       - key: RESMARA_SIGNUP_CODE     # shared beta invite code
         sync: false
 
-  # ── The scheduler: NOT DEPLOYED ON PURPOSE ────────────────────────────────────────────────
-  # A cron job has no free tier (~$1/month, billed from the moment the service exists). Today the
-  # publishing clock runs from this Mac — ~/Library/LaunchAgents/com.sport.resmara.clock.plist
-  # every five minutes — so nothing here is missing. Uncommenting this block and syncing the
-  # Blueprint BUYS the cron service; do that when publishing must not depend on the Mac being
-  # awake, not to "make the file match the docs".
+  # ── The scheduler: created through the API, kept commented here ─────────────────────────────
+  # A cron job has no free tier (~$1/month, billed from the moment the service exists). The clock
+  # runs as the cron `resmara-publisher` (created through the API), every 15 minutes, and the Mac
+  # LaunchAgent that used to do it is retired. This block stays commented because the service
+  # already exists: a Blueprint sync that saw it here would try to buy a second one. If the job is
+  # ever recreated from this file, use the same command — render_clock.py publishes, reads the
+  # comments, syncs the build room, sweeps listings every sixth hour and checks Meta tokens daily.
   #
   #  - type: cron
   #    name: resmara-publisher
   #    runtime: docker
   #    region: virginia
   #    dockerfilePath: ./Dockerfile
-  #    dockerCommand: python scripts/publish_due.py
+  #    dockerCommand: python scripts/render_clock.py
   #    schedule: "*/15 * * * *"     # UTC, Render's cron dial is UTC
   #    plan: 0.5c-512mb             # cheapest; cron jobs have no free plan
   #    envVars:

@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""Resmara's clock, as the Render cron job `resmara-publisher` runs it.
+
+This is the same work the Mac's LaunchAgent used to do from ``scripts/resmara_clock.sh``, moved
+into the service so publishing no longer depends on a computer in Dan's office being awake:
+
+  * every run (Render fires at :00/:15/:30/:45 UTC) publish every approved post whose time has come,
+    read the comments on the live campaigns and email new Social leads, and sync the build room;
+  * every sixth hour, re-read each running campaign's listing (sold / pending / offline);
+  * once a day around 14:00 UTC, check every Meta connection's token health.
+
+Two deliberate choices:
+
+  * It talks to the public HTTP API, not the database, exactly as the Mac script did. Publishing
+    through ``/api/content/publish/run`` keeps one publisher: the retry ladder, the channel
+    metadata and the "already sent" ledger all live in the web process. A second code path here
+    is how two schedulers end up posting the same draft twice.
+  * It exits 0 when the run completed, even if a step failed, because the failure is already in
+    the log line for that step. Exit 1 is reserved for "no token" — a clock that cannot
+    authenticate must look broken, not idle.
+
+Usage:  RESMARA_PUBLISH_TOKEN=... python scripts/render_clock.py
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+from datetime import datetime, timezone
+
+import httpx
+
+BASE = (os.getenv("RESMARA_PUBLIC_BASE_URL") or "https://www.resmara.com").rstrip("/")
+TOKEN = (os.getenv("RESMARA_PUBLISH_TOKEN") or "").strip()
+
+
+def say(message: str) -> None:
+    print(f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} {message}", flush=True)
+
+
+def post(path: str, timeout: float) -> tuple[int, str]:
+    """POST with the machine token. Returns (status, short body); never raises."""
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.post(BASE + path, headers={"X-Resmara-Token": TOKEN})
+        return resp.status_code, resp.text[:400]
+    except Exception as exc:  # noqa: BLE001 - the failure is the report
+        return 0, f"{type(exc).__name__}: {exc}"
+
+
+def run_step(name: str, path: str, timeout: float, quiet_when: str = "") -> None:
+    status, body = post(path, timeout)
+    if status == 200 and quiet_when and quiet_when in body.replace(" ", ""):
+        return                       # measured zero: stay quiet, like the old script did
+    say(f"{name}: {status or 'ERR'} {body}")
+
+
+def main() -> int:
+    if not TOKEN:
+        say("no RESMARA_PUBLISH_TOKEN - nothing sent")
+        return 1
+
+    # Publishing first: a failed scan must never delay a due post.
+    run_step("published", "/api/content/publish/run", 120, quiet_when='"published":0')
+    run_step("leads", "/api/admin/leads/scan", 240, quiet_when='"leads":0')
+    run_step("buildroom", "/api/admin/buildroom/sync", 180,
+             quiet_when='"created":[]"status":[]"tested":[]')
+
+    now = datetime.now(timezone.utc)
+    if now.hour % 6 == 0 and now.minute < 15:
+        run_step("listings sweep", "/api/admin/listings/sweep", 180)
+    if now.hour == 14 and now.minute < 10:
+        run_step("meta token health", "/api/oauth/meta/check-all", 180)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
