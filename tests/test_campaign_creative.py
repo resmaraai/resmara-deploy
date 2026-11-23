@@ -142,6 +142,33 @@ def test_rewrite_uses_the_model_when_it_answers():
     print("ok   model copy lands, closing line enforced")
 
 
+def test_hashtags_are_capped_at_five():
+    """A model that answers with six or seven tags must not put them all on the post."""
+    posts = plan()
+    got = ce.assign_gallery(posts, GALLERY)
+    days = [(p["day"], i) for i, p in enumerate(posts) if got[i]["replaced"]]
+
+    async def fake(system, user, **kwargs):
+        return {"posts": [{"day": d, "slot": 1, "title": "Sunlit kitchen",
+                           "kicker": "THE KITCHEN", "overlayText": "Room to gather",
+                           "caption": "Written for the photo on day " + str(d),
+                           "hashtags": ["one", "two", "three", "four", "five", "six", "seven"]}
+                          for d, _ in days]}
+
+    original = ce.llm.chat_json
+    ce.llm.chat_json = fake
+    try:
+        asyncio.run(ce._rewrite_creative(
+            posts, got, address="1 Test St", brand_json="{}", facts="3 bed",
+            closing_line="Call Test Agent", engine_notes=[]))
+    finally:
+        ce.llm.chat_json = original
+    for _, i in days:
+        assert posts[i]["hashtags"] == ["one", "two", "three", "four", "five"], \
+            f"day {posts[i]['day']} kept {len(posts[i]['hashtags'])} hashtags"
+    print("ok   hashtags are capped at five")
+
+
 def test_overlay_never_exceeds_a_readable_line():
     assert ce._overlay_from("A" * 90, "Kitchen") == "A" * 42
     assert ce._overlay_from("", "Primary Bedroom") == "Primary Bedroom"
@@ -213,5 +240,6 @@ if __name__ == "__main__":
     test_an_address_is_never_the_overlay()
     test_rewrite_falls_back_to_the_photos_own_tags()
     test_rewrite_uses_the_model_when_it_answers()
+    test_hashtags_are_capped_at_five()
     test_overlay_never_exceeds_a_readable_line()
     print("ALL CAMPAIGN CREATIVE TESTS PASSED")
