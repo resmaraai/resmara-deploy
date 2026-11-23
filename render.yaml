@@ -1,25 +1,51 @@
 # Render Blueprint — the repository is the deployment.
 #
-# Render reads this file, builds ./Dockerfile, creates the database, wires the connection
-# string in, and redeploys on every merge to main. Anything marked sync:false is asked for
-# once in the dashboard and never stored in git.
-# --- Pull-request preview environments -------------------------------------------------
-# One temporary copy of this stack per pull request, so a change can be clicked through on a
-# real host before it is merged. This block is the declaration; it does NOT turn previews on
-# by itself, and today nothing here is active. Two things have to be true first:
+# Render reads this file, builds ./Dockerfile, wires the database connection string in, and
+# deploys on every commit to the branch below. Anything marked `sync: false` is a placeholder:
+# its value lives in the Render dashboard and is never written to git.
 #
-#   1. A Blueprint linked to this repo in the Render dashboard. There is none right now: the
-#      live `resmara` service and `resmara-db` were created by hand in the dashboard, so Render
-#      never reads this file. Until a Blueprint exists, render.yaml is documentation, not
-#      configuration — and syncing one over hand-made resources is a migration, not a click
-#      (it can try to create second copies of the service and database).
-#   2. A Pro workspace plan ($25/mo). Hobby includes only single-service previews, which reuse
-#      the production env — including DATABASE_URL — so a preview would read and write the live
-#      database. Full-stack previews (their own empty database) are Pro and above.
+# ── How a sync behaves (read before linking) ─────────────────────────────────────────────
+# Render's own rules, because each one is a way this file can hurt a live service:
 #
-# Also true when it does go live: env vars marked `sync: false` (META_CLIENT_SECRET, the engine
-# keys) are NOT copied into a preview, so Meta login in a preview needs an environment group.
-# `expireAfterDays: 3` deletes a preview three days after its last commit.
+#   * A resource whose `name` matches an existing one has *this file's* configuration applied to
+#     it; it does not create a second copy. So the names below are load-bearing: `resmara` and
+#     `resmara-db` are the live ones, created by hand in the dashboard.
+#   * Every setting OMITTED from a service reverts to its DEFAULT on sync — and the defaults are
+#     not what this service runs. `region` defaults to oregon and this service lives in
+#     virginia; that is why repo, branch, region, plan and the Docker paths are all spelled out
+#     rather than left implicit.
+#   * Environment variables already on the service are PRESERVED even when they are not listed
+#     here. They are listed anyway, as placeholders, so this file is a complete inventory of what
+#     production needs — an omitted key here is invisible to whoever reads it next.
+#   * Changing a value outside the Blueprint is overwritten by the next sync, and a deleted
+#     Blueprint-managed resource is recreated by it. Neither is a disaster; both are surprises.
+#
+# ── Preview environments ───────────────────────────────────────────────────────────────────
+# `previews` below is the declaration, not the switch: Render creates pull-request environments
+# only once a Blueprint is linked to this repo (Dashboard → Blueprints → New Blueprint Instance).
+# Previews require the Pro workspace plan.
+#
+# What a preview is, and what it therefore cannot do:
+#   * a fresh copy of every service + database in this file, with its OWN EMPTY database
+#     (copies of datastores do not include data) — so a preview can never read or write the live
+#     database as long as the datastore is declared here as it is;
+#   * `sync: false` values are NOT copied into a preview. META_CLIENT_SECRET is one of them, so a
+#     preview cannot complete a Facebook login until an environment group carries it — that is a
+#     deliberate trade, not a bug;
+#   * the preview's web service inherits the production plan (`free`), so it sleeps and cold-
+#     starts. Change `previews.plan` here if a preview needs to stay awake;
+#   * `expireAfterDays: 3` deletes a preview three days after its last commit, and Render removes
+#     it when the pull request closes.
+#
+# ── Which repository a preview builds ─────────────────────────────────────────────────────
+# The `repo` below is the public mirror, `resmara-deploy`, which is what production builds today
+# (`.github/workflows/deploy.yml` there calls the service's deploy hook on every push to main).
+# That keeps a sync from repointing production at a different repository. It also means a
+# preview, whose code comes from the pull request, only reflects this app if the Blueprint is
+# linked to the repository those pull requests are opened against — `resmaraai/resmara`. Moving
+# production onto that repository is a separate decision (it needs Render's GitHub app
+# installed on the `resmaraai` account and retires the mirror + hook); make it in one step, not
+# as a side effect of linking previews.
 previews:
   generation: automatic
   expireAfterDays: 3
@@ -28,18 +54,25 @@ databases:
   - name: resmara-db
     databaseName: resmara
     user: resmara
-    plan: free          # free Postgres expires 30 days after creation — see DEPLOY.md §3b
-    ipAllowList: []     # private network only: the service reaches it, the internet does not.
-                        # To connect from a laptop, add that IP in the dashboard.
+    region: virginia       # must match the live database, or a sync tries to move it
+    plan: 0.1c-256mb       # paid: free Postgres is DELETED on its expiry date (see DEPLOY.md §3b)
+    ipAllowList: []        # private network only: the service reaches it, the internet does not.
+                           # To connect from a laptop, add that IP in the dashboard.
 
 services:
   - type: web
     name: resmara
     runtime: docker
-    plan: free          # free web services sleep after ~15 min idle; see DEPLOY.md §3b
+    plan: starter          # paid: free web services sleep after ~15 min idle; see DEPLOY.md §3b
+    region: virginia
+    repo: https://github.com/resmaraai/resmara-deploy
+    branch: main
     dockerfilePath: ./Dockerfile
-    healthCheckPath: /openapi.json
+    dockerContext: .
     autoDeployTrigger: commit   # merging to main is the deploy (autoDeploy: true is deprecated)
+    # healthCheckPath is deliberately not set: the live service has none, and adding one to a
+    # free instance means a restarted container that fails the check mid-migration is rolled
+    # back instead of coming up. Set `/openapi.json` here when the plan is paid.
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -47,85 +80,123 @@ services:
           property: connectionString
       - key: RESMARA_ENV
         value: production
+      - key: RESMARA_PUBLIC_BASE_URL
+        value: https://www.resmara.com
       - key: SECRET_KEY
-        generateValue: true
+        generateValue: true     # Render keeps the value already on the service; a preview gets
+                                # its own. Changing it logs everybody out and orphans stored
+                                # ad-account tokens (they are encrypted with a key derived from it).
       - key: RESMARA_PUBLISH_TOKEN
-        generateValue: true
-      # No RESMARA_PUBLIC_BASE_URL / META_REDIRECT_URI: the app reads RENDER_EXTERNAL_URL and
-      # derives the callback from it, so the origin follows whatever host Render assigns.
-      # App "Resmara" under Be Authentic Productions (verified), switched 2026-11-15. The old
-      # 1881970083170197 app belongs to the previous setup and must not be used: Facebook Login for
-      # Business there is not configured to issue a user token.
+        generateValue: true     # the machine token: /api/admin/system-check, build-room sync,
+                                # the publishing clock. Must match the service's own value; the
+                                # copy used by scripts on the Mac is in the dev profile's secrets.
+      # ── Meta ─────────────────────────────────────────────────────────────────────────────
+      # App "Resmara" under Be Authentic Productions (verified), App ID 1135911812356864.
+      # META_CLIENT_ID and META_CLIENT_SECRET are a PAIR and have to change together: a new ID
+      # with the old secret answers "Error validating client secret" on every token exchange, and
+      # it reads like a code bug. That is why the ID is a placeholder and not a literal — set
+      # both in the dashboard, in one sitting. The old app (1881970083170197) belongs to a
+      # previous setup and must not be used.
       - key: META_CLIENT_ID
-        value: "1135911812356864"
+        sync: false             # wanted value: 1135911812356864
       - key: META_CLIENT_SECRET
-        sync: false     # Meta → App settings → Basic. The one value Render has to be told.
+        sync: false             # Meta → App settings → Basic
       # Reading the ad account (ads_read/read_insights), managing Page ads (pages_manage_ads) and
-      # Instagram insights are new with the switch: the readiness audit and the day 7/14 report read
-      # all four. Keep this list in step with the app's use cases or Meta answers Invalid Scopes.
+      # Instagram insights are new with the app switch: the readiness audit and the day 7/14
+      # report read all four. Keep this list in step with the app's use cases, or Meta answers
+      # Invalid Scopes. A preview environment needs an environment group carrying this list.
       - key: META_SCOPES
         value: >-
           ads_management,ads_read,pages_manage_ads,read_insights,business_management,pages_read_engagement,pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish,instagram_manage_insights
-      # Content engine: any OpenAI-compatible endpoint. The build box points at Ollama on
-      # localhost, which a hosted instance cannot reach. Unset, the engine honestly reports
-      # source="unavailable" and generates nothing; everything else keeps working.
-      # - key: RESMARA_ENGINE_BASE_URL    # e.g. https://api.openai.com/v1
-      #   sync: false
-      # - key: RESMARA_ENGINE_API_KEY
-      #   sync: false
-      # - key: RESMARA_MODEL_RESEARCH     # likewise _PLAN, _BRAND, _CHECK
-      #   sync: false
-      # Encrypts connected ad-account tokens at rest. Left unset deliberately: an invalid value
-      # makes every token write fail and Render cannot generate a valid Fernet key. Unset, the
-      # app derives a stable key from SECRET_KEY. To pin it instead:
-      #   python scripts/make_token_key.py  → paste the output into RESMARA_TOKEN_KEY
-      # - key: RESMARA_TOKEN_KEY
-      #   sync: false
-      # Email: Resend first, Gmail SMTP as the fallback. Resend is HTTP, so it is the only one
-      # that works here — Render's free plan drops outbound SMTP silently. Free Resend is
-      # 100 messages/day; the fallback covers the cap and any Resend error.
-      # - key: RESEND_API_KEY
-      #   sync: false
-      # - key: MAIL_FROM
-      #   value: "Resmara <support@resmara.com>"
-      # - key: SMTP_HOST            # the Gmail/Workspace fallback, once that mailbox exists
-      #   value: smtp.gmail.com
-      # - key: SMTP_USER
-      #   value: support@resmara.com
-      # - key: SMTP_PASSWORD        # a Google App Password, not the account password
-      #   sync: false
+      - key: META_SYSTEM_TOKEN       # our own ad spend: Marketing page + token health
+        sync: false
+      - key: META_AD_ACCOUNT_ID      # 16 digits, no act_ prefix
+        sync: false
+      - key: META_PAGE_ID            # where a Boost posts
+        sync: false
+      - key: META_IG_ID              # the Instagram account a post goes to
+        sync: false
+      - key: META_PIXEL_ID
+        sync: false
+      # ── Content engine ───────────────────────────────────────────────────────────────────
+      # Any OpenAI-compatible endpoint. Prod runs on ollama.com (flat plan, no per-token bill);
+      # unset, the engine honestly reports source="unavailable" and generates nothing.
+      - key: OPENAI_API_KEY
+        sync: false
+      # ── Payments ─────────────────────────────────────────────────────────────────────────
+      # The live Resmara account (acct_1UYo4pDOjDXzVDgN) can take money. Checkout builds its line
+      # item inline, so no price id is required; the webhook secret is what makes an order paid.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_CENTS
+        value: "4900"
+      # ── Email ────────────────────────────────────────────────────────────────────────────
+      # Render's free plan drops outbound SMTP, so Resend over HTTPS is the only sender that
+      # works here. `onboarding@resend.dev` is Resend's test sender: it delivers only to the
+      # Resend account owner. Verify resmara.com in Resend and change MAIL_FROM before promising
+      # a confirmation, invite or reset link to anybody.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        value: "Resmara <onboarding@resend.dev>"
+      # ── Analytics / tracking ────────────────────────────────────────────
+      - key: GA4_PROPERTY_ID         # numeric property, not the G- measurement id
+        sync: false
+      - key: GA4_MEASUREMENT_ID
+        sync: false
+      - key: GA4_SA_JSON             # service-account JSON; a path is also accepted
+        sync: false
+      - key: CLARITY_PROJECT_ID
+        sync: false
+      - key: CLARITY_TOKEN           # ~10 export calls per project per DAY; the app caches 6h
+        sync: false
+      - key: RESMARA_PAGESPEED_KEY
+        sync: false
+      # ── The console's own wiring ─────────────────────────────────────────────────────────
+      - key: RESMARA_GITHUB_TOKEN    # Releases + build-room sync (GitHub PAT, repo scope)
+        sync: false
+      - key: RESMARA_RENDER_API_KEY  # Releases: what production actually serves
+        sync: false
+      - key: RESMARA_RENDER_SERVICE_ID
+        value: srv-dbml2aei0phs73c6639g
+      - key: RESMARA_ADMIN_EMAILS    # operator console = is_admin, not this list alone
+        sync: false
+      - key: RESMARA_SIGNUP_CODE     # shared beta invite code
+        sync: false
 
-  # The scheduler. Without this service nothing calls the publisher: a post can be approved
-  # and scheduled and then sit there forever, because "scheduled" is a clock, and a clock
-  # needs someone to look at it. Every 15 minutes this container opens the database directly
-  # and publishes what is due, then reads the comments on everything that is live and emails
-  # the agent about buying interest (Post Engine §10.4) - same clock, one service, so the lead
-  # scan costs nothing extra. Reading comments needs pages_read_engagement (held) on the Page;
-  # an ad thread Meta refuses is reported on the campaign instead of failing the run.
-  - type: cron
-    name: resmara-publisher
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    dockerCommand: python scripts/publish_due.py
-    schedule: "*/15 * * * *"     # UTC, Render's cron dial is UTC: 15 minutes, always
-    plan: 0.5c-512mb            # cron jobs have no free plan; this is the cheapest ($1/mo floor)
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: resmara-db
-          property: connectionString
-      - key: RESMARA_ENV
-        value: production
-      # A cron container has no inbound request, so PUBLIC_BASE_URL cannot be inferred here the
-      # way it is in the web service. Instagram fetches post images by URL: without this the
-      # media URL would name the cron job's own host and every photo post would fail.
-      - key: RESMARA_PUBLIC_BASE_URL
-        value: https://www.resmara.com
-      # Ad-account tokens are encrypted with a key derived from SECRET_KEY, so this service must
-      # hold the same secret as the web service or every stored Meta token is unreadable.
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: resmara
-          envVarKey: SECRET_KEY
-
+  # ── The scheduler: NOT DEPLOYED ON PURPOSE ────────────────────────────────────────────────
+  # A cron job has no free tier (~$1/month, billed from the moment the service exists). Today the
+  # publishing clock runs from this Mac — ~/Library/LaunchAgents/com.sport.resmara.clock.plist
+  # every five minutes — so nothing here is missing. Uncommenting this block and syncing the
+  # Blueprint BUYS the cron service; do that when publishing must not depend on the Mac being
+  # awake, not to "make the file match the docs".
+  #
+  #  - type: cron
+  #    name: resmara-publisher
+  #    runtime: docker
+  #    region: virginia
+  #    dockerfilePath: ./Dockerfile
+  #    dockerCommand: python scripts/publish_due.py
+  #    schedule: "*/15 * * * *"     # UTC, Render's cron dial is UTC
+  #    plan: 0.5c-512mb             # cheapest; cron jobs have no free plan
+  #    envVars:
+  #      - key: DATABASE_URL
+  #        fromDatabase:
+  #          name: resmara-db
+  #          property: connectionString
+  #      - key: RESMARA_ENV
+  #        value: production
+  #      # A cron container has no inbound request, so the public base URL cannot be inferred
+  #      # here the way it is in the web service. Instagram fetches post images by URL: without
+  #      # this the media URL would name the cron job's own host and every photo post would fail.
+  #      - key: RESMARA_PUBLIC_BASE_URL
+  #        value: https://www.resmara.com
+  #      # Ad-account tokens are encrypted with a key derived from SECRET_KEY, so this service
+  #      # must hold the same secret as the web service or every stored Meta token is unreadable.
+  #      - key: SECRET_KEY
+  #        fromService:
+  #          type: web
+  #          name: resmara
+  #          envVarKey: SECRET_KEY
