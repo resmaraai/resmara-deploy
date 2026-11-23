@@ -74,6 +74,41 @@ Top to bottom:
 client. Every sentence has to be backed by the file or a photo (no invented features), and passes
 the same Fair Housing check as every post (Engine 4, 9f). The agent can edit any of it in review.
 
+## 3a. The price: automatic, and never stale (Adam, 22 Nov)
+
+The agent does nothing about the price. Resmara takes it from what it already reads online, and
+shows nothing rather than something it isn't sure of:
+- **Where it comes from:** the listing's price field on the agent's link and the other listing sites
+  Engine 3 found (read the same self-healing way as the status, Engine 6 section 7).
+- **Shown only when the sources agree.** One clear price, or several that match: shown as "Listed at
+  $845,000". **No price found, or the sources disagree: no price is shown**, and the page says "Ask
+  Morgan about pricing" (which also creates a lead).
+- **Checked every hour** with the listing status, **and every day against the agent's own Facebook Page
+  and Instagram** (Engine 6): if anything suggests the price changed (a listing site shows a new
+  number, or the agent posts "Price improved" about this home), **the price comes off the website
+  immediately**, and comes back only when the sources agree on the new price.
+- **When Resmara knows the price changed but can't find the new number** (for example the agent posts
+  "Price improved!" with no number, or the sources disagree), it sends **one email** about that house
+  (Adam, 22 Nov): "We noticed a price change on 1248 Oakridge Drive", what Resmara saw ("Your post on
+  Instagram says the price on this home has improved, but we can't find the new price online yet, so
+  your website isn't showing a price right now"), "Would you like us to update it?", and **two
+  buttons**:
+  - **Set a new price** opens one page: "What's the right price?", a **Current list price** box and
+    **Save**. (A box to type in can't live inside the email itself: most mail apps block them. Buttons
+    work everywhere.)
+  - **Don't show a price** is done in one tap: a confirmation page says "Got it. No price on this
+    listing." The website shows "Ask Morgan about pricing", Resmara stops showing a price for this
+    listing even if one is found online, and never asks again for it.
+  Both links are unique to that agent and house, need no sign-in, and work for 7 days.
+- **When they save a new price:** the website shows the new price straight away, and every post and the ad
+  that hasn't gone out yet is checked: anything that talks about pricing is updated (still no numbers
+  in posts or ads, worded "Improved price"), and the next round (Engine 8) can lead with it. If the
+  agent never answers, the website simply shows no price.
+- **Posts and ads never show a price number** (Engine 4); a validated change is worded "Improved
+  price" or "Updated pricing" (Engine 8).
+- The footer keeps "Information is believed accurate but not guaranteed. Buyers should verify all
+  details."
+
 ## 4. Beautiful on every screen
 
 - **Phone first.** Most visitors come from Facebook and Instagram on their phones. Everything
@@ -279,6 +314,7 @@ CNAME to `resmara.onrender.com` (the live `resmara` service). DNS is at GoDaddy,
 - Call taps and Text taps are leads, counted separately (call leads, text leads).
 - Templated: one best design, filled from the brand kit; no research of the agent's own website.
 - Everything about the website lives in section 3 of the campaign page, never at the top.
+- The price is automatic: shown only when the online sources agree, hidden the moment anything suggests a change, no price when none is found; if the new price can't be found, one email gives the agent Set a new price or Don't show a price, and it updates the website and the posts still to go out.
 - Built in the same build as the campaign; it lands with the calendar, ready to review (section 5).
 - The listing video plays in the hero when there is one.
 
