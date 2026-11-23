@@ -19,7 +19,7 @@ Each engine also has a Build room ticket in the Team room. **Started:** 21 Nov 2
 | **Engine 6 · Active campaign** (posting, the live ad audit, comment and website leads, the listing watcher, pause, the agent report and the seller version) | ✅ Done | ✅ Greenlit | ✅ **PR #28**, 22 Nov (merged) | `engines/engine-6-brain.md` |
 | **Engine 7 · Marketing** (folded into Engine 9, Adam 22 Nov) | — | — | — | — |
 | **Engine 8 · Run it until it sells** (set it and forget it: a fresh 14 days every 2 weeks for $39 until it sells, emails at every turn, Run it again for everyone else) | ✅ Done | ✅ Greenlit | ✅ **PR #29**, 22 Nov | `engines/engine-8-brain.md` |
-| **Engine 9 · Marketing: Website, Email campaigns and Digital ads** (Team room: Marketing is the parent page that says whether each channel pays for itself; Website, Email campaigns and Digital ads under it, each tracking every visitor, email or ad; Mailchimp through its API; includes what was Engine 7) | ✅ Done | ✅ Greenlit | ✅ **PR #(opening)**, 22 Nov | `engines/engine-9-brain.md` |
+| **Engine 9 · Marketing: Website, Email campaigns and Digital ads** (Team room: Marketing is the parent page that says whether each channel pays for itself; Website, Email campaigns and Digital ads under it, each tracking every visitor, email or ad; Mailchimp through its API; includes what was Engine 7) | ✅ Done | ✅ Greenlit | ✅ **PR #31**, 22 Nov | `engines/engine-9-brain.md` |
 
 PR numbers are filled in only once the PR is opened, never planned ahead (Adam, 22 Nov).
 

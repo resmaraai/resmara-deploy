@@ -1,6 +1,6 @@
 # Engine 9 brain: Marketing (Website, Email campaigns, Digital ads) in the Team room
 
-**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #(filled in when opened) · **Started:** 22 Nov 2026
+**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #31 · **Started:** 22 Nov 2026
 **Includes what was Engine 7 (Marketing)** (Adam, 22 Nov). The growth plan (Founding Agents, coach referral codes) is a separate engine, later.
 
 ---
