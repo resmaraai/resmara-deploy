@@ -161,6 +161,8 @@ services:
         sync: false
       - key: RESMARA_RENDER_SERVICE_ID
         value: srv-dbml2aei0phs73c6639g
+      - key: RESMARA_RENDER_CRON_SERVICE_ID   # the clock: a second image Render never rebuilds
+        value: crn-dc1tk1qjnfac739p0big
       - key: RESMARA_ADMIN_EMAILS    # operator console = is_admin, not this list alone
         sync: false
       - key: RESMARA_SIGNUP_CODE     # shared beta invite code
