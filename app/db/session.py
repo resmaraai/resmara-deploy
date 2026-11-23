@@ -60,6 +60,35 @@ class User(Base):
     team_access = Column(JSON, nullable=True)
     team_super_admin = Column(Boolean, default=False)
     team_invited_at = Column(DateTime(timezone=True), nullable=True)
+    # --- Engine 9 (Marketing) ---------------------------------------------------
+    # Where this sign-up came from: "ad", "email" or "website". Stamped once, when the account
+    # is made, and never changed afterwards - the channel rows on Marketing are only honest if
+    # the stamp cannot be rewritten by a later visit.
+    signup_source = Column(String, nullable=True)
+    # The raw evidence for the stamp (utm_*, fbclid, the ad or campaign id, the referrer), kept
+    # so a number can be explained later without guessing what the tags were.
+    signup_source_detail = Column(JSON, nullable=True)
+    # The one-line marketing consent at sign-up, and the on/off switch on the account. It is
+    # stored here rather than only in Mailchimp because "someone unsubscribed" has to survive a
+    # sync that has not run yet.
+    marketing_optin = Column(Boolean, default=True)
+    # --- Engine 1 Part A (login) ------------------------------------------------
+    # Facebook is the way in (Adam, 22 Nov), so the account is keyed by the Facebook user id.
+    # Unique: the same Facebook account logging in twice must land on the same account, never
+    # a second one.
+    facebook_id = Column(String, unique=True, index=True, nullable=True)
+    facebook_name = Column(String, nullable=True)
+    # Consent, recorded before the Facebook redirect and stamped on the account it creates:
+    # which Terms version, when, and from where. New accounts only.
+    terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
+    terms_version = Column(String, nullable=True)
+    signup_ip = Column(String, nullable=True)
+    signup_ua = Column(String, nullable=True)
+    # "Close my account" (reversible, keeps campaigns/leads/reports) is deliberately not the
+    # same thing as "Delete my data" (permanent). One timestamp cannot mean both.
+    closed_at = Column(DateTime(timezone=True), nullable=True)
+    # Facebook sometimes hides the email. The account still works; we ask once, for receipts.
+    needs_email = Column(Boolean, default=False)
 
 # --- Ad Account (OAuth) ---
 class AdAccount(Base):
@@ -195,6 +224,12 @@ class Boost(Base):
     leads_checked_at = Column(DateTime(timezone=True), nullable=True)
     leads_scan_note = Column(Text, nullable=True)
     reboost_offer_sent_at = Column(DateTime(timezone=True), nullable=True)
+    # --- Engine 9 (Marketing) ---------------------------------------------------
+    # Which channel gets credit for this purchase: "ad", "email" or "website". Decided once, when
+    # the payment lands, by the last thing that got them to buy (Engine 9, section 1a) - so a
+    # campaign bought after a day-5 email counts once, for Email, and never twice.
+    paid_source = Column(String, nullable=True)
+    paid_source_detail = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     launched_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -359,6 +394,25 @@ class PasswordReset(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
     used_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class FacebookLoginCode(Base):
+    """A one-time ticket handed back from Facebook's redirect.
+
+    Facebook sends the browser to our callback with no Authorization header, so the callback
+    cannot hand a JWT back in the URL: a token in a query string is written to referrer logs,
+    analytics and browser history. The callback mints one of these, the app swaps it for a
+    token immediately, and a second use is refused.
+    """
+
+    __tablename__ = "facebook_login_codes"
+    id = Column(Integer, primary_key=True)
+    code = Column(String, unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    purpose = Column(String, default="login")  # login | reactivate
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 
 # --- Orders (one paid campaign = one order) ---
 class Order(Base):
@@ -563,6 +617,20 @@ class HelpAnswer(Base):
     created_by = Column(String(160), nullable=True)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# --- Marketing settings (Engine 9) ---
+class MarketingSetting(Base):
+    """The two monthly costs the team types in once, plus which email series are on.
+
+    Ad spend is read from Meta on its own; Mailchimp's plan and the website hosting are not
+    measurable from here, so the operator states them once and every "did it pay for itself?"
+    answer is arithmetic on this row. Guessed costs would make the verdict meaningless.
+    """
+    __tablename__ = "marketing_settings"
+    id = Column(Integer, primary_key=True)
+    payload = Column(JSON, default=dict)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 Base.metadata.create_all(bind=engine)

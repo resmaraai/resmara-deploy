@@ -241,8 +241,31 @@
     // server records it with the time and IP so the agreement can be proved later.
     var body = { email: email, password: password, name: name,
                  terms_accepted: true, terms_version: TERMS_VERSION };
+    // Engine 9, section 1a: where this sign-up came from, captured from the link this browser
+    // landed on. Stored in sessionStorage on the first page it sees, so an agent who lands on a
+    // page without the query string and signs up three pages later still gets the stamp.
+    var source = signupSource();
+    if (source && Object.keys(source).length) body.source = source;
     if (inviteCode) body.invite_code = inviteCode;
     return json('/api/auth/register', 'POST', body);
+  }
+
+  // The attribution keys we understand. Anything else on the query string is not kept.
+  var SOURCE_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+                     'fbclid', 'gclid', 'ad_id', 'campaign_id'];
+  function signupSource() {
+    var kept = {};
+    try { kept = JSON.parse(sessionStorage.getItem('resmara_attribution') || '{}') || {}; } catch (e) { kept = {}; }
+    try {
+      var query = new URLSearchParams(location.search);
+      SOURCE_KEYS.forEach(function (k) { if (query.get(k)) kept[k] = String(query.get(k)).slice(0, 200); });
+      if (!kept.landing) kept.landing = location.pathname;
+      if (!kept.referrer && document.referrer && document.referrer.indexOf(location.host) === -1) {
+        kept.referrer = String(document.referrer).slice(0, 200);
+      }
+      sessionStorage.setItem('resmara_attribution', JSON.stringify(kept));
+    } catch (e) { /* private mode: the query string still counts, it just is not remembered */ }
+    return kept;
   }
 
   function me() {

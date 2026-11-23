@@ -72,6 +72,10 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
                 is_admin=email in parse_allowlist(settings.ADMIN_EMAILS))
     db.add(user)
     db.flush()
+    # Engine 9, section 1a: stamp where this sign-up came from, once, before anything else reads
+    # the account. The stamp is what Marketing's channel rows are built on.
+    from app.services import attribution
+    attribution.stamp_signup(db, user, getattr(user_in, "source", None))
     # The activity log is what the operator console charts; a new account is the first
     # thing it should be able to show.
     # Email confirmation before first sign-in (item 8). When no provider is configured the

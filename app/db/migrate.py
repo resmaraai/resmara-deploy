@@ -36,6 +36,22 @@ ADDITIONS = {
         ("team_access", "JSON"),
         ("team_super_admin", "BOOLEAN DEFAULT 0"),
         ("team_invited_at", "TIMESTAMP"),
+        # Engine 9 (Marketing): where the sign-up came from, and marketing consent. Marketing's
+        # channel rows read these on every load, so an established database needs the ALTER.
+        ("signup_source", "VARCHAR"),
+        ("signup_source_detail", "JSON"),
+        ("marketing_optin", "BOOLEAN DEFAULT 1"),
+        # Engine 1 Part A: Facebook is the way in. On an established database these arrive by
+        # ALTER; the unique index is created separately because ADD COLUMN cannot carry it.
+        ("facebook_id", "VARCHAR"),
+        ("facebook_name", "VARCHAR"),
+        ("terms_accepted_at", "TIMESTAMP"),
+        ("terms_version", "VARCHAR"),
+        ("signup_ip", "VARCHAR"),
+        ("signup_ua", "VARCHAR"),
+        # Close (reversible) and delete (permanent) cannot share one flag.
+        ("closed_at", "TIMESTAMP"),
+        ("needs_email", "BOOLEAN DEFAULT FALSE"),
     ],
     "ad_accounts": [
         ("refresh_token", "TEXT"),
@@ -131,6 +147,9 @@ ADDITIONS = {
         ("leads_checked_at", "TIMESTAMP"),
         ("leads_scan_note", "TEXT"),
         ("reboost_offer_sent_at", "TIMESTAMP"),
+        # Engine 9 (Marketing): the channel credited with each purchase, decided once at payment.
+        ("paid_source", "VARCHAR"),
+        ("paid_source_detail", "JSON"),
     ],
     # The agent's note on a lead (added 21 Nov 2026).
     "leads": [

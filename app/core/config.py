@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     GITHUB_REPO: str = os.getenv("RESMARA_GITHUB_REPO", "resmaraai/resmara-deploy")
     RENDER_API_KEY: str = os.getenv("RESMARA_RENDER_API_KEY", "")
     RENDER_SERVICE_ID: str = os.getenv("RESMARA_RENDER_SERVICE_ID", "")
+    # The clock is a second service with its own image, and Render never redeploys a cron job on a
+    # commit. Its id is what lets the web service keep the two on the same build (clock_image.py).
+    RENDER_CRON_SERVICE_ID: str = os.getenv("RESMARA_RENDER_CRON_SERVICE_ID", "")
+    RENDER_GIT_COMMIT: str = os.getenv("RENDER_GIT_COMMIT", "")
     RENDER_API_BASE: str = os.getenv("RESMARA_RENDER_API_BASE", "https://api.render.com/v1")
     # A free PageSpeed Insights key: anonymous calls are rate-limited to the point of a 429.
     PAGESPEED_KEY: str = os.getenv("RESMARA_PAGESPEED_KEY", "")
@@ -111,9 +115,24 @@ class Settings(BaseSettings):
     # The app is mounted behind the router at /resmara/, so the callback must carry
     # that prefix or Meta's redirect 404s. Override with META_REDIRECT_URI for a real domain.
     META_REDIRECT_URI: str = os.getenv("META_REDIRECT_URI") or PUBLIC_BASE_URL + "/api/oauth/meta/callback"
+    # Engine 1 Part A: "Log in with Facebook" needs its own callback, because Facebook refuses a
+    # redirect URI that is not registered on the app. Scopes are the identity only - the Page,
+    # Instagram and ad permissions are added here once Meta's App Review grants them.
+    FB_LOGIN_REDIRECT_URI: str = os.getenv("FB_LOGIN_REDIRECT_URI") or PUBLIC_BASE_URL + "/api/auth/facebook/callback"
+    FB_LOGIN_SCOPES: str = os.getenv("FB_LOGIN_SCOPES", "public_profile,email")
     TIKTOK_CLIENT_ID: str = os.getenv("TIKTOK_CLIENT_ID", "")
     TIKTOK_CLIENT_SECRET: str = os.getenv("TIKTOK_CLIENT_SECRET", "")
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
+    # --- Engine 9 · Marketing ---------------------------------------------------
+    # Mailchimp (Resmara's own account). One API key, which carries its data-centre suffix
+    # (e.g. "abc123-us21"); the audience id names the "Resmara clients" list. Unset means the
+    # Email campaigns page says "not connected" rather than pretending a list is empty.
+    MAILCHIMP_API_KEY: str = os.getenv("MAILCHIMP_API_KEY", "")
+    MAILCHIMP_AUDIENCE_ID: str = os.getenv("MAILCHIMP_AUDIENCE_ID", "")
+    # The two costs that cannot be measured from here; Settings can override them.
+    MAILCHIMP_MONTHLY_USD: str = os.getenv("MAILCHIMP_MONTHLY_USD", "")
+    MARKETING_HOSTING_MONTHLY_USD: str = os.getenv("MARKETING_HOSTING_MONTHLY_USD", "")
 
 settings = Settings()
