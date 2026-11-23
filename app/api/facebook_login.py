@@ -209,6 +209,18 @@ async def facebook_callback(request: Request, code: str = "", state: str = "", e
         db.commit()
         return _back({"fb": "closed", "ticket": ticket}, format)
 
+    # Facebook log-in and Connect Meta are the same connection, never two (Engine 1 Part B §6):
+    # every sign-in saves the login and runs the audit, so sign-up and audit are one step.
+    try:
+        from app.services import meta_engine
+        db.commit()  # the account is saved first; nothing below can undo a sign-in
+        token, expires_at = await meta_engine.long_lived(token_data["access_token"])
+        meta_engine.save_login(db, user, token, expires_at=expires_at, fb_user_id=fb_id, fb_user_name=name)
+        db.commit()
+        await meta_engine.check(db, user, "connect", force=True)
+    except Exception:  # noqa: BLE001 - the audit must never cost a sign-in
+        db.rollback()
+
     if created:
         _notify_owner_new_account(db, user, created, bool(user.meta_connected_at))
         try:

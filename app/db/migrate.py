@@ -269,7 +269,9 @@ def ensure_unique_indexes() -> list[str]:
     Facebook account always lands on the same Resmara account": without it, a race between two
     sign-ins could create two accounts for one person.
     """
-    wanted = [("users", "ix_users_facebook_id_unique", "facebook_id")]
+    wanted = [("users", "ix_users_facebook_id_unique", "facebook_id"),
+              # One Page, one Resmara account (Engine 1 Part B, section 3).
+              ("meta_connections", "ix_meta_connections_page_unique", "page_id")]
     done = []
     for table, index, column in wanted:
         try:

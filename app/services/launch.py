@@ -32,6 +32,13 @@ def _as_datetime(value):
 
 
 def resolve_ad_account(boost: Boost, current_user: User, db: Session):
+    # The ad account the agent's Meta connection is using comes first (Engine 1 Part B).
+    from app.services import meta_engine
+    conn = meta_engine.connection_for(db, boost.user_id)
+    if conn is not None and conn.ad_account_id:
+        acct = db.query(AdAccount).filter(AdAccount.id == conn.ad_account_id).first()
+        if acct:
+            return acct
     if boost.ad_account_id:
         acct = db.query(AdAccount).filter(AdAccount.id == boost.ad_account_id).first()
         if acct:

@@ -149,6 +149,71 @@ class AdAccount(Base):
         from app.core.crypto import encrypt
         self._refresh_token = encrypt(value)
 
+
+# --- Meta connection (Engine 1 Part B) ---
+class MetaConnection(Base):
+    """One Meta connection per agent: their login, the Page they chose, its Instagram and the
+    ad account in use. Saved on every Facebook login, even with no Page and no ad account,
+    and overwritten (never ``or``-ed) on every reconnect and Check again. Ad accounts stay in
+    ``ad_accounts`` for the ad engine and billing; this row points at the one in use.
+    See docs/engines/meta-integration-engine.md, section 4.
+    """
+    __tablename__ = "meta_connections"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    fb_user_id = Column(String, nullable=True)
+    fb_user_name = Column(String, nullable=True)
+    fb_user_picture = Column(Text, nullable=True)
+    _token = Column("token_enc", Text, nullable=True)
+    _page_token = Column("page_token_enc", Text, nullable=True)
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    token_status = Column(String, nullable=True)      # healthy | expiring | needs_reconnect | unknown
+    scopes_granted = Column(JSON, default=list)
+    scopes_declined = Column(JSON, default=list)
+    page_id = Column(String, nullable=True, index=True)
+    page_name = Column(String, nullable=True)
+    page_picture = Column(Text, nullable=True)
+    page_tasks = Column(JSON, default=list)
+    page_published = Column(Boolean, nullable=True)
+    page_chosen = Column(Boolean, default=False)      # the agent picked it (or it was the only one)
+    page_info = Column(JSON, default=dict)            # website, phone, address, category, about: for the Brand engine
+    pages_available = Column(JSON, default=list)      # [{id, name, picture, tasks, published, ig_id, ig_username}]
+    ig_user_id = Column(String, nullable=True)
+    ig_username = Column(String, nullable=True)
+    ig_picture = Column(Text, nullable=True)
+    ad_account_id = Column(Integer, ForeignKey("ad_accounts.id"), nullable=True)
+    ad_account_name = Column(String, nullable=True)
+    ad_account_owner = Column(String, nullable=True)  # their own, or the brokerage business that owns it
+    issues = Column(JSON, default=list)               # current outcome keys, most important first
+    issue_log = Column(JSON, default=list)            # the setup to-do list: [{key, found_at, fixed_at}]
+    capabilities = Column(JSON, default=dict)         # {fb_post, ig_post, ad, download_mode, campaigns_allowed}
+    last_checked_at = Column(DateTime(timezone=True), nullable=True)
+    last_check_source = Column(String, nullable=True) # connect | sign_in | check_again | sweep | daily | pre_publish
+    unreachable_since = Column(DateTime(timezone=True), nullable=True)
+    breakage_emails = Column(JSON, default=dict)      # {key: [sent_at, ...]} for after-onboarding breakages
+    first_connected_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    @property
+    def access_token(self):
+        from app.core.crypto import decrypt
+        return decrypt(self._token)
+
+    @access_token.setter
+    def access_token(self, value):
+        from app.core.crypto import encrypt
+        self._token = encrypt(value)
+
+    @property
+    def page_access_token(self):
+        from app.core.crypto import decrypt
+        return decrypt(self._page_token)
+
+    @page_access_token.setter
+    def page_access_token(self, value):
+        from app.core.crypto import encrypt
+        self._page_token = encrypt(value)
+
 # --- Creative ---
 class Creative(Base):
     __tablename__ = "creatives"
@@ -256,7 +321,7 @@ class Post(Base):
     design_asset_id = Column(Integer, nullable=True)
     client_status = Column(String, default="pending")  # pending, approved, change_requested
     publish_at = Column(String, nullable=True)      # set by the engine, acted on by the publisher
-    publish_status = Column(String, default="scheduled")  # scheduled | posting | posted | failed | skipped
+    publish_status = Column(String, default="scheduled")  # scheduled | posting | posted | failed | skipped | held | download
     publish_target = Column(String, default="both")  # facebook | instagram | both
     fb_post_id = Column(String, nullable=True)
     ig_media_id = Column(String, nullable=True)
