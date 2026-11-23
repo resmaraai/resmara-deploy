@@ -525,7 +525,9 @@ async def _rewrite_creative(plan_posts, assignments, *, address: str, brand_json
                 p[key] = value[:60] if key != "cta" else value[:40]
         tags = x.get("hashtags")
         if isinstance(tags, list) and tags:
-            p["hashtags"] = tags[:6]
+            # Five is the house cap: a post carries at most five hashtags, and a model that
+            # returns more is trimmed rather than trusted.
+            p["hashtags"] = tags[:5]
     return applied
 
 
