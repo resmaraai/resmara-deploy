@@ -1,27 +1,31 @@
 # Resmara engine tracker
 
-**Keep this table.** It tracks each engine through our process, not whether it's live:
+The engines, their brains and their stage. Each engine has one Build room task in the Team room. **Started:** 21 Nov 2026 · **Last updated:** 23 Nov 2026
 
-1. **Brain written:** Adam explains the logic, guardrails and references, and Claude writes the brain doc.
-2. **Designed:** every revision is mocked up and previewed, and Adam greenlights it.
-3. **Sent to Dan:** packaged as its own PR and sent to Dan by email and Chat for implementation.
+**Stages now live in the Build room** (one task per engine; the five stages are defined in
+`docs/engines/README.md`). This list is the engines and their brains. As of 23 Nov 2026 every engine
+is at **1. Planned**: the PRs below were plans with no app code.
 
-Each engine also has a Build room ticket in the Team room. **Started:** 21 Nov 2026 · **Last updated:** 22 Nov 2026
+| Engine | Build room task | Brain (plan PR) | Stage |
+|--------|-----------------|-----------------|-------|
+| Sign-up & Facebook connection (Engine 1) | #26 | `engine-1-brain.md` (#18) | 1. Planned |
+| Brand kit (Engine 2) | #27 | `engine-2-brain.md` (#22) | 1. Planned |
+| Sign-up tour | #83 | `resmara-signup-tour-engine.md` (#23) | 1. Planned |
+| Listing link check (Engine 3) | #28 | `engine-3-brain.md` (#24) | 1. Planned |
+| Campaign build & pay to unlock (Engine 4) | #29 | `engine-4-brain.md` (#26) | 1. Planned |
+| Listing website (Engine 5) | #30 | `engine-5-brain.md` (#27, #28) | 1. Planned |
+| Live campaign: posting, ads, leads & reports (Engine 6) | #31 | `engine-6-brain.md` (#28) | 1. Planned |
+| Run it until it sells (Engine 8) | #33 | `engine-8-brain.md` (#29) | 1. Planned |
+| Marketing pages in the Team room (Engine 9) | #84 | `engine-9-brain.md` (#31) | 1. Planned |
+| Billing (Engine 10) | #85 | `engine-10-brain.md` (#35) | 1. Planned |
+| Support & Ask Resmara (Engine 11) | #86 | `engine-11-brain.md` (#36) | 1. Planned |
 
-| Engine | Brain written | Designed | Sent to Dan | Brain doc |
-|--------|---------------|----------|-------------|-----------|
-| **Engine 1 · Login and Meta integration** (account, Meta connection, audit, setup to-do list; ends at Show me around) | ✅ Done | ✅ Greenlit | ✅ **PR #18**, 22 Nov (merged) | `engines/engine-1-brain.md` |
-| **Engine 2 · Brand** (quick AI investigation during sign-up that researches the agent and builds their brand page) | ✅ Done | ✅ Greenlit | ✅ **PR #22**, 22 Nov (merged) | `engines/engine-2-brain.md` |
-| **Resmara sign-up tour** (finish pop-up, fixes first, one setup plan, tour, first campaign: build then pay to unlock; carries Engine 1's Facebook-only log-in and no teams) | ✅ Done | ✅ Greenlit | ✅ **PR #23**, 22 Nov (merged) | `engines/resmara-signup-tour-engine.md` |
-| **Engine 3 · Listing link** (the link identifies the house; AI builds the home's file from every source; the gate for the build; plus the one-box Accounts setup) | ✅ Done | ✅ Greenlit | ✅ **PR #24**, 22 Nov | `engines/engine-3-brain.md` |
-| **Engine 4 · Campaign build** (14 one-of-a-kind posts and the ad from the brand kit, the home's file, the style profile and the trend brief; learns from 👍 / 👎, edits and results) | ✅ Done | ✅ Greenlit | ✅ **PR #26**, 22 Nov | `engines/engine-4-brain.md` |
-| **Engine 5 · Website** (a beautiful page for every home in the agent's brand, where the ad and posts send people; Preview, Copy link and Share in section 3 of the campaign) | ✅ Done | ✅ Greenlit | ✅ **PR #27**, 22 Nov | `engines/engine-5-brain.md` |
-| **Engine 6 · Active campaign** (posting, the live ad audit, comment and website leads, the listing watcher, pause, the agent report and the seller version) | ✅ Done | ✅ Greenlit | ✅ **PR #28**, 22 Nov (merged) | `engines/engine-6-brain.md` |
-| **Engine 7 · Marketing** (folded into Engine 9, Adam 22 Nov) | — | — | — | — |
-| **Engine 8 · Run it until it sells** (set it and forget it: a fresh 14 days every 2 weeks for $39 until it sells, emails at every turn, Run it again for everyone else) | ✅ Done | ✅ Greenlit | ✅ **PR #29**, 22 Nov | `engines/engine-8-brain.md` |
-| **Engine 9 · Marketing: Website, Email campaigns and Digital ads** (Team room: Marketing is the parent page that says whether each channel pays for itself; Website, Email campaigns and Digital ads under it, each tracking every visitor, email or ad; Mailchimp through its API; includes what was Engine 7) | ✅ Done | ✅ Greenlit | ✅ **PR #31**, 22 Nov | `engines/engine-9-brain.md` |
-| **Engine 10 · Billing** (one card, Stripe's card form in the pop-up, prices in one place, Stripe Tax, Coming up with Turn off, receipts, refunds and chargebacks, closing an account stops everything) | ✅ Done | ✅ Greenlit | ✅ **PR #35**, 22 Nov | `engines/engine-10-brain.md` |
-| **Engine 11 · Support** (Ask Resmara says it's AI, Support page with Which listing? and the 1 business day promise, one shared inbox support@resmara.com, reply-by times, the Resmara setup session) | ✅ Done | ✅ Greenlit | ✅ **PR #36**, 22 Nov | `engines/engine-11-brain.md` |
+(Engine 7 was folded into Engine 9.)
+
+**Build order: three slices, all needed for launch.**
+1. **Sign-up to first campaign:** Engines 1, 2, the sign-up tour, 3 and 4.
+2. **The live campaign:** Engines 5, 6 and 8.
+3. **The business side:** Engines 10, 11 and 9.
 
 PR numbers are filled in only once the PR is opened, never planned ahead (Adam, 22 Nov).
 
@@ -39,8 +43,9 @@ the sign-up tour PR, under `docs/journey/`.
 
 ## Up next
 
-1. Not engines: the Resmara setup session in Calendly, the support@resmara.com inbox, and turning on Stripe Tax (Adam). The AI tutorial videos are done (PRs #25 and #30).
-2. Later: the growth plan engine (Founding Agents, coach codes).
+1. **Slice 1 front end** (Ready for Dan), then slices 2 and 3.
+2. Not engines: the Resmara setup session in Calendly, the support@resmara.com inbox, and turning on Stripe Tax (Adam). The AI tutorial videos are done (PRs #25 and #30).
+3. Later: the growth plan engine (Founding Agents, coach codes).
 
 ## The new agent's path (decided 22 Nov)
 
