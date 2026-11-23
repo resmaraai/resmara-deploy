@@ -1,6 +1,6 @@
 # Engine 8 brain: Run it until it sells
 
-**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #(filled in when opened) · **Started:** 22 Nov 2026
+**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #29 · **Started:** 22 Nov 2026
 **Existing:** `app/services/renewals.py` and `scripts/until_sold_due.py` (Dan), `claude/until-it-sells-pr6-for-dan.md` (front end, PR #6), Ad Engine spec §7 (Run it again). This brain sets the direction; where they differ, this brain wins.
 
 ---

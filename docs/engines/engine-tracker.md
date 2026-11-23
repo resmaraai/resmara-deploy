@@ -18,7 +18,7 @@ Each engine also has a Build room ticket in the Team room. **Started:** 21 Nov 2
 | **Engine 5 · Website** (a beautiful page for every home in the agent's brand, where the ad and posts send people; Preview, Copy link and Share in section 3 of the campaign) | ✅ Done | ✅ Greenlit | ✅ **PR #27**, 22 Nov | `engines/engine-5-brain.md` |
 | **Engine 6 · Active campaign** (posting, the live ad audit, comment and website leads, the listing watcher, pause, the agent report and the seller version) | ✅ Done | ✅ Greenlit | ✅ **PR #28**, 22 Nov (merged) | `engines/engine-6-brain.md` |
 | **Engine 7 · Marketing** (on hold: scope to be defined with Adam) | Not started | — | — | — |
-| **Engine 8 · Run it until it sells** (set it and forget it: a fresh 14 days every 2 weeks for $39 until it sells, emails at every turn, Run it again for everyone else) | ✅ Done | ✅ Greenlit | ✅ Sent 22 Nov (PR number filled in when opened) | `engines/engine-8-brain.md` |
+| **Engine 8 · Run it until it sells** (set it and forget it: a fresh 14 days every 2 weeks for $39 until it sells, emails at every turn, Run it again for everyone else) | ✅ Done | ✅ Greenlit | ✅ **PR #29**, 22 Nov | `engines/engine-8-brain.md` |
 | **Engine 9 · Email campaigns, Digital ads and the Marketing overview** (Team room; moved to the end, Adam 22 Nov) | 📝 Logged | — | — | Notes below |
 
 PR numbers are filled in only once the PR is opened, never planned ahead (Adam, 22 Nov).
