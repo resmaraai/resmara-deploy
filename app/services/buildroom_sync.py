@@ -20,6 +20,13 @@ What it deliberately will not do: touch a task it did not create, take a claim o
 close a "Back end needed" bullet by itself. Those bullets describe work in code, and only a
 person or an agent who did the work can say it is done. A machine that guesses there would turn
 the one board that tells the truth into another dashboard.
+
+One exception, and it is narrow: after each sweep ``reconcile`` clears the two drifts the per-PR
+blocks cannot reach. A heading-only bullet ("3. **Run it until it sells:**") is deleted once its
+release is live, because it asks for nothing; and a hand-written card left in **review** whose
+pull request is merged, live, and merged *after* the card was written is closed — nobody owes a
+review of work that already serves traffic. It still never takes a claim, never closes a ``todo``
+card, and leaves a card alone when the card's own words say it owes more.
 """
 from __future__ import annotations
 
@@ -39,6 +46,21 @@ _MARK = re.compile(r"\[auto:pr #(\d+) (review|release|be)(?: (\d+))?\]")
 # Notes lines are written as "[YYYY-MM-DD] deploy=live", so the state has to be read from the
 # last such line, not from a bare marker.
 _STATE_LINE = re.compile(r"^\[[0-9-]+\] deploy=(\w+)", re.MULTILINE)
+
+# A pull request body that uses numbered bold sections ("3. **Run it until it sells:**") puts that
+# heading through the bullet parser as if it were work. A title that is *only* a heading, with
+# nothing under it, is a parsing artefact: it can be deleted once the release it came from is live.
+_HEADING_ONLY = re.compile(r"^\s*\d+\.?\s*\*\*[^*]{1,120}\*\*:?\s*$")
+
+# A card that says, in its own words, that it still owes something. A release going live does not
+# overrule that — the phrase is reported instead, so a person looks rather than the watcher guessing.
+_OWES_MORE = ("not built", "not yet", "blocked on", "to be written", "to write",
+              "once the meta app review", "still to", "remain")
+
+# Written once into a held card's notes, so the same explanation is not appended every sweep and
+# the next person can see why a card with a live pull request is still in review.
+_HELD = "release watcher:"
+
 
 
 def _operator() -> str:
@@ -73,6 +95,18 @@ def _index(rows: List[BuildroomTask]) -> Dict[Tuple[int, str, int], BuildroomTas
         if match:
             out[(int(match.group(1)), match.group(2), int(match.group(3) or 0))] = row
     return out
+
+
+def _as_utc(value: Optional[Any]) -> Optional[datetime]:
+    """SQLite hands back naive datetimes and Postgres aware ones; comparing them raises."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
 def _new_task(db: Session, *, pr: int, kind: str, bullet: int, title: str, area: str,
@@ -115,6 +149,79 @@ def _drive(task: BuildroomTask, *, status: str, deploy: str, live_commit: str,
         task.test_note = (f"live as {live_commit or 'the current build'} on resmara.com"
                           + (f", deployed {live_at}" if live_at else ""))
         changed["tested"].append(task.id)
+
+
+def reconcile(db: Session, payload: Dict[str, Any], live_commit: str = "") -> Dict[str, List[str]]:
+    """Close what the releases prove is finished, and delete rows that are not work.
+
+    The board drifts in two directions the per-pull-request blocks above do not reach:
+
+    * a card a person wrote for a spec ("Engine 4 · Campaign build") sits in **review** for days
+      after the pull request that shipped it went live, because the sync never touches a row it
+      did not create. Nobody owes a review of work that is already serving traffic.
+    * a PR body's numbered bold heading ("3. **Run it until it sells:**") becomes a back-end task
+      that asks for nothing, and it stays on the board forever.
+
+    Two rules, both narrow enough to defend:
+
+    * delete a heading-only ``be`` row once its pull request is merged **and live**;
+    * close a **hand-written** row in ``review`` only when its notes name a pull request that is
+      merged and live *and was merged after the row was created* — the PR is then evidence that the
+      card's work shipped. A card that says it still owes something (``_OWES_MORE``), that somebody
+      has claimed, or that a person has already tested is reported in ``skipped`` and left alone.
+      ``todo`` rows are never closed: "not started" is not "shipped".
+    """
+    out: Dict[str, List[str]] = {"closed": [], "deleted": [], "skipped": []}
+    live: Dict[int, Dict[str, Any]] = {}
+    for rel in payload.get("releases") or []:
+        try:
+            number = int(rel.get("number"))
+        except (TypeError, ValueError):
+            continue
+        if rel.get("merged_at") and (rel.get("deploy") or "") == "live":
+            live[number] = rel
+    if not live:
+        return out
+
+    stamp = datetime.now(timezone.utc)
+    for row in db.query(BuildroomTask).all():
+        marker = _MARK.search(row.notes or "")
+        if marker and marker.group(2) == "be":
+            if int(marker.group(1)) in live and _HEADING_ONLY.match(row.title or ""):
+                out["deleted"].append(f"#{row.id} {row.title}")
+                db.delete(row)
+            continue
+        if marker or row.status != "review":
+            continue
+        # The PR has to have merged after the card existed: an older card that merely mentions a
+        # pull request number is not evidence that this card's work shipped.
+        opened = _as_utc(row.created_at)
+        named = {int(n) for n in re.findall(r"\bPR #(\d+)", row.notes or "")}
+        shipped = [n for n in sorted(named)
+                   if n in live and opened and (_as_utc(live[n].get("merged_at")) or stamp) > opened]
+        if not shipped:
+            continue
+        if row.claimed_by or (row.tested_by and row.tested_by != SYNC_BY):
+            continue                      # somebody is on it, or a person signed it: never overrule
+        notes = (row.notes or "").lower()
+        if any(phrase in notes for phrase in _OWES_MORE):
+            if _HELD in (row.notes or ""):
+                continue          # explained once already: repeating it every sweep is noise
+            number = shipped[0]
+            _append(row, f"{_HELD} PR #{number} is merged and live, but this card says it still "
+                         f"owes work, so it stays in review for a person to look at")
+            out["skipped"].append(f"#{row.id} {row.title}")
+            continue
+        number = shipped[0]
+        _append(row, f"PR #{number} went live; nothing was claimed and nothing was left owed, "
+                     f"so the release watcher closed this review row")
+        row.status = "done"
+        row.tested_by = SYNC_BY
+        row.tested_at = stamp
+        row.test_note = (f"PR #{number} merged and live as {live_commit or 'the current build'} "
+                         f"on resmara.com")
+        out["closed"].append(f"#{row.id} {row.title}")
+    return out
 
 
 def sync(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -220,6 +327,7 @@ def sync(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
             _drive(release, status="todo", deploy=deploy, live_commit=live_commit,
                    live_at=None, changed=changed)
 
+    reconciled = reconcile(db, payload, live_commit=live_commit)
     db.commit()
     return {
         "checked_prs": seen_prs,
@@ -227,6 +335,7 @@ def sync(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
         "status": changed["status"],
         "tested": changed["tested"],
         "blocked": changed["blocked"],
+        "reconciled": reconciled,
         "live_commit": live_commit or None,
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }

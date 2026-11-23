@@ -65,6 +65,36 @@ def run_step(name: str, path: str, timeout: float, quiet_when: str = "") -> None
     say(f"{name}: {status or 'ERR'} {body}")
 
 
+def post_body(path: str, timeout: float) -> tuple[int, str]:
+    """POST with the machine token, returning the whole body. Never raises."""
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.post(BASE + path, headers={"X-Resmara-Token": TOKEN})
+        return resp.status_code, resp.text
+    except Exception as exc:  # noqa: BLE001 - the failure is the report
+        return 0, f"{type(exc).__name__}: {exc}"
+
+
+def buildroom() -> None:
+    """Every fire prints one line, because a step that only speaks when it changes something
+    cannot be told apart from a step that stopped firing. The counts are the heartbeat."""
+    status, body = post_body("/api/admin/buildroom/sync", 180)
+    if status != 200:
+        say(f"buildroom: {status or 'ERR'} {body[:300]}")
+        return
+    try:
+        answer = json.loads(body)
+        rec = answer.get("reconciled") or {}
+        say("buildroom: checked %d PRs, created %d, moved %d, tested %d, reconciled %d closed / "
+            "%d deleted / %d held"
+            % (len(answer.get("checked_prs") or []), len(answer.get("created") or []),
+               len(answer.get("status") or []), len(answer.get("tested") or []),
+               len(rec.get("closed") or []), len(rec.get("deleted") or []),
+               len(rec.get("skipped") or [])))
+    except (ValueError, TypeError):
+        say(f"buildroom: {status} {body[:300]}")
+
+
 def main() -> int:
     if not TOKEN:
         say("no RESMARA_PUBLISH_TOKEN - nothing sent")
@@ -73,8 +103,7 @@ def main() -> int:
     # Publishing first: a failed scan must never delay a due post.
     run_step("published", "/api/content/publish/run", 120, quiet_when='"published":0')
     run_step("leads", "/api/admin/leads/scan", 240, quiet_when='"leads":0')
-    run_step("buildroom", "/api/admin/buildroom/sync", 180,
-             quiet_when='"created":[]"status":[]"tested":[]')
+    buildroom()   # always one line: the build room's heartbeat, not just its changes
 
     # The console's System page claims it runs every 15 minutes; this is the call that makes it
     # true. Quiet unless a check actually fails.

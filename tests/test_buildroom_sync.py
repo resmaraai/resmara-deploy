@@ -207,6 +207,87 @@ def main() -> int:
           (r15.notes or "")[-60:])
     check("a closed pull request makes no release row", rel15 is None)
 
+    # ── the reconcile pass: shipped work leaves the board, junk rows go ─────────────
+    print("reconcile: a live release clears what it proved")
+    from datetime import datetime, timezone
+    with SessionLocal() as db:
+        db.add_all([
+            # a PR body's numbered heading, captured as a back-end task
+            BuildroomTask(title="3. **Run it until it sells:**", area="back_end", status="todo",
+                          notes="[auto:pr #11 be 9]", created_by="release-sync"),
+            BuildroomTask(title="2. **Dark mode:**", area="back_end", status="todo",
+                          notes="[auto:pr #13 be 9]", created_by="release-sync"),
+            # hand-written spec cards, opened before the PR that shipped them merged
+            BuildroomTask(title="Engine 4 · Campaign build", area="both", status="review",
+                          notes="Opened 21 Nov. Shipped by PR #11.",
+                          created_by="dan@example.com",
+                          created_at=datetime(2026, 11, 16, 12, 0, tzinfo=timezone.utc)),
+            BuildroomTask(title="Engine 9 · Marketing", area="both", status="review",
+                          notes="Shipped by PR #13.", created_by="dan@example.com",
+                          created_at=datetime(2026, 11, 16, 12, 0, tzinfo=timezone.utc)),
+            BuildroomTask(title="Engine 10 · Billing", area="both", status="review",
+                          notes="Follows PR #11.", created_by="dan@example.com",
+                          created_at=datetime(2026, 11, 20, 12, 0, tzinfo=timezone.utc)),
+            BuildroomTask(title="Engine 2 · Brand", area="both", status="review",
+                          notes="Shipped by PR #11; the social audit is not built.",
+                          created_by="dan@example.com",
+                          created_at=datetime(2026, 11, 16, 12, 0, tzinfo=timezone.utc)),
+            BuildroomTask(title="Engine 5 · Website", area="both", status="todo",
+                          notes="Shipped by PR #11.", created_by="dan@example.com",
+                          created_at=datetime(2026, 11, 16, 12, 0, tzinfo=timezone.utc)),
+            BuildroomTask(title="Engine 6 · Active campaign", area="both", status="review",
+                          claimed_by="adam@example.com",
+                          claimed_at=datetime(2026, 11, 22, 12, 0, tzinfo=timezone.utc),
+                          notes="Shipped by PR #11.", created_by="dan@example.com",
+                          created_at=datetime(2026, 11, 16, 12, 0, tzinfo=timezone.utc)),
+        ])
+        db.commit()
+
+    with SessionLocal() as db:
+        fifth = sync(db, payload("cccc333", [pr_live]))
+        db.commit()
+        rec = fifth.get("reconciled") or {}
+        shipped = row(db, "Engine 4 · Campaign build")
+        waiting_card = row(db, "Engine 9 · Marketing")
+        newer_card = row(db, "Engine 10 · Billing")
+        owes_card = row(db, "Engine 2 · Brand")
+        todo_card = row(db, "Engine 5 · Website")
+        claimed_card = row(db, "Engine 6 · Active campaign")
+        junk_live = row(db, "3. **Run it until it sells:**")
+        junk_waiting = row(db, "2. **Dark mode:**")
+
+    check("a card whose live PR merged after it was written is closed",
+          shipped is not None and shipped.status == "done", shipped.status if shipped else "missing")
+    check("the close names the PR and the build",
+          shipped is not None and "PR #11" in (shipped.test_note or "")
+          and "cccc333" in (shipped.test_note or ""), (shipped.test_note or "") if shipped else "")
+    check("a heading-only bullet from a live release is deleted", junk_live is None)
+    check("a heading-only bullet from an unreleased PR stays",
+          junk_waiting is not None and junk_waiting.status == "todo")
+    check("a card naming a PR that is not live stays in review",
+          waiting_card is not None and waiting_card.status == "review")
+    check("a card written after that PR merged is left alone",
+          newer_card is not None and newer_card.status == "review")
+    check("a card that says it still owes something is held, not closed",
+          owes_card is not None and owes_card.status == "review"
+          and any("Engine 2" in s for s in rec.get("skipped", [])), str(rec.get("skipped")))
+    check("a todo card is never closed by a release", todo_card.status == "todo", todo_card.status)
+    check("a claimed card is never touched", claimed_card.status == "review", claimed_card.status)
+    check("the report says what it closed and deleted",
+          any("Engine 4" in s for s in rec.get("closed", [])) and len(rec.get("deleted", [])) == 1,
+          str(rec))
+    check("a held card gains one note saying why, not one per sweep",
+          owes_card is not None and (owes_card.notes or "").count("release watcher:") == 1,
+          str((owes_card.notes or "").count("release watcher:")) if owes_card else "missing")
+
+    with SessionLocal() as db:
+        again = sync(db, payload("cccc333", [pr_live]))
+        db.commit()
+        rec2 = again.get("reconciled") or {}
+    check("a second sweep reconciles nothing",
+          rec2.get("closed") == [] and rec2.get("deleted") == [] and rec2.get("skipped") == [],
+          str(rec2))
+
     # ── the endpoint is machine-only ────────────────────────────────────────────────
     print("the endpoint")
     from fastapi.testclient import TestClient
