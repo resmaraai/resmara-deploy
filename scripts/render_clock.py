@@ -118,6 +118,19 @@ def main() -> int:
         run_step("listings sweep", "/api/admin/listings/sweep", 180)
     if now.hour == 14 and now.minute < 10:
         run_step("meta token health", "/api/oauth/meta/check-all", 180)
+        # Engine 1 §6: welcome / day 3 / day 7 / day 14, once each, stopping at the first
+        # launched campaign. Idempotent server-side, so a doubled tick sends nothing twice.
+        status, body = post_body("/api/admin/onboarding/emails/run", 180)
+        if status != 200:
+            say(f"onboarding emails: {status or 'ERR'} {body[:300]}")
+        else:
+            try:
+                answer = json.loads(body)
+                say("onboarding emails: sent %d, skipped %d, stopped after launch %d"
+                    % (len(answer.get("sent") or []), answer.get("skipped") or 0,
+                       answer.get("stopped_after_launch") or 0))
+            except (ValueError, TypeError):
+                say(f"onboarding emails: {status} {body[:200]}")
 
     return 0
 

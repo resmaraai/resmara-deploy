@@ -136,3 +136,24 @@ Clickable preview (sample numbers): https://claude.ai/artifact/UYQnJ1FtEf77oiNUb
 | Email campaigns | `engine-9-screens/03-email-campaigns.png` |
 | Website | `engine-9-screens/04-website.png` |
 | Preview source (one self-contained page) | `engine-9-screens/preview.html` |
+
+## Built (23 Nov 2026)
+
+PR #31 carried this brain and the screens and no code, so the tabs were never in the Team room.
+The build is in `app/` and `static/admin.html`:
+
+| Piece | Where |
+|---|---|
+| The three rules (stamp, one credit per agent, nothing counted twice) | `app/services/attribution.py` |
+| The stamp at sign-up (utm tags, `fbclid`, ad or campaign id, referrer) | `POST /api/auth/register` via `static/api.js`; stored on `users.signup_source` |
+| The credit at payment | `app/api/billing.py` writes `boosts.paid_source` |
+| Marketing (the parent), Digital ads, Email campaigns, Website | `app/api/marketing.py`; the Business menu in `static/admin.html` |
+| Mailchimp: audience, tags, series, reports, CSV, click lookup | `app/services/mailchimp.py` |
+| Meta: campaigns, ads, pause/run | `app/services/marketing_ads.py` |
+| The two monthly costs | Settings, stored in `marketing_settings` |
+| Tests | `tests/test_engine9_marketing.py` |
+
+**Still Adam's:** the Mailchimp account and its API key (to Render, never by email or chat), the two
+Mailchimp DNS records in GoDaddy, Resmara's own Meta ad account connected, and the emails
+themselves built in Mailchimp in Resmara's look. Until those exist the pages say so and keep
+showing the numbers we own: sign-ups, paying agents and money back.

@@ -33,6 +33,12 @@ from app.api import public
 # Social leads (Post Engine §10.4): /api/boosts/{id}/leads and the scan the scheduler calls.
 # Before this router existed the panel was a browser mockup with sample comments.
 from app.api import leads
+# Engine 1 Part A: "Log in with Facebook" (start -> callback -> ticket), the reversible
+# "Close my account" and the one-question email ask. Before this router existed the only door
+# into Resmara was email and password.
+from app.api import facebook_login
+# The four onboarding emails, run by the clock, plus the one-click unsubscribe they carry.
+from app.api import onboarding_emails
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(resmara.router, prefix="", tags=["resmara"])
@@ -67,3 +73,5 @@ api_router.include_router(marketing.router, prefix="", tags=["console"])
 # the source of every site that uses them. The homepage fetches these to install its tags.
 api_router.include_router(public.router, prefix="", tags=["public"])
 api_router.include_router(leads.router, prefix="", tags=["leads"])
+api_router.include_router(facebook_login.router, prefix="/auth", tags=["facebook login"])
+api_router.include_router(onboarding_emails.router, prefix="", tags=["onboarding emails"])

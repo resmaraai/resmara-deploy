@@ -38,6 +38,8 @@ nav#index.hidden{display:none}
 nav#index a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;color:#a2c9de;
   font-size:13px;font-weight:600;text-decoration:none;transition:background .14s,color .14s}
 nav#index a:hover{background:rgba(255,255,255,.07);color:#fff;text-decoration:none}
+/* The channels under Marketing: one level in, so the parent reads as the parent. */
+nav#index a.nav-sub{padding-left:26px;font-weight:500;font-size:12.5px;color:#8fb6cb}
 nav#index a[aria-current="true"]{background:var(--wash);color:var(--blue)}
 .side-foot{margin-top:auto;border-top:1px solid rgba(255,255,255,.13);padding-top:15px;
   font-size:11px;line-height:1.6;color:#9fbccd}
@@ -713,7 +715,9 @@ html.dark .rel-body{color:#d6e6f1}
       <div class="nav-group">Business</div>
       <a href="#sec-growth" data-go="growth">Growth</a>
       <a href="#sec-marketing" data-go="marketing">Marketing</a>
-      <a href="#sec-website" data-go="website">Website</a>
+      <a href="#sec-website" data-go="website" class="nav-sub">Website</a>
+      <a href="#sec-email" data-go="email" class="nav-sub">Email campaigns</a>
+      <a href="#sec-digitalads" data-go="digitalads" class="nav-sub">Digital ads</a>
       <div class="nav-group">System</div>
       <a href="#sec-health" data-go="health">System check</a>
       <a href="#sec-activity" data-go="activity">Activity</a>
@@ -875,9 +879,15 @@ html.dark .rel-body{color:#d6e6f1}
       <summary><h2>Marketing</h2><span class="secsum" id="sum-marketing">…</span><span class="chev">›</span></summary>
       <div class="body">
         <div id="mkHero"><div class="hint">Loading…</div></div>
-        <div class="br-card" style="margin-top:0"><h3 class="card-title">Is it worth it?</h3><div id="mkVerdict" class="hint">Loading…</div></div>
-        <div class="br-card"><h3 class="card-title">From ad to paying agent</h3><div id="mkFunnel" class="hint">Loading…</div></div>
-        <div class="br-card"><h3 class="card-title">Each week</h3><div id="mkWeeks" class="hint">Loading…</div></div>
+        <div class="br-card" style="margin-top:0"><h3 class="card-title">Is each channel paying for itself?</h3>
+          <div class="scrollx"><table id="mkChannels" style="min-width:900px">
+            <thead><tr><th style="min-width:170px">channel</th><th>cost</th><th>sign-ups</th><th>paying agents</th><th>per paying agent</th><th>money back</th><th>back per $1</th><th style="min-width:220px">verdict</th></tr></thead>
+            <tbody><tr><td colspan="8" class="hint">Loading…</td></tr></tbody>
+          </table></div>
+          <div class="hint" id="mkCostNote" style="margin-top:8px"></div>
+        </div>
+        <div class="br-card"><h3 class="card-title">Paying agents each week</h3><div id="mkWeeks" class="hint">Loading…</div></div>
+        <div class="br-card"><h3 class="card-title">How the numbers are counted</h3><div id="mkRules" class="hint">Loading…</div></div>
       </div>
     </details>
 
@@ -886,12 +896,38 @@ html.dark .rel-body{color:#d6e6f1}
       <div class="body">
         <div id="webHero"><div class="hint">Loading…</div></div>
         <div class="attn" id="attn-website"></div>
-        <div class="br-card" style="margin-top:0"><h3 class="card-title">Is it working?</h3><div id="webChecks" class="hint">Loading…</div></div>
+        <div class="br-card" style="margin-top:0"><h3 class="card-title">Why it works or it doesn't</h3><div id="webChecks" class="hint">Loading…</div></div>
+        <div class="br-card"><h3 class="card-title">Who came, and where they're counted</h3><div id="webSplit" class="hint">Loading…</div></div>
         <div class="grid2c">
           <div class="br-card"><h3 class="card-title">Where visitors come from</h3><div id="webSources" class="hint">Loading…</div></div>
           <div class="br-card"><h3 class="card-title">Top pages</h3><div id="webPages" class="hint">Loading…</div></div>
         </div>
         <div class="br-card heat"><div><h3 class="card-title">Heat maps and recordings</h3><p id="webHeatTxt" class="hint" style="margin:0">See where people click, scroll and give up, in Microsoft Clarity.</p></div><span id="webHeatBtn"></span></div>
+      </div>
+    </details>
+
+    <details class="card sec" data-sec="email" id="sec-email">
+      <summary><h2>Email campaigns</h2><span class="secsum" id="sum-email">…</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div id="emHero"><div class="hint">Loading…</div></div>
+        <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;margin:4px 0 16px">
+          <button id="emSync" class="tk-send" style="flex:0 0 auto">Sync the audience now</button>
+          <a id="emExport" class="tk-toggle" style="flex:0 0 auto" href="/api/admin/email-campaigns/export.csv">Export emails (CSV)</a>
+          <a id="emOpen" class="tk-toggle" style="flex:0 0 auto" href="https://admin.mailchimp.com/lists/" target="_blank" rel="noopener">Open Mailchimp</a>
+          <span class="msg" id="emMsg"></span>
+        </div>
+        <div class="br-card" style="margin-top:0"><h3 class="card-title">Every email we're running</h3><div id="emSeries" class="hint">Loading…</div></div>
+        <div class="br-card"><h3 class="card-title">What the emails brought in</h3><div id="emBrought" class="hint">Loading…</div></div>
+        <div class="br-card"><h3 class="card-title">Who's on the list</h3><div id="emTags" class="hint">Loading…</div></div>
+      </div>
+    </details>
+
+    <details class="card sec" data-sec="digitalads" id="sec-digitalads">
+      <summary><h2>Digital ads</h2><span class="secsum" id="sum-digitalads">…</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div id="adsHero"><div class="hint">Loading…</div></div>
+        <div class="br-card" style="margin-top:0"><h3 class="card-title">Every campaign and ad we're running</h3><div id="adsList" class="hint">Loading…</div></div>
+        <div class="hint" style="margin-top:8px">Sign-ups and paying agents are matched to the ad that brought them. Click a campaign to see its ads; pause or run any of them from its status.</div>
       </div>
     </details>
 
@@ -1037,6 +1073,15 @@ html.dark .rel-body{color:#d6e6f1}
           <div class="msg" id="tmMsg"></div>
         </div>
         <div class="br-card"><h3 class="card-title">Team members</h3><div id="teamList" class="hint">Loading…</div></div>
+        </div>
+        <div class="br-card" id="mkCostsCard"><h3 class="card-title">What marketing costs a month</h3>
+          <p class="hint" style="margin:0 0 12px">Typed in once. Ad spend is read from Meta; these two cannot be measured from here, so the verdicts on Marketing need them. A blank field means "not known", not zero.</p>
+          <div class="row">
+            <div style="flex:1 1 220px"><label for="mcMailchimp">Mailchimp plan ($ a month)</label><input id="mcMailchimp" inputmode="decimal" placeholder="e.g. 20"></div>
+            <div style="flex:1 1 220px"><label for="mcHosting">Website hosting ($ a month)</label><input id="mcHosting" inputmode="decimal" placeholder="e.g. 7"></div>
+            <div style="flex:0 0 auto"><label>&nbsp;</label><button id="mcSave">Save</button></div>
+          </div>
+          <div class="msg" id="mcMsg"></div>
         </div>
       </div>
     </details>
@@ -1901,61 +1946,324 @@ function paintAccountsHero(){
       {n: inactive, l: 'Inactive', s: 'closed or switched off', cls: inactive ? 'alert' : ''}]});
 }
 
-// ── marketing: is our own advertising bringing in agents for less than they are worth? ──
-// Needs GET /api/admin/marketing from the back end (Resmara's own ad account + sign-ups).
+// ── marketing: Resmara's own marketing, and whether each channel pays for itself ──
+// Needs GET /api/admin/marketing (Engine 9: sign-ups, paying agents, money back, costs).
 let mkData = null;
 async function loadMarketing(){
   try { mkData = await api('/api/admin/marketing'); } catch (err) { mkData = null; }
   paintMarketing();
 }
-function paintMarketing(){
-  const hero_ = $('mkHero'); if (!hero_) return;
-  const m = mkData;
-  if (!m) {
-    hero_.innerHTML = hero({eyebrow: 'Marketing · last 30 days', big: 'Not connected yet', small: 'connect Resmara’s own ad account to fill this page',
-      steps: [{n: '—', l: 'Ad spend'}, {n: '—', l: 'Leads'}, {n: '—', l: 'Cost per lead'}, {n: '—', l: 'New paying agents'}]});
-    ['mkVerdict', 'mkFunnel', 'mkWeeks'].forEach(id => { $(id).className = 'hint'; $(id).textContent = 'Appears once the back end sends Resmara’s ad numbers and sign-ups.'; });
-    const s = $('sum-marketing'); if (s) s.textContent = 'not connected yet';
-    return;
-  }
-  if (m.connected === false) {
-    // Same rule as the Website page: our own counts are real, the ad numbers need Meta. Showing
-    // "null" or "$0" spend would read as "we spent nothing", which is a different claim entirely.
-    const why = ((m.unavailable || []).find(u => u.metric === 'ad_spend') || {}).reason || 'connect Resmara’s own ad account to fill this page';
-    hero_.innerHTML = hero({eyebrow: 'Marketing · last ' + (m.days || 30) + ' days', big: 'Not connected yet', small: why,
-      steps: [{n: '—', l: 'Ad spend', s: 'needs the Meta ad account'},
-              {n: '—', l: 'Leads', s: 'needs the ad account'},
-              {n: Number(m.signups || 0).toLocaleString('en-US'), l: 'Sign-ups', s: 'counted here, and real'},
-              {n: m.paying, l: 'New paying agents', s: 'paid for a first campaign', cls: m.paying ? 'good' : ''}]});
-    ['mkVerdict', 'mkFunnel', 'mkWeeks'].forEach(id => { const el = $(id); if (el) { el.className = 'hint';
-      el.textContent = 'Needs the ad account. The sign-ups and paying agents above are counted from our own database and are real.'; } });
-    const s2 = $('sum-marketing'); if (s2) s2.textContent = 'not connected · ' + Number(m.signups || 0) + ' sign-ups';
-    navBadge('marketing', 0);
-    return;
-  }
-  const cpl = m.leads ? m.spend_usd / m.leads : null, cpa = m.paying ? m.spend_usd / m.paying : null;
-  const allowed = finData && finData.acquisition ? finData.acquisition.max_cac_usd[3] : null;
-  hero_.innerHTML = hero({eyebrow: 'Marketing · last ' + (m.days || 30) + ' days', big: cpa === null ? 'No paying agents yet' : esc(usd(cpa)) + ' <small>per new paying agent</small>',
-    small: allowed !== null && cpa !== null ? (cpa <= allowed ? 'under the ' + esc(usd(allowed)) + ' we can afford' : 'over the ' + esc(usd(allowed)) + ' we can afford') : '',
-    steps: [
-      {n: usd(m.spend_usd), l: 'Ad spend', s: m.campaigns_running + ' ad(s) running'},
-      {n: m.leads, l: 'Leads', s: 'people who started signing up'},
-      {n: cpl === null ? '—' : usd(cpl), l: 'Cost per lead'},
-      {n: m.paying, l: 'New paying agents', s: 'paid for a first campaign', cls: m.paying ? 'good' : ''}]});
-  $('mkVerdict').className = '';
-  $('mkVerdict').innerHTML = cpa === null || allowed === null ? '<div class="hint">Needs at least one paying agent from ads to judge.</div>' :
-    '<div class="verdict ' + (cpa <= allowed ? 'ok' : 'bad') + '"><b>' + (cpa <= allowed ? 'Yes, it’s paying for itself.' : 'Not yet. Each agent costs more than they’re worth.') + '</b>' +
-    '<span>A new paying agent costs us <b>' + esc(usd(cpa)) + '</b>. Finance says we can spend up to <b>' + esc(usd(allowed)) + '</b> to win one and still make 3x back.</span></div>';
-  const steps = [['Saw an ad', m.impressions], ['Clicked', m.clicks], ['Started signing up', m.leads], ['Made an account', m.signups], ['Paid for a campaign', m.paying]];
-  $('mkFunnel').className = '';
-  $('mkFunnel').innerHTML = '<div class="funnel">' + steps.map((s, i) => '<div class="fn"><b>' + esc(Number(s[1] || 0).toLocaleString('en-US')) + '</b><span>' + esc(s[0]) + '</span>' +
-    (i ? '<small>' + (steps[i - 1][1] ? Math.round(s[1] / steps[i - 1][1] * 1000) / 10 : 0) + '% of the step before</small>' : '<small>&nbsp;</small>') + '</div>').join('<i>›</i>') + '</div>';
-  const wk = m.weeks || [], mx = Math.max(1, ...wk.map(w => w.leads || 0));
-  $('mkWeeks').className = '';
-  $('mkWeeks').innerHTML = wk.length ? '<div class="weeks" style="grid-template-columns:repeat(' + wk.length + ',1fr)">' + wk.map(w => '<div class="wk"><b>' + esc(w.leads) + '</b><i style="height:' + Math.max(4, Math.round((w.leads || 0) / mx * 100)) + '%"></i><span>' +
-    esc(dateOnly(w.start).replace(/, \d{4}$/, '')) + '<br>' + esc(usd(w.spend_usd || 0)) + '</span></div>').join('') + '</div><p class="hint" style="margin:10px 0 0">Bars are leads. The money under each is what we spent that week.</p>' : '<div class="hint">No weeks yet.</div>';
-  const s = $('sum-marketing'); if (s) s.textContent = (cpl === null ? '' : usd(cpl) + ' per lead · ') + m.paying + ' new paying agent(s)';
+function mkMoney(v){ return v === null || v === undefined ? '—' : esc(usd(v)); }
+function mkVerdict(ch){
+  const word = ch.verdict === true ? '<span class="pill ok">Working</span>'
+    : ch.verdict === false ? '<span class="pill bad">Not working</span>'
+    : '<span class="pill warn">Can’t say yet</span>';
+  return word + '<div class="hint" style="margin-top:4px">' + esc(ch.verdict_text || '') + '</div>';
 }
+function paintMarketing(){
+  const heroEl = $('mkHero'); if (!heroEl) return;
+  const m = mkData, table = $('mkChannels'), weeks = $('mkWeeks'), rules = $('mkRules'), note = $('mkCostNote');
+  if (!m) {
+    heroEl.innerHTML = hero({eyebrow: 'Marketing · last 30 days', big: 'Not readable yet', small: 'the back end did not answer',
+      steps: [{n: '—', l: 'Spent'}, {n: '—', l: 'Sign-ups'}, {n: '—', l: 'Paying agents'}, {n: '—', l: 'Money back'}]});
+    if (table) table.querySelector('tbody').innerHTML = '<tr><td colspan="8" class="hint">Appears once the back end answers.</td></tr>';
+    ['mkWeeks', 'mkRules'].forEach(id => { const el = $(id); if (el) { el.className = 'hint'; el.textContent = 'Appears once the back end answers.'; } });
+    const s = $('sum-marketing'); if (s) s.textContent = 'not readable';
+    return;
+  }
+  const t = m.total || {};
+  const missing = (m.channels || []).filter(c => c.cost_usd === null);
+  heroEl.innerHTML = hero({eyebrow: 'Marketing · last ' + (m.days || 30) + ' days',
+    big: m.paying ? esc(String(m.paying)) + ' <small>paying agent' + (m.paying === 1 ? '' : 's') + '</small>' : 'No paying agents yet',
+    small: m.paying ? esc(mkMoney(t.per_paying_usd)) + ' to win each one' : 'sign-ups are counted; a paying agent is somebody who bought a campaign',
+    steps: [
+      {n: m.total && m.total.cost_usd !== null ? usd(t.cost_usd) : '—', l: 'Spent on marketing', s: t.cost_complete ? 'all three channels' : 'some costs are not entered'},
+      {n: Number(m.signups || 0).toLocaleString('en-US'), l: 'Sign-ups', s: 'stamped with where they came from'},
+      {n: Number(m.paying || 0).toLocaleString('en-US'), l: 'Paying agents', s: 'each counted once, for the last thing that got them to buy', cls: m.paying ? 'good' : ''},
+      {n: usd(t.money_back_usd || 0), l: 'Money back', s: 'campaigns they bought, at what they paid', cls: t.back_per_dollar > 1 ? 'good' : ''}]});
+
+  if (table) {
+    const rows = (m.channels || []).map(c =>
+      '<tr class="mkrow" data-go="' + esc(c.go) + '" role="button" tabindex="0">' +
+        '<td><b>' + esc(c.name) + '</b><div class="hint">' + esc(c.cost_note || '') + '</div></td>' +
+        '<td>' + mkMoney(c.cost_usd) + '</td>' +
+        '<td>' + esc(String(c.signups || 0)) + '</td>' +
+        '<td>' + esc(String(c.paying || 0)) + '</td>' +
+        '<td>' + mkMoney(c.per_paying_usd) + '</td>' +
+        '<td>' + mkMoney(c.money_back_usd) + '</td>' +
+        '<td>' + (c.back_per_dollar === null || c.back_per_dollar === undefined ? '—' : esc('$' + c.back_per_dollar)) + '</td>' +
+        '<td>' + mkVerdict(c) + '</td></tr>').join('') +
+      '<tr style="background:rgba(255,255,255,.04)"><td><b>All marketing</b></td>' +
+        '<td>' + mkMoney(t.cost_usd) + (t.cost_complete ? '' : ' <span class="pill warn">partial</span>') + '</td>' +
+        '<td>' + esc(String(t.signups || 0)) + '</td>' +
+        '<td>' + esc(String(t.paying || 0)) + '</td>' +
+        '<td>' + mkMoney(t.per_paying_usd) + '</td>' +
+        '<td>' + mkMoney(t.money_back_usd) + '</td>' +
+        '<td>' + (t.back_per_dollar === null || t.back_per_dollar === undefined ? '—' : esc('$' + t.back_per_dollar)) + '</td>' +
+        '<td>' + mkVerdict(t) + '</td></tr>';
+    table.querySelector('tbody').innerHTML = rows;
+  }
+  if (note) {
+    note.innerHTML = missing.length
+      ? 'Cost is not known for ' + missing.map(c => esc(c.name)).join(' and ') + ', so those rows cannot be judged yet. ' +
+        'Ad spend comes from Meta; the Mailchimp plan and hosting are typed in once in Settings.'
+      : 'Ad spend is read from Resmara’s own Meta account. The Mailchimp plan and hosting are typed in once in Settings and spread evenly across the days.';
+  }
+
+  if (weeks) {
+    const wk = m.weeks || [];
+    weeks.className = '';
+    weeks.innerHTML = wk.length ? '<div class="scrollx"><table style="min-width:640px"><thead><tr><th>week of</th><th>digital ads</th><th>email</th><th>website</th><th>paying agents</th><th>sign-ups</th><th>ad spend</th></tr></thead><tbody>' +
+      wk.map(w => '<tr><td>' + esc(dateOnly(w.start).replace(/, \d{4}$/, '')) + '</td><td>' + esc(String(w.ad || 0)) + '</td><td>' + esc(String(w.email || 0)) + '</td><td>' + esc(String(w.website || 0)) + '</td><td><b>' + esc(String(w.total || 0)) + '</b></td><td>' + esc(String(w.signups || 0)) + '</td><td>' + (w.spend_usd === null || w.spend_usd === undefined ? '—' : esc(usd(w.spend_usd))) + '</td></tr>').join('') +
+      '</tbody></table></div><p class="hint" style="margin:10px 0 0">Paying agents each week, by the channel that gets the credit. The last column is what the ads cost that week.</p>'
+      : '<div class="hint">No weeks yet.</div>';
+  }
+  if (rules) {
+    rules.className = '';
+    rules.innerHTML = '<ol style="margin:0;padding-left:20px;line-height:1.7">' + (m.rules || []).map(r => '<li>' + esc(r) + '</li>').join('') + '</ol>';
+  }
+  const s = $('sum-marketing');
+  if (s) s.textContent = (t.cost_usd !== null && t.cost_usd !== undefined ? usd(t.cost_usd) + ' spent · ' : '') +
+    (m.paying || 0) + ' paying agent(s) · ' + usd(t.money_back_usd || 0) + ' back';
+  navBadge('marketing', 0);
+}
+
+// ── email campaigns: Mailchimp, the three series, and what the emails brought in ──
+// Needs GET /api/admin/email-campaigns from the back end (MAILCHIMP_API_KEY), plus
+// POST /api/admin/email-campaigns/sync, PUT .../series/{key} and GET .../export.csv.
+let emData = null;
+async function loadEmail(){
+  try { emData = await api('/api/admin/email-campaigns'); } catch (err) { emData = null; }
+  paintEmail();
+}
+function emNote(text, ok){
+  const m = $('emMsg'); if (!m) return;
+  m.className = 'msg ' + (ok ? 'ok' : 'bad'); m.textContent = text;
+  clearTimeout(emNote._t); emNote._t = setTimeout(() => { m.textContent = ''; m.className = 'msg'; }, 9000);
+}
+function paintEmail(){
+  const h = $('emHero'); if (!h) return;
+  const e = emData;
+  const parts = ['emSeries', 'emBrought', 'emTags'];
+  if (!e) {
+    h.innerHTML = hero({eyebrow: 'Email campaigns · last 30 days', big: 'Not readable yet', small: 'the back end did not answer',
+      steps: [{n: '—', l: 'On the list'}, {n: '—', l: 'Opened'}, {n: '—', l: 'Clicked'}, {n: '—', l: 'Bought after an email'}]});
+    parts.forEach(id => { const el = $(id); if (el) { el.className = 'hint'; el.textContent = 'Appears once the back end answers.'; } });
+    const s = $('sum-email'); if (s) s.textContent = 'not readable';
+    return;
+  }
+  const on = !!e.connected;
+  h.innerHTML = hero({eyebrow: 'Email campaigns · last ' + (e.days || 30) + ' days',
+    big: on ? esc(Number(e.list_size || 0).toLocaleString('en-US')) + ' <small>on the list</small>'
+            : 'No list yet',
+    small: on ? (e.audience && e.audience.name ? esc(e.audience.name) : 'Resmara clients') + (e.audience && e.audience.last_sync ? ' · last sign-up ' + esc(when(e.audience.last_sync)) : '')
+              : esc(e.why || 'Mailchimp is not connected yet'),
+    steps: [
+      {n: on ? Number(e.opened || 0).toLocaleString('en-US') : '—', l: 'Opened', s: on ? 'unique opens, all campaigns' : 'needs Mailchimp'},
+      {n: on ? Number(e.clicked || 0).toLocaleString('en-US') : '—', l: 'Clicked', s: on ? 'unique clicks, all campaigns' : 'needs Mailchimp'},
+      {n: Number(e.paying || 0).toLocaleString('en-US'), l: 'Bought after an email', s: 'counted here, and real', cls: e.paying ? 'good' : ''},
+      {n: e.unsubscribed === null || e.unsubscribed === undefined ? '—' : Number(e.unsubscribed).toLocaleString('en-US'), l: 'Unsubscribed', s: 'never emailed marketing again'}]});
+
+  // The series: each one, its emails, and whether it is on.
+  const series = $('emSeries');
+  if (series) {
+    series.className = '';
+    series.innerHTML = (e.series || []).map(sr =>
+      '<div class="cost' + (sr.on ? ' open' : '') + '">' +
+        '<div class="cost-line"><div class="cost-main"><b>' + esc(sr.name) + '</b>' +
+          '<span>' + esc(sr.audience || '') + ' · ' + esc(sr.when || '') + '</span></div>' +
+          '<div class="chips">' + (sr.on ? '<span class="pill ok">On</span>' : '<span class="pill warn">Off</span>') + '</div>' +
+          '<div><button class="tk-toggle" data-series="' + esc(sr.key) + '" data-on="' + (sr.on ? '1' : '0') + '">' + (sr.on ? 'Turn off' : 'Turn on') + '</button></div>' +
+        '</div>' +
+        '<div class="scrollx" style="margin-top:8px"><table style="min-width:520px"><thead><tr><th style="min-width:200px">email</th><th>sent</th><th>opened</th><th>clicked</th><th>last sent</th></tr></thead><tbody>' +
+        (sr.emails || []).map(em => '<tr><td>' + esc(em.name) + (em.in_mailchimp ? '' : ' <span class="pill warn">not built yet</span>') + '</td>' +
+          '<td>' + (em.sent === null ? '—' : esc(String(em.sent))) + '</td>' +
+          '<td>' + (em.opened === null ? '—' : esc(String(em.opened))) + '</td>' +
+          '<td>' + (em.clicked === null ? '—' : esc(String(em.clicked))) + '</td>' +
+          '<td>' + (em.sent_at ? esc(when(em.sent_at)) : '—') + '</td></tr>').join('') +
+        '</tbody></table></div></div>').join('') +
+        (e.series_connected ? '' : '<p class="hint" style="margin:10px 0 0">' + esc(e.series_why || 'Mailchimp is not connected, so no email has numbers yet.') + '</p>');
+  }
+
+  // What the emails brought in, by series.
+  const brought = $('emBrought');
+  if (brought) {
+    brought.className = '';
+    const bi = e.brought_in || {};
+    brought.innerHTML = '<div class="scrollx"><table style="min-width:520px"><thead><tr><th style="min-width:240px">series</th><th>paying agents</th><th>campaigns</th><th>money back</th></tr></thead><tbody>' +
+      (bi.by_series || []).map(r => '<tr><td>' + esc(r.name) + '</td><td>' + esc(String(r.paying)) + '</td><td>' + esc(String(r.campaigns)) + '</td><td>' + esc(usd(r.money_back_usd || 0)) + '</td></tr>').join('') +
+      '<tr style="background:rgba(255,255,255,.04)"><td><b>All emails</b></td><td><b>' + esc(String(bi.paying || 0)) + '</b></td><td><b>' + esc(String(bi.campaigns || 0)) + '</b></td><td><b>' + esc(usd(bi.money_back_usd || 0)) + '</b></td></tr>' +
+      '</tbody></table></div><p class="hint" style="margin:10px 0 0">An agent counts here when an email was the last thing that got them to buy. ' +
+      (e.cost_usd === null || e.cost_usd === undefined ? 'The Mailchimp plan is not in Settings, so this channel has no cost to judge yet.' :
+        esc(usd(e.cost_usd)) + ' of Mailchimp plan in this window. ' + esc(e.verdict_text || '')) + '</p>';
+    const s = $('sum-email');
+    if (s) s.textContent = (on ? Number(e.list_size || 0).toLocaleString('en-US') + ' on the list · ' : 'not connected · ') + (bi.paying || 0) + ' bought after an email';
+  }
+
+  // Who is on the list, by tag.
+  const tags = $('emTags');
+  if (tags) {
+    tags.className = '';
+    if (!on) {
+      tags.innerHTML = '<div class="hint">' + esc(e.why || 'Mailchimp is not connected.') + ' The CSV export still works from this database.</div>';
+    } else {
+      const rows = e.tags || [];
+      tags.innerHTML = '<div class="chips" style="flex-wrap:wrap">' + rows.map(t => '<span class="pill">' + esc(t.name) + ' ' + esc(String(t.count)) + '</span>').join(' ') + '</div>' +
+        '<p class="hint" style="margin:10px 0 0">' + (e.members_synced ? 'The audience was read from Mailchimp just now.' : 'The audience could not be read.') +
+        (e.opted_out_here ? ' ' + esc(String(e.opted_out_here)) + ' account(s) switched marketing off here.' : '') + '</p>';
+    }
+  }
+  navBadge('email', 0);
+}
+
+// ── digital ads: every campaign and ad on Resmara's own Meta account ──
+// Needs GET /api/admin/digital-ads, GET .../{id}/ads and POST .../{id}/status.
+let adsData = null, adsOpen = {}, adsDetail = {};
+async function loadAds(){
+  try { adsData = await api('/api/admin/digital-ads'); } catch (err) { adsData = null; }
+  paintAds();
+}
+function paintAds(){
+  const h = $('adsHero'); if (!h) return;
+  const list = $('adsList');
+  const a = adsData;
+  if (!a) {
+    h.innerHTML = hero({eyebrow: 'Digital ads · last 30 days', big: 'Not readable yet', small: 'the back end did not answer',
+      steps: [{n: '—', l: 'Spend'}, {n: '—', l: 'Clicks'}, {n: '—', l: 'Paying agents'}, {n: '—', l: 'Money back'}]});
+    if (list) { list.className = 'hint'; list.textContent = 'Appears once the back end answers.'; }
+    const s = $('sum-digitalads'); if (s) s.textContent = 'not readable';
+    return;
+  }
+  const t = a.total || {};
+  const on = !!a.connected;
+  h.innerHTML = hero({eyebrow: 'Digital ads · last ' + (a.days || 30) + ' days',
+    big: on ? esc(usd(t.spend_usd || 0)) + ' <small>spent</small>' : 'No ad account yet',
+    small: on ? (t.paying ? esc(usd(t.per_paying_usd)) + ' per paying agent · ' + esc(usd(t.money_back_usd || 0)) + ' back'
+                          : 'sign-ups here are counted from our own database and are real')
+              : esc(a.why || 'set META_AD_ACCOUNT_ID and META_SYSTEM_TOKEN on the service'),
+    steps: [
+      {n: on ? Number(t.clicks || 0).toLocaleString('en-US') : '—', l: 'Clicks', s: on ? 'on the ads' : 'needs the ad account'},
+      {n: Number(t.signups || 0).toLocaleString('en-US'), l: 'Sign-ups', s: 'matched to the campaign they came from'},
+      {n: Number(t.paying || 0).toLocaleString('en-US'), l: 'Paying agents', s: 'each counted once', cls: t.paying ? 'good' : ''},
+      {n: esc(usd(t.money_back_usd || 0)), l: 'Money back', s: 'what those agents paid'}]});
+
+  if (!list) return;
+  list.className = '';
+  const campaigns = a.campaigns || [];
+  if (!campaigns.length) {
+    list.innerHTML = '<div class="hint">' + (on ? 'No campaigns on the account yet.' :
+      esc(a.why || 'Resmara’s own Meta ad account is not connected.') + ' Sign-ups and paying agents still show above, because they are counted here.') + '</div>';
+    const s = $('sum-digitalads'); if (s) s.textContent = on ? 'no campaigns yet' : 'not connected · ' + (t.paying || 0) + ' paying agent(s)';
+    return;
+  }
+  list.innerHTML = '<div class="cost-list">' + campaigns.map(c => {
+    const open = !!adsOpen[c.id];
+    const detail = adsDetail[c.id];
+    return '<div class="cost' + (open ? ' open' : '') + '">' +
+      '<div class="cost-line"><div class="cost-main"><b>' + esc(c.name) + '</b><span>' + esc(c.status_word || c.status || '') + ' · ' + esc(c.objective || '') + '</span></div>' +
+        '<div class="chips"><span class="pill">' + esc(usd(c.spend_usd || 0)) + ' spent</span>' +
+          '<span class="pill">' + esc(String(c.signups || 0)) + ' sign-ups</span>' +
+          '<span class="pill">' + esc(String(c.paying || 0)) + ' paying</span>' +
+          (c.verdict === true ? '<span class="pill ok">Working</span>' : c.verdict === false ? '<span class="pill bad">Not working</span>' : '<span class="pill warn">Can’t say yet</span>') + '</div>' +
+        '<div class="cost-meta"><span>money back</span><span>' + esc(usd(c.money_back_usd || 0)) + '</span></div>' +
+        '<button class="tk-toggle" data-adscamp="' + esc(c.id) + '">' + (open ? 'Close' : 'See the ads') + '</button>' +
+        '<button class="tk-toggle" data-adstatus="' + esc(c.id) + '" data-run="' + (c.status === 'ACTIVE' ? '0' : '1') + '">' + (c.status === 'ACTIVE' ? 'Pause' : 'Run') + '</button>' +
+      '</div>' +
+      '<div class="cost-actions' + (open ? '' : ' hidden') + '" style="flex-direction:column;align-items:stretch;gap:8px">' +
+        '<div class="hint">' + esc(c.verdict_text || '') + '</div>' +
+        (!detail ? '<div class="hint">Loading the ads…</div>' :
+          detail.why && !(detail.ads || []).length ? '<div class="hint">' + esc(detail.why) + '</div>' :
+          '<div class="scrollx"><table style="min-width:620px"><thead><tr><th style="min-width:200px">ad</th><th>status</th><th>runs</th><th>spend</th><th>clicks</th><th></th></tr></thead><tbody>' +
+          (detail.ads || []).map(ad => '<tr><td>' + esc(ad.name) + '</td><td>' + esc(ad.status) + '</td><td>' + esc(ad.where || '—') + '</td>' +
+            '<td>' + esc(usd(ad.spend_usd || 0)) + '</td><td>' + esc(String(ad.clicks || 0)) + '</td>' +
+            '<td><button class="tk-toggle" data-adstatus="' + esc(ad.id) + '" data-run="' + (ad.status === 'ACTIVE' ? '0' : '1') + '">' + (ad.status === 'ACTIVE' ? 'Pause' : 'Run') + '</button></td></tr>').join('') +
+          '</tbody></table></div>') +
+      '</div></div>';
+  }).join('') + '</div>' +
+  (t.unmatched_signups ? '<p class="hint" style="margin:12px 0 0">' + esc(String(t.unmatched_signups)) + ' sign-up(s) carry no campaign id, so they are counted but not under a campaign.</p>' : '');
+  const s = $('sum-digitalads');
+  if (s) s.textContent = on ? usd(t.spend_usd || 0) + ' spent · ' + (t.paying || 0) + ' paying agent(s)' : 'not connected · ' + (t.paying || 0) + ' paying agent(s)';
+}
+
+// ── the two marketing costs, typed in once in Settings ──
+let mcCosts = null;
+async function loadMarketingCosts(){
+  try { mcCosts = await api('/api/admin/marketing-costs'); } catch (err) { mcCosts = null; }
+  const mailchimp = $('mcMailchimp'), hosting = $('mcHosting');
+  if (mailchimp) mailchimp.value = mcCosts && mcCosts.mailchimp_monthly_usd !== null ? String(mcCosts.mailchimp_monthly_usd) : '';
+  if (hosting) hosting.value = mcCosts && mcCosts.hosting_monthly_usd !== null ? String(mcCosts.hosting_monthly_usd) : '';
+}
+async function saveMarketingCosts(){
+  const m = $('mcMsg');
+  const body = { mailchimp_monthly_usd: ($('mcMailchimp') || {}).value,
+                 hosting_monthly_usd: ($('mcHosting') || {}).value };
+  try {
+    mcCosts = await api('/api/admin/marketing-costs', { method: 'PUT', body: body });
+    if (m) { m.className = 'msg ok'; m.textContent = 'Saved. The Marketing verdicts use these from now on.'; }
+    loadMarketing();
+  } catch (err) {
+    if (m) { m.className = 'msg bad'; m.textContent = (err && err.message) || 'Could not save those costs.'; }
+  }
+}
+
+// Clicks on the new pages: a channel row, a series switch, a sync, an ad's status, its ads.
+document.addEventListener('click', async (e) => {
+  const seriesBtn = e.target.closest('[data-series]');
+  if (seriesBtn) {
+    const key = seriesBtn.dataset.series, on = seriesBtn.dataset.on === '1';
+    try {
+      await api('/api/admin/email-campaigns/series/' + encodeURIComponent(key),
+                { method: 'PUT', body: { on: !on } });
+      emNote((!on ? 'Series on. ' : 'Series off. ') + 'Mailchimp starts (or stops starting) its emails from the tag.', true);
+      loadEmail();
+    } catch (err) { emNote((err && err.message) || 'Could not change that series.', false); }
+    return;
+  }
+  const syncBtn = e.target.closest('#emSync');
+  if (syncBtn) {
+    syncBtn.disabled = true;
+    emNote('Syncing the audience…', true);
+    try {
+      const out = await api('/api/admin/email-campaigns/sync', { method: 'POST' });
+      emNote(out && out.synced ? ('Synced: ' + out.added + ' added, ' + out.updated + ' updated, ' + out.removed + ' removed.')
+                               : ((out && out.why) || 'Mailchimp is not connected, so nothing was synced.'), !!(out && out.synced));
+      loadEmail();
+    } catch (err) {
+      emNote((err && err.message) || 'The sync failed.', false);
+    } finally { syncBtn.disabled = false; }
+    return;
+  }
+  const campBtn = e.target.closest('[data-adscamp]');
+  if (campBtn) {
+    const id = campBtn.dataset.adscamp;
+    adsOpen[id] = !adsOpen[id];
+    paintAds();
+    if (adsOpen[id] && !adsDetail[id]) {
+      try { adsDetail[id] = await api('/api/admin/digital-ads/' + encodeURIComponent(id) + '/ads'); }
+      catch (err) { adsDetail[id] = { ads: [], why: (err && err.message) || 'Could not read the ads.' }; }
+      paintAds();
+    }
+    return;
+  }
+  const statusBtn = e.target.closest('[data-adstatus]');
+  if (statusBtn) {
+    const id = statusBtn.dataset.adstatus, run = statusBtn.dataset.run === '1';
+    statusBtn.disabled = true;
+    try {
+      await api('/api/admin/digital-ads/' + encodeURIComponent(id) + '/status',
+                { method: 'POST', body: { run: run } });
+      adsDetail = {};
+      loadAds();
+    } catch (err) {
+      statusBtn.disabled = false;
+      statusBtn.textContent = (err && err.message) ? 'Refused' : 'Failed';
+    }
+    return;
+  }
+  const row = e.target.closest('tr.mkrow[data-go]');
+  if (row) { openSection(row.dataset.go); return; }
+  if (e.target.closest('#mcSave')) { saveMarketingCosts(); }
+});
 
 // ── website: is resmara.com up, tracking, fast, and turning visitors into sign-ups? ──
 // Needs GET /api/admin/website from the back end (Google Analytics, Clarity, PageSpeed, tag checks).
@@ -1970,7 +2278,7 @@ function paintWebsite(){
   if (!w) {
     h.innerHTML = hero({eyebrow: 'resmara.com · last 30 days', big: 'Not connected yet', small: 'connect Google Analytics, Clarity and the tags to fill this page',
       steps: [{n: '—', l: 'Visitors'}, {n: '—', l: 'Sign-ups started'}, {n: '—', l: 'Conversion rate'}, {n: '—', l: 'Page speed'}]});
-    ['webChecks', 'webSources', 'webPages'].forEach(id => { $(id).className = 'hint'; $(id).textContent = 'Appears once the back end is connected to Google Analytics, Clarity and PageSpeed.'; });
+    ['webChecks', 'webSources', 'webPages', 'webSplit'].forEach(id => { $(id).className = 'hint'; $(id).textContent = 'Appears once the back end is connected to Google Analytics, Clarity and PageSpeed.'; });
     $('webHeatBtn').innerHTML = ''; attnBox('attn-website', [], ''); navBadge('website', 0);
     const s = $('sum-website'); if (s) s.textContent = 'not connected yet';
     return;
@@ -1990,6 +2298,7 @@ function paintWebsite(){
               {n: '—', l: 'Conversion rate', s: 'needs visitors from Google Analytics'},
               {n: speed, l: 'Page speed', s: 'on phones, out of 100 · ' + desk + ' on desktop', cls: speed >= 90 ? 'good' : speed < 50 && speed !== '—' ? 'alert' : ''}]});
     $('webChecks').className = ''; $('webChecks').innerHTML = checkGrid(w.checks || []);
+    $('webSplit').className = ''; $('webSplit').innerHTML = webSplitTable(w);
     ['webSources', 'webPages'].forEach(id => { const el = $(id); if (el) { el.className = 'hint'; el.textContent = 'Needs Google Analytics.'; } });
     $('webHeatTxt').textContent = clarityOn
       ? Number(w.clarity_sessions).toLocaleString('en-US') + ' recorded visits in the last 3 days. See where people click, scroll and give up.'
@@ -2012,6 +2321,7 @@ function paintWebsite(){
       {n: w.speed_mobile, l: 'Page speed', s: 'on phones, out of 100 · ' + w.speed_desktop + ' on desktop', cls: speedCls}]});
   $('webChecks').className = '';
   $('webChecks').innerHTML = checkGrid(w.checks || []);
+  $('webSplit').className = ''; $('webSplit').innerHTML = webSplitTable(w);
   const fails = (w.checks || []).filter(c => c.status === 'fail');
   attnBox('attn-website', [], fails.length ? attnList(fails.map(c => ({main: c.name + ' is not working', sub: c.detail || ''}))) : '', fails.length);
   navBadge('website', fails.length);
@@ -2022,6 +2332,20 @@ function paintWebsite(){
   $('webHeatTxt').textContent = w.clarity_sessions ? Number(w.clarity_sessions).toLocaleString('en-US') + ' recorded visits in the last 30 days. See where people click, scroll and give up.' : 'See where people click, scroll and give up, in Microsoft Clarity.';
   $('webHeatBtn').innerHTML = w.clarity_url ? '<a class="tk-send heat-btn" href="' + esc(w.clarity_url) + '" target="_blank" rel="noopener">Open heat maps</a>' : '';
   const s = $('sum-website'); if (s) s.textContent = Number(w.visitors).toLocaleString('en-US') + ' visitors · ' + conv + '% start signing up' + (fails.length ? ' · ' + fails.length + ' check(s) failing' : '');
+}
+
+// Who came, and where they're counted (Engine 9, 3a). Everyone lands on the site, so this page
+// shows all three; the Website row on Marketing only counts the people who came on their own.
+function webSplitTable(w){
+  const rows = w.channel_split || [];
+  if (!rows.length) return '<div class="hint">Nothing to split yet.</div>';
+  const note = w.connected ? '' : '<p class="hint" style="margin:10px 0 0">Visitors need Google Analytics. The sign-ups and paying agents are counted from our own database and are real.</p>';
+  return '<div class="scrollx"><table style="min-width:520px"><thead><tr><th style="min-width:200px">came from</th><th>visitors</th><th>sign-ups</th><th>paying agents</th><th>counted under</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td><b>' + esc(r.name) + '</b></td>' +
+      '<td>' + (r.visitors === null || r.visitors === undefined ? '—' : esc(Number(r.visitors).toLocaleString('en-US'))) + '</td>' +
+      '<td>' + esc(String(r.signups || 0)) + '</td><td>' + esc(String(r.paying || 0)) + '</td>' +
+      '<td>' + esc(r.key === 'ad' ? 'Digital ads' : r.key === 'email' ? 'Email campaigns' : 'Website') + '</td></tr>').join('') +
+    '</tbody></table></div>' + note;
 }
 
 // ── filings & deadlines ───────────────────────────────────────────────────────────
@@ -2213,7 +2537,7 @@ const ACCESS = [
   ['agents', 'Agents', 'Accounts, Support, Connections', ['users', 'support', 'advertising']],
   ['campaigns', 'Campaigns', 'Campaigns and their posts', ['campaigns']],
   ['money', 'Money', 'Finance, Start-up costs, Filings', ['finance', 'costs', 'filings']],
-  ['business', 'Business', 'Growth, Marketing, Website', ['growth', 'marketing', 'website']],
+  ['business', 'Business', 'Growth, Marketing, Website, Email campaigns, Digital ads', ['growth', 'marketing', 'website', 'email', 'digitalads']],
   ['system', 'System', 'System check, Activity', ['health', 'activity']],
 ];
 let teamRows = null, teamOpen = new Set();
@@ -2518,7 +2842,7 @@ async function loadMetrics(){
     $('advertisingBody').innerHTML = a.error ? groupError('connections', a.error) :
       '<div class="br-card" style="margin-top:0"><h3 class="card-title">Every connection</h3><div id="connList" class="hint">Loading…</div></div>';
     loadConnections();
-    loadCampaigns(); loadActivity(); loadSystemCheck(); loadMarketing(); loadWebsite(); loadTeam(); loadReleases();
+    loadCampaigns(); loadActivity(); loadSystemCheck(); loadMarketing(); loadWebsite(); loadEmail(); loadAds(); loadMarketingCosts(); loadTeam(); loadReleases();
 
     $('activityBody').innerHTML = act.error ? groupError('activity', act.error) :
       sparkline(act.per_day) + '<div class="hint" style="margin-top:8px">Click a day to see what happened.</div>';
@@ -3003,7 +3327,7 @@ if ($('cAdd')) {
 }
 
 
-function refreshAll(){ hideTip(); loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); loadFinance(); loadBuildroom(); loadFilings(); }
+function refreshAll(){ hideTip(); loadHealth(); loadMetrics(); loadUsers(); loadTickets(); loadCosts(); loadFinance(); loadBuildroom(); loadFilings(); loadMarketing(); loadWebsite(); loadEmail(); loadAds(); loadMarketingCosts(); }
 
 // ── build room ────────────────────────────────────────────────────────────────────
 // Who is working on what, and who has it claimed. The server owns the lock: a claimed task
@@ -3535,7 +3859,7 @@ boot();
 /* One section at a time. The sidebar picks a view; Overview shows the pulse and a card per section. */
 (function(){
   document.body.classList.add('views');
-  const GROUP={buildroom:'Build',releases:'Build',users:'Agents',growth:'Business',marketing:'Business',website:'Business',support:'Agents',advertising:'Agents',campaigns:'Campaigns',finance:'Money',costs:'Money',filings:'Money',health:'System',activity:'System',settings:'System'};
+  const GROUP={buildroom:'Build',releases:'Build',users:'Agents',growth:'Business',marketing:'Business',website:'Business',email:'Business',digitalads:'Business',support:'Agents',advertising:'Agents',campaigns:'Campaigns',finance:'Money',costs:'Money',filings:'Money',health:'System',activity:'System',settings:'System'};
   function paintOverview(){
     const box=document.getElementById('overviewList'); if(!box) return;
     box.innerHTML=[...document.querySelectorAll('#index a[data-go]')].filter(a=>a.dataset.go!=='overview').map(a=>{

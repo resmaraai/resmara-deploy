@@ -26,7 +26,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
     "agents": ("users", "support", "connections", "advertising"),
     "campaigns": ("campaigns",),
     "money": ("finance", "costs", "filings", "money"),
-    "business": ("growth", "marketing", "website"),
+    "business": ("growth", "marketing", "website", "digitalads", "email"),
     "system": ("health", "activity", "system"),
 }
 

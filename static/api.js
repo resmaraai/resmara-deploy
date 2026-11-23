@@ -231,6 +231,42 @@
     return body;
   }
 
+  // ---- "Log in with Facebook" (Engine 1 Part A) ---------------------------
+  // The Terms box is ticked before any of this is called: the server refuses to start the
+  // Facebook dialog without it, and the consent it records is what the new account is stamped
+  // with. The redirect comes back as a one-time ticket, never as a token in the URL.
+  function facebookStart(termsVersion) {
+    return json('/api/auth/facebook/start', 'POST',
+      { terms_accepted: true, terms_version: termsVersion || TERMS_VERSION });
+  }
+
+  function facebookExchange(ticket) {
+    return json('/api/auth/facebook/exchange', 'POST', { ticket: ticket })
+      .then(function (body) {
+        if (body && body.access_token) setToken(body.access_token);
+        return body;
+      });
+  }
+
+  function facebookReactivate(ticket) {
+    return json('/api/auth/facebook/reactivate', 'POST', { ticket: ticket })
+      .then(function (body) {
+        if (body && body.access_token) setToken(body.access_token);
+        return body;
+      });
+  }
+
+  // Facebook hid the email, so we ask once - for receipts, never to sign in.
+  function setEmail(email) {
+    return json('/api/auth/me/email', 'PATCH', { email: email });
+  }
+
+  // "Close my account" is reversible (campaigns, leads and reports are kept); deleting the
+  // data is the permanent one and stays on deleteAccount().
+  function closeAccount() {
+    return request('/api/auth/me/close', { method: 'POST' }).then(function (r) { logout(); return r; });
+  }
+
   // Change together with the "Last updated" date on terms.html and privacy.html.
   var TERMS_VERSION = '2026-11-22';
 
@@ -241,8 +277,31 @@
     // server records it with the time and IP so the agreement can be proved later.
     var body = { email: email, password: password, name: name,
                  terms_accepted: true, terms_version: TERMS_VERSION };
+    // Engine 9, section 1a: where this sign-up came from, captured from the link this browser
+    // landed on. Stored in sessionStorage on the first page it sees, so an agent who lands on a
+    // page without the query string and signs up three pages later still gets the stamp.
+    var source = signupSource();
+    if (source && Object.keys(source).length) body.source = source;
     if (inviteCode) body.invite_code = inviteCode;
     return json('/api/auth/register', 'POST', body);
+  }
+
+  // The attribution keys we understand. Anything else on the query string is not kept.
+  var SOURCE_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+                     'fbclid', 'gclid', 'ad_id', 'campaign_id'];
+  function signupSource() {
+    var kept = {};
+    try { kept = JSON.parse(sessionStorage.getItem('resmara_attribution') || '{}') || {}; } catch (e) { kept = {}; }
+    try {
+      var query = new URLSearchParams(location.search);
+      SOURCE_KEYS.forEach(function (k) { if (query.get(k)) kept[k] = String(query.get(k)).slice(0, 200); });
+      if (!kept.landing) kept.landing = location.pathname;
+      if (!kept.referrer && document.referrer && document.referrer.indexOf(location.host) === -1) {
+        kept.referrer = String(document.referrer).slice(0, 200);
+      }
+      sessionStorage.setItem('resmara_attribution', JSON.stringify(kept));
+    } catch (e) { /* private mode: the query string still counts, it just is not remembered */ }
+    return kept;
   }
 
   function me() {
@@ -643,6 +702,12 @@
     onSessionLost: onSessionLost,
     login: login,
     register: register,
+    facebookStart: facebookStart,
+    facebookExchange: facebookExchange,
+    facebookReactivate: facebookReactivate,
+    setEmail: setEmail,
+    closeAccount: closeAccount,
+    termsVersion: function () { return TERMS_VERSION; },
     me: me,
     requestPasswordReset: requestPasswordReset,
     confirmPasswordReset: confirmPasswordReset,

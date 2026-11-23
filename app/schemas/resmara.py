@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 from datetime import datetime
 
 # --- Auth ---
@@ -9,6 +9,10 @@ class UserCreate(BaseModel):
     name: Optional[str] = None
     # Only needed while the beta gate is on (RESMARA_SIGNUP_CODE); ignored when signup is open.
     invite_code: Optional[str] = None
+    # Where this sign-up came from, read from the link the browser landed on (Engine 9, 1a):
+    # utm_source / utm_medium / utm_campaign, fbclid, the ad or campaign id, the referrer. It
+    # is stamped on the account at creation and never changed afterwards.
+    source: Optional[Dict[str, Any]] = None
 
 class UserOut(BaseModel):
     id: int

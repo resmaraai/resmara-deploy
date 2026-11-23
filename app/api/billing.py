@@ -322,6 +322,10 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         if boost:
             boost.paid_at = datetime.utcnow()
             boost.paid_amount_cents = outcome.get("amount_cents") or billing.price_cents()
+            # Engine 9, section 1a: the channel that gets credit for this purchase, decided once,
+            # when the money lands (the last thing that got them to buy).
+            from app.services import attribution
+            attribution.record_purchase(db, boost, boost.paid_at)
         if order:
             db.add(Event(user_id=order.user_id, boost_id=order.boost_id, event_type="campaign_paid",
                          payload={"session_id": outcome.get("session_id"),
@@ -454,6 +458,9 @@ async def charge_campaign(body: ChargeRequest, current_user: User = Depends(get_
     db.add(order)
     boost.paid_at = now
     boost.paid_amount_cents = cents
+    # Engine 9, section 1a: which channel gets credit for this purchase.
+    from app.services import attribution
+    attribution.record_purchase(db, boost, now)
     db.add(Event(user_id=current_user.id, boost_id=boost.id, event_type="campaign_paid",
                  payload={"payment_intent": result.get("payment_intent"), "amount_cents": cents,
                           "via": "saved_card", "card": card.get("label")}))

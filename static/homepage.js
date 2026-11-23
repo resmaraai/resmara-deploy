@@ -185,14 +185,119 @@ function togglePw(btn){
  btn.setAttribute('aria-label',show?'Hide password':'Show password');
  btn.setAttribute('aria-pressed',show?'true':'false');
 }
-function clientAccess(mode='signin'){
+function clientAccessEmail(mode='signin'){
  // state.clientSignedIn is a browser memory, not a session. Ask the API client whether the
  // token is still alive, or a customer whose session ended can never reach the form to fix it.
  if(state.clientSignedIn&&window.RM&&RM.isLoggedIn()){dashboard();return}
  if(state.clientSignedIn){state.clientSignedIn=false;persist()}
  const creating=mode==='create';
- show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>${creating?'Create an account':'Client Login'}</h2><p>${creating?'Just your name, email and a password. Resmara learns the rest when you connect your Meta account.':'Enter your email and password.'}</p><form onsubmit="event.preventDefault();submitTestClient(this,${creating})">${creating?'<div class="nc-row name-row"><label class="field">First name<input name="firstName" required maxlength="60" autocomplete="given-name"></label><label class="field">Last name<input name="lastName" required maxlength="60" autocomplete="family-name"></label></div>':''}<label class="field">Email address<input name="clientEmail" type="email" required maxlength="254" autocomplete="email"></label><label class="field">Password<span class="pw-wrap"><input name="clientPassword" type="password" required minlength="${creating?8:1}" autocomplete="${creating?'new-password':'current-password'}"><button type="button" class="pw-eye" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false">Show</button></span></label>${creating?'<details class="invite-toggle"><summary>Have an invite code?</summary><label class="field">Invite code<input name="inviteCode" maxlength="64" autocomplete="off" spellcheck="false" placeholder="From your invitation"></label></details><label class="terms-agree" style="display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;font-size:14px;line-height:1.45;color:#12354d;cursor:pointer"><input type="checkbox" name="agreeTerms" required style="margin-top:3px;width:18px;height:18px;flex:0 0 18px"><span>I agree to the <a href="terms.html" target="_blank" rel="noopener" style="color:#12354d;font-weight:700;text-decoration:underline">Terms of Service</a> and <a href="privacy.html" target="_blank" rel="noopener" style="color:#12354d;font-weight:700;text-decoration:underline">Privacy Policy</a>, including the <b>arbitration agreement and class action waiver</b> in section 17 of the Terms.</span></label>':''}<p class="fine" role="status"></p><div class="modal-actions"><button>${creating?'Create account':'Sign in'}</button><button type="button" class="alt" onclick="clientAccess('${creating?'signin':'create'}')">${creating?'Back to sign in':'Create an account'}</button></div></form>${state.name&&!state.email?'<button class="alt" onclick="resumeDemo()">Resume previous demo</button>':''}<p class="fine">${creating?'Passwords need at least 8 characters.':'<a href="#" onclick="forgotPassword();return false">Forgot your password?</a>'}</p>`);
+ show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>${creating?'Create an account':'Client Login'}</h2><p>${creating?'Just your name, email and a password. Resmara learns the rest when you connect your Meta account.':'Enter your email and password.'}</p><form onsubmit="event.preventDefault();submitTestClient(this,${creating})">${creating?'<div class="nc-row name-row"><label class="field">First name<input name="firstName" required maxlength="60" autocomplete="given-name"></label><label class="field">Last name<input name="lastName" required maxlength="60" autocomplete="family-name"></label></div>':''}<label class="field">Email address<input name="clientEmail" type="email" required maxlength="254" autocomplete="email"></label><label class="field">Password<span class="pw-wrap"><input name="clientPassword" type="password" required minlength="${creating?8:1}" autocomplete="${creating?'new-password':'current-password'}"><button type="button" class="pw-eye" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false">Show</button></span></label>${creating?'<details class="invite-toggle"><summary>Have an invite code?</summary><label class="field">Invite code<input name="inviteCode" maxlength="64" autocomplete="off" spellcheck="false" placeholder="From your invitation"></label></details><label class="terms-agree" style="display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;font-size:14px;line-height:1.45;color:#12354d;cursor:pointer"><input type="checkbox" name="agreeTerms" required style="margin-top:3px;width:18px;height:18px;flex:0 0 18px"><span>I agree to the <a href="terms.html" target="_blank" rel="noopener" style="color:#12354d;font-weight:700;text-decoration:underline">Terms of Service</a> and <a href="privacy.html" target="_blank" rel="noopener" style="color:#12354d;font-weight:700;text-decoration:underline">Privacy Policy</a>, including the <b>arbitration agreement and class action waiver</b> in section 17 of the Terms.</span></label>':''}<p class="fine" role="status"></p><div class="modal-actions"><button>${creating?'Create account':'Sign in'}</button><button type="button" class="alt" onclick="clientAccessEmail('${creating?'signin':'create'}')">${creating?'Back to sign in':'Create an account'}</button></div></form>${state.name&&!state.email?'<button class="alt" onclick="resumeDemo()">Resume previous demo</button>':''}<p class="fine">${creating?'Passwords need at least 8 characters.':'<a href="#" onclick="forgotPassword();return false">Forgot your password?</a>'}</p>`);
 }
+// Engine 1 Part A: "Log in with Facebook" is the door (Adam, 22 Nov). One pop-up for new and
+// returning clients - an existing Facebook signs in, a new one creates the account and starts
+// the Meta connection in the same step. The email form stays underneath as the fallback until
+// Meta's App Review approves the email permission for customers, and that is said on screen.
+function clientAccess(mode = 'signin') {
+ // state.clientSignedIn is a browser memory, not a session: ask the API client whether the
+ // token is still alive, or a customer whose session ended can never reach the form to fix it.
+ if (state.clientSignedIn && window.RM && RM.isLoggedIn()) { dashboard(); return; }
+ if (state.clientSignedIn) { state.clientSignedIn = false; persist(); }
+ fbLoginPopup();
+}
+
+const FB_TERMS = '<label class="terms-agree" style="display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;font-size:14px;line-height:1.45;color:#12354d;cursor:pointer">'
+ + '<input type="checkbox" id="fbTerms" style="margin-top:3px;width:18px;height:18px;flex:0 0 18px" onchange="var g=document.getElementById(\'fbGo\');if(g)g.disabled=!this.checked">'
+ + '<span>I agree to the <a href="terms.html" target="_blank" rel="noopener" style="color:#12354d;font-weight:700;text-decoration:underline">Terms of Service</a> and '
+ + '<a href="privacy.html" target="_blank" rel="noopener" style="color:#12354d;font-weight:700;text-decoration:underline">Privacy Policy</a>, including the '
+ + '<b>arbitration agreement and class action waiver</b> in section 17 of the Terms.</span></label>';
+
+function fbLoginPopup() {
+ show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>Log in with Facebook</h2>
+ <p>Resmara does everything through Facebook: your Page, your Instagram and your ad account. Logging in connects them, so there is nothing else to set up first.</p>
+ ${FB_TERMS}
+ <p class="fine" id="fbStatus" role="status"></p>
+ <div class="modal-actions">
+  <button type="button" class="alt" onclick="clientAccessEmail()">Use email and password instead</button>
+  <button type="button" class="campaign-primary" id="fbGo" disabled onclick="fbLoginBegin()">Continue with Facebook</button>
+ </div>
+ <p class="fine">No Facebook account? You'll need one to use Resmara. It's free: <a href="https://www.facebook.com/reg/" target="_blank" rel="noopener">create one on Facebook</a>, then come back here.</p>`);
+}
+
+async function fbLoginBegin() {
+ const status = document.getElementById('fbStatus');
+ const go = document.getElementById('fbGo');
+ if (!window.RM || !RM.facebookStart) { if (status) status.textContent = 'The API client is unavailable in this browser.'; return; }
+ const box = document.getElementById('fbTerms');
+ if (!box || !box.checked) { if (status) status.textContent = 'Tick the box agreeing to the Terms first.'; return; }
+ if (go) { go.disabled = true; go.textContent = 'Opening Facebook…'; }
+ try {
+  const reply = await RM.facebookStart(RM.termsVersion ? RM.termsVersion() : undefined);
+  if (reply && reply.redirect_url) { location.href = reply.redirect_url; return; }
+  throw new Error('Facebook did not answer with a login window.');
+ } catch (err) {
+  if (status) status.textContent = (err && err.message) || 'Facebook login could not start.';
+  if (go) { go.disabled = false; go.textContent = 'Continue with Facebook'; }
+ }
+}
+
+// Facebook's return trip: a one-time ticket, never a token in the URL.
+async function fbReturn() {
+ const query = new URLSearchParams(location.search);
+ const outcome = query.get('fb');
+ if (!outcome) return false;
+ history.replaceState({}, '', location.pathname + location.hash);
+ if (outcome === 'login') {
+  show(`<span class="eyebrow">SIGNING YOU IN</span><h2>Just a moment…</h2><p>Facebook said yes. Resmara is opening your account.</p>`);
+  try {
+   const reply = await RM.facebookExchange(query.get('ticket') || '');
+   state.clientSignedIn = true; state.firstRun = true; persist();
+   if (reply && reply.needs_email) { fbAskEmail(); return true; }
+   if (modal.open) modal.close();
+   metaGateOnLogin();
+  } catch (err) { fbLoginFailed((err && err.message) || 'Signing in did not finish.'); }
+  return true;
+ }
+ if (outcome === 'closed') { fbReactivatePrompt(query.get('ticket') || ''); return true; }
+ if (outcome === 'cancelled') { toast('Facebook sign-in was cancelled - nothing changed.'); clientAccess(); return true; }
+ fbLoginFailed(query.get('reason') || 'Facebook did not finish the sign-in.');
+ return true;
+}
+
+function fbLoginFailed(reason) {
+ show(`<span class="eyebrow">FACEBOOK SIGN-IN</span><h2>That didn't finish.</h2><p>${esc(reason)}</p><div class="modal-actions"><button type="button" class="alt" onclick="clientAccessEmail()">Use email and password</button><button type="button" class="campaign-primary" onclick="clientAccess()">Try Facebook again</button></div>`);
+}
+
+// Some Facebook accounts hide the email. We ask once - for receipts, never to sign in.
+function fbAskEmail() {
+ show(`<span class="eyebrow">ONE MORE THING</span><h2>What email should we use?</h2><p>Facebook didn't share one. We only use it for receipts and updates - you'll keep signing in with Facebook.</p>
+ <form onsubmit="event.preventDefault();fbSaveEmail(this)"><label class="field">Email address<input name="email" type="email" required maxlength="254" autocomplete="email"></label><p class="fine" role="status"></p><div class="modal-actions"><span></span><button class="campaign-primary">Save it</button></div></form>`);
+}
+
+async function fbSaveEmail(form) {
+ const status = form.querySelector('[role="status"]');
+ status.textContent = 'Saving…';
+ try {
+  await RM.setEmail(form.elements.email.value.trim());
+  modal.close(); metaGateOnLogin();
+ } catch (err) { status.textContent = (err && err.message) || 'That did not save.'; }
+}
+
+// "This account has been closed. Would you like to reactivate it?" - one click, all back.
+function fbReactivatePrompt(ticket) {
+ show(`<span class="eyebrow">ACCOUNT CLOSED</span><h2>Welcome back.</h2><p>This account has been closed. Would you like to reactivate it? Everything is still here - your campaigns, leads and reports.</p>
+ <div class="modal-actions"><span></span><button type="button" class="campaign-primary" onclick="fbReactivate('${esc(ticket)}')">Reactivate my account</button></div>`);
+}
+
+async function fbReactivate(ticket) {
+ try {
+  const reply = await RM.facebookReactivate(ticket);
+  state.clientSignedIn = true; persist();
+  if (reply && reply.needs_email) { fbAskEmail(); return; }
+  if (modal.open) modal.close();
+  metaGateOnLogin();
+ } catch (err) { fbLoginFailed((err && err.message) || 'Reactivating did not finish.'); }
+}
+
 function forgotPassword(){
  show(`<span class="eyebrow">PASSWORD HELP</span><h2>Reset your password</h2><p>Enter the email address on your account and we will send a link to choose a new password.</p><form onsubmit="event.preventDefault();requestResetLink(this)"><label class="field">Email address<input name="email" type="email" required maxlength="254" autocomplete="email" value="${esc(state.email||'')}"></label><p class="fine" role="status"></p><div class="modal-actions"><button>Send reset link</button><button type="button" class="alt" onclick="clientAccess()">Back to sign in</button></div></form><p class="fine">The link works once and expires in an hour.</p>`);
 }

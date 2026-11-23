@@ -25,6 +25,12 @@ Each engine also has a Build room ticket in the Team room. **Started:** 21 Nov 2
 
 PR numbers are filled in only once the PR is opened, never planned ahead (Adam, 22 Nov).
 
+> **A merged PR is not a built engine.** Step 3 sends the design to Dan; the engine exists only
+> when `app/` or `static/` changed and its page answers in the Team room. Engine 9 went out as a
+> docs-only PR on 22 Nov and was read as delivered; it was built on 23 Nov. Before a row is
+> treated as live, check that the code moved - `git show --stat <merge>` listing only `docs/` is
+> the tell.
+
 ## Client journey map
 
 Every screen and branch from the website to the first live campaign, with screenshots:
