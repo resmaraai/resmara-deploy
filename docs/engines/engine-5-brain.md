@@ -158,7 +158,7 @@ Call leads, Text leads**, each its own number, and which post or ad brought them
 **The short version:** no website is deployed per listing, and nobody touches anything. Every build
 saves a **site record** for the home, the photos sit in **Cloudflare R2**, and one route in the app
 we already run on Render draws the page from the record when anyone opens the link. Cloudflare sits
-in front and caches it so it's fast. One template, in code, for every site.
+can sit in front later to cache it. One template, in code, for every site.
 
 **Why not a Cloudflare Pages site per listing** (the first idea): every campaign would need its own
 build and deploy, a second hosting setup, and its own copy of the design, so a design fix would mean
@@ -198,8 +198,9 @@ and there's nothing to deploy when a campaign is built.
   drawn with the same template code the dashboard preview uses, so the preview and the real page
   can't drift apart. Returning finished HTML (not a blank page that draws itself) matters: Facebook,
   iMessage and Google read the page title and share image from it.
-- **Cloudflare caches each page** at the edge, so a burst of ad clicks never hits Render; when the
-  record changes, the app clears that page from the cache.
+- **Caching:** the app keeps each finished page in memory until its record changes, so a burst of ad
+  clicks doesn't rebuild the page every time. Cloudflare's edge cache can sit in front later (see
+  Setup).
 - Leads (form, call, text) and visits go to the public endpoints in section 7.
 
 ### Keeping it current, automatically
@@ -223,14 +224,24 @@ and there's nothing to deploy when a campaign is built.
 ### What this costs
 
 Close to nothing: R2 is about a tenth of a cent per campaign a year past its free tier (see
-`storage.py`), and the pages are served by the app we already run, behind Cloudflare's free cache.
+`storage.py`), and the pages are served by the app we already run.
 
 ### Setup (one time)
 
-- **Adam:** the DNS record pointing `homes.resmara.com` at Render.
-- **Dan:** add `homes.resmara.com` as a custom domain on Render; turn R2 on in production with a
-  public address for it (for example `media.resmara.com`); put Cloudflare's cache in front of
-  `homes.resmara.com`.
+Checked in GoDaddy on 22 Nov: `resmara.com` is an A record to Render (216.24.57.1) and `www` is a
+CNAME to `resmara.onrender.com` (the live `resmara` service). DNS is at GoDaddy, not Cloudflare.
+
+- **DNS (Adam):** add `homes` as a CNAME to `resmara.onrender.com`, the same target as `www`.
+- **Render (Dan):** add `homes.resmara.com` as a custom domain on the `resmara` service (Render then
+  issues its certificate). **Move the service off the free plan before launch:** a free web service
+  sleeps after about 15 minutes idle, so the first person to tap an ad would wait while it wakes up.
+- **R2 in production (Dan):** turn it on. Its built-in `r2.dev` address is rate-limited and not meant
+  for public traffic, so photos need a custom address (for example `media.resmara.com`).
+- **Decision for Adam and Dan, before launch:** R2's custom address and Cloudflare's edge cache both
+  need `resmara.com`'s DNS to be on Cloudflare (free). That means moving the nameservers from GoDaddy
+  to Cloudflare and copying these 8 records over (email records included). It's a one-time move, done
+  carefully at a quiet time. Until then, websites are served straight from Render, which is fine at
+  low traffic.
 
 ## 10. Decided with Adam (22 Nov 2026)
 
