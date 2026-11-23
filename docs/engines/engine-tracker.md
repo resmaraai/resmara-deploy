@@ -16,7 +16,7 @@ Each engine also has a Build room ticket in the Team room. **Started:** 21 Nov 2
 | **Engine 3 · Listing link** (the link identifies the house; AI builds the home's file from every source; the gate for the build; plus the one-box Accounts setup) | ✅ Done | ✅ Greenlit | ✅ **PR #24**, 22 Nov | `engines/engine-3-brain.md` |
 | **Engine 4 · Campaign build** (14 one-of-a-kind posts and the ad from the brand kit, the home's file, the style profile and the trend brief; learns from 👍 / 👎, edits and results) | ✅ Done | ✅ Greenlit | ✅ **PR #26**, 22 Nov | `engines/engine-4-brain.md` |
 | **Engine 5 · Website** (a beautiful page for every home in the agent's brand, where the ad and posts send people; Preview, Copy link and Share in section 3 of the campaign) | ✅ Done | ✅ Greenlit | ✅ **PR #27**, 22 Nov | `engines/engine-5-brain.md` |
-| **Engine 6 · Active campaign** (ad, publishing, leads, reports) | Not started | — | — | — |
+| **Engine 6 · Active campaign** (posting, the live ad audit, comment and website leads, the listing watcher, pause, the agent report and the seller version) | ✅ Done | ✅ Greenlit | ✅ **PR #28**, 22 Nov | `engines/engine-6-brain.md` |
 | **Engine 7 · Marketing** | Not started | — | — | — |
 | **Engine 8 · Run it until it sells** | Not started | — | — | — |
 | **Engine 9 · Email campaigns, Digital ads and the Marketing overview** (Team room; moved to the end, Adam 22 Nov) | 📝 Logged | — | — | Notes below |
@@ -31,8 +31,8 @@ the sign-up tour PR, under `docs/journey/`.
 
 ## Up next
 
-1. **Engine 6 · Active campaign** (next).
-2. Engines 7–8 in order.
+1. **Engine 7 · Marketing** (next).
+2. Engine 8 · Run it until it sells.
 3. Engine 9 · Email campaigns, Digital ads and the Marketing overview.
 4. Not engines, after them: the AI tutorial videos for the Setup page (Build room ticket, 22 Nov) and the Resmara setup session in Calendly.
 

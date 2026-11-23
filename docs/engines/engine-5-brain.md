@@ -111,7 +111,7 @@ campaign together, ready to review: the launch details, the calendar and the web
 | Built, waiting to be unlocked | There, blurred with everything else behind pay to unlock |
 | Unlocked, in review | **3 Your listing page:** the preview, Preview your website, Copy link, Share. The link works, so the agent can send it to anyone. (Steps: 1 Confirm your launch details, 2 Campaign calendar, 3 Your listing page, 4 Ready to go?) |
 | Live | **3 Your listing page** with its numbers (1 Campaign leads, 2 Campaign calendar, 3 Your listing page, 4 Reports) |
-| Pending or sold (Engine 6 sees it) | Stays up with a Pending or Sold banner; the form still works |
+| Pending or sold (Engine 6, the moment it's detected or the agent marks it) | **Stops marketing the home** (legally required once it's pending): a Pending or Sold banner, the status chip changes, **Schedule a showing becomes Ask about similar homes**, the video stops; the agent's contact details and the form stay so late visitors still reach the agent |
 | Ended | Stays up 30 days, then becomes the agent card and form only: "This home is no longer available. Ask about similar homes." |
 
 Changes made in review (a fact, a photo) show on the website straight away.
