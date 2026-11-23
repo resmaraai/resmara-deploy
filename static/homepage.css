@@ -1552,7 +1552,7 @@ html.dark .sg-video{border-color:#1f4d68}
 .rmh .rh-actions{justify-content:center}
 .rmh .rh-card,.rmh .rh-step{text-align:center}
 .rmh .rh-card .rh-ic,.rmh .rh-num{margin-left:auto;margin-right:auto}
-.rmh .rh-show>div{text-align:center}
+.rmh .rh-show-text{text-align:center}
 .rmh .rh-tabs{justify-content:center}
 .rmh .rh-leads,.rmh .rh-leads *{text-align:left}
 .rmh .rh-list,.rmh .rh-li{text-align:left}
@@ -1588,3 +1588,5 @@ html.dark .sg-video{border-color:#1f4d68}
 .rmh .rh-frame{overflow-x:auto}
 .rmh .rh-robot{overflow:hidden;padding:18px}
 .rmh .rh-robot .home-world{width:96%;max-width:none;aspect-ratio:1.42;margin:0 auto}
+.rmh .rh-frame>*{text-align:left}
+.rmh .rh-panel[data-tab="posts"] .rh-frame{height:auto;max-height:580px}
