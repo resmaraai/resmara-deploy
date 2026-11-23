@@ -1,6 +1,6 @@
 # Engine 11 brain: Support
 
-**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #(filled in when opened) · **Started:** 22 Nov 2026
+**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #36 · **Started:** 22 Nov 2026
 **Existing:** Ask Resmara spec v1.0 (project `engine-specs/resmara-ask-resmara-engine-spec.md`, 15 Nov), `app/api/help.py`, `static/help-kb.js`, `static/help/resmara-guide.md`, the Support page (`supportPage` in `app.js`), tickets and `notify_operators` in `app/api/resmara.py`, the Team room Support section, the setup-session booking (`obBook` in `onboarding.js`). This brain keeps the Ask Resmara spec and adds everything around it.
 
 ---
