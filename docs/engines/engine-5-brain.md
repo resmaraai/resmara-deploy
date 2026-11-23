@@ -153,14 +153,84 @@ Changes made in review (a fact, a photo) show on the website straight away.
 On the campaign page (section 3, "Your listing page") and in the reports: **Visits, Form leads,
 Call leads, Text leads**, each its own number, and which post or ad brought them.
 
-## 9. How it's built (simplest that works)
+## 9. How every website is built, stored and served, automatically (for Dan)
 
-As in `flows/listing-page.md` section 2: **one public route in the app we already run**
-(`/l/<slug>`, served at `homes.resmara.com/<slug>`), drawing the page with the same code the
-dashboard preview uses, so the preview and the real page can't drift apart. No site deployed per
-listing. Photos stay where they are (Cloudflare R2). The domain is one DNS record Adam adds.
-Plus, new in this engine: the preview card tags on that route, and the page served fast enough for
-section 4.
+**The short version:** no website is deployed per listing, and nobody touches anything. Every build
+saves a **site record** for the home, the photos sit in **Cloudflare R2**, and one route in the app
+we already run on Render draws the page from the record when anyone opens the link. Cloudflare sits
+in front and caches it so it's fast. One template, in code, for every site.
+
+**Why not a Cloudflare Pages site per listing** (the first idea): every campaign would need its own
+build and deploy, a second hosting setup, and its own copy of the design, so a design fix would mean
+redeploying hundreds of sites. With one route and one template, a fix reaches every website at once,
+and there's nothing to deploy when a campaign is built.
+
+### What happens on every campaign, step by step
+
+1. **The build runs** (after the link is in and the campaign is purchased, alongside Engines 3 and 4).
+2. **Photos:** every photo from the home's file is saved to R2 in three sizes (phone, computer,
+   full screen), plus the listing video if there is one. R2 already holds the listing photos
+   (`app/services/storage.py`); for websites it must be **on in production** (today it falls back to
+   the database when it isn't set up, which is fine for the app but too slow for public pages).
+3. **The site record:** one row per home in a new `listing_sites` table, written by this engine:
+   - the **slug** (`1248-oakridge-drive`, unique; on a clash `-2`, `-3`), which never changes;
+   - the facts, the story headline, the 4 chapters, the agent's note, the neighborhood times and
+     the open house, all from Engines 3 and 4;
+   - the photo and video addresses in R2, in order;
+   - a **snapshot of the brand kit** (logo, fonts, colours, headshot, name, brokerage, license, phone,
+     legal lines), so a later brand change doesn't silently restyle a live listing (a "Refresh my
+     website" button can update it on purpose);
+   - status (built, live, pending, sold, ended) and a version number.
+4. **The share image:** a 1200×630 picture (hero photo, address, price) is made once and saved in
+   R2. It's what shows when the link is texted or posted.
+5. **Checks before it's ready** (same idea as Engine 4's checks): every required field is there,
+   every photo loads, the words pass the Fair Housing check, the page renders without errors, and
+   the share image exists. If something fails, that part is retried once, then a safe default is used
+   (for example, a chapter is dropped rather than shown broken), and the team is alerted if the page
+   still can't be built. Nothing is charged until unlock, as with Engine 4.
+6. **It lands in section 3** of the campaign with the rest of the build, and the link is live once
+   the campaign is unlocked.
+
+### How the page is served
+
+- **`homes.resmara.com/<slug>`** points at the Render app (one DNS record Adam adds at GoDaddy).
+- The app's route (`/l/<slug>`) reads the site record and **returns the finished page as HTML**,
+  drawn with the same template code the dashboard preview uses, so the preview and the real page
+  can't drift apart. Returning finished HTML (not a blank page that draws itself) matters: Facebook,
+  iMessage and Google read the page title and share image from it.
+- **Cloudflare caches each page** at the edge, so a burst of ad clicks never hits Render; when the
+  record changes, the app clears that page from the cache.
+- Leads (form, call, text) and visits go to the public endpoints in section 7.
+
+### Keeping it current, automatically
+
+- **The agent edits something in review** (a fact, a photo, a chapter): the record updates, the
+  version goes up, the cache is cleared. The page is current on the next load.
+- **Status changes** from Engine 6 (pending, sold) or the campaign ending: the record's status
+  changes and the page shows the banner, or after 30 days the "no longer available" version.
+- **Run it until it sells** (Engine 8): same slug, the record is refreshed with the new round's story
+  and photos, so every link already shared keeps working.
+
+### Keeping it consistent and good
+
+- **One template, versioned in the code.** No per-site copies. Any design improvement reaches every
+  website on the next deploy.
+- **A test page per release:** the template is rendered with 3 sample brand kits (light, dark, bold)
+  and checked on a phone and a computer before a release goes out.
+- **A daily check:** every live website is fetched once a day; any that doesn't load, or has a broken
+  photo, is flagged to the team.
+
+### What this costs
+
+Close to nothing: R2 is about a tenth of a cent per campaign a year past its free tier (see
+`storage.py`), and the pages are served by the app we already run, behind Cloudflare's free cache.
+
+### Setup (one time)
+
+- **Adam:** the DNS record pointing `homes.resmara.com` at Render.
+- **Dan:** add `homes.resmara.com` as a custom domain on Render; turn R2 on in production with a
+  public address for it (for example `media.resmara.com`); put Cloudflare's cache in front of
+  `homes.resmara.com`.
 
 ## 10. Decided with Adam (22 Nov 2026)
 
