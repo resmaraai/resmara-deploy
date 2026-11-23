@@ -4,9 +4,13 @@ from typing import ClassVar
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
-# Load this app's own .env first, whatever directory uvicorn was started from.
+# Load this app's own .env first, whatever directory uvicorn was started from. The bare
+# load_dotenv() used to follow that with a search upward from the working directory, which on
+# this Mac found /Users/dan/.env - a stray file from September holding a Stripe key. Any test or
+# script run from a fresh clone (a worktree has no .env of its own) silently inherited it, and
+# the billing tests failed in ways that had nothing to do with billing. Project files only.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
-load_dotenv()
+load_dotenv(Path.cwd() / ".env")
 
 class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "resmara-dev-secret-key-change-in-prod")
