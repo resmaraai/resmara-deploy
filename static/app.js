@@ -735,4 +735,4 @@ function metaReturnNotice(){
  history.replaceState(null,'',location.pathname+location.hash);
  if(RM.isLoggedIn()){state.clientSignedIn=true;state.name=state.name||'there';persist();dashboard('accounts');}
 }
-window.addEventListener('load',()=>{try{metaReturnNotice();}catch(e){}});
+window.addEventListener('load',()=>{try{if(typeof fbReturn==='function')fbReturn();}catch(e){}try{metaReturnNotice();}catch(e){}});

@@ -231,6 +231,42 @@
     return body;
   }
 
+  // ---- "Log in with Facebook" (Engine 1 Part A) ---------------------------
+  // The Terms box is ticked before any of this is called: the server refuses to start the
+  // Facebook dialog without it, and the consent it records is what the new account is stamped
+  // with. The redirect comes back as a one-time ticket, never as a token in the URL.
+  function facebookStart(termsVersion) {
+    return json('/api/auth/facebook/start', 'POST',
+      { terms_accepted: true, terms_version: termsVersion || TERMS_VERSION });
+  }
+
+  function facebookExchange(ticket) {
+    return json('/api/auth/facebook/exchange', 'POST', { ticket: ticket })
+      .then(function (body) {
+        if (body && body.access_token) setToken(body.access_token);
+        return body;
+      });
+  }
+
+  function facebookReactivate(ticket) {
+    return json('/api/auth/facebook/reactivate', 'POST', { ticket: ticket })
+      .then(function (body) {
+        if (body && body.access_token) setToken(body.access_token);
+        return body;
+      });
+  }
+
+  // Facebook hid the email, so we ask once - for receipts, never to sign in.
+  function setEmail(email) {
+    return json('/api/auth/me/email', 'PATCH', { email: email });
+  }
+
+  // "Close my account" is reversible (campaigns, leads and reports are kept); deleting the
+  // data is the permanent one and stays on deleteAccount().
+  function closeAccount() {
+    return request('/api/auth/me/close', { method: 'POST' }).then(function (r) { logout(); return r; });
+  }
+
   // Change together with the "Last updated" date on terms.html and privacy.html.
   var TERMS_VERSION = '2026-11-22';
 
@@ -666,6 +702,12 @@
     onSessionLost: onSessionLost,
     login: login,
     register: register,
+    facebookStart: facebookStart,
+    facebookExchange: facebookExchange,
+    facebookReactivate: facebookReactivate,
+    setEmail: setEmail,
+    closeAccount: closeAccount,
+    termsVersion: function () { return TERMS_VERSION; },
     me: me,
     requestPasswordReset: requestPasswordReset,
     confirmPasswordReset: confirmPasswordReset,
