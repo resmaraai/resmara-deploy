@@ -589,9 +589,9 @@ const SETUP_GUIDES = [
    steps: ['Every Facebook account already comes with an ad account. Go to adsmanager.facebook.com to open yours.', 'In the left menu, open Billing & payments, then Payment settings, and click Add payment method. Check your country and currency are right first: they can’t be changed later.', 'Enter your card and click Save. Meta may place a small temporary charge to check the card. That’s normal.'],
    note: 'Without a card on your ad account your posts still go out. Only the listing ad is off.',
    link: ['Open Ads Manager', 'https://adsmanager.facebook.com/'] },
- { id: 'connect', title: 'Connect it all to Resmara', need: 'Last step', time: '1 minute',
-   why: 'One Facebook login gives Resmara your Page, Instagram and ad account.',
-   steps: ['In your Resmara dashboard, open Accounts and click Connect your Meta account.', 'Log in with Facebook and choose your Page, your Instagram and your ad account.', 'Resmara checks everything. If anything still needs fixing, it tells you what, and you click Check again once it’s done.'] }
+ { id: 'connect', video: true, title: 'Connect it all to Resmara', need: 'Last step', time: '1 minute',
+   why: 'Logging in to Resmara with Facebook connects your Page, Instagram and ad account. Your Accounts page shows whether each one is ready.',
+   steps: ['Log in to Resmara with Facebook. That’s what connects you.', 'Open Accounts to see your Facebook business Page, business Instagram and ad account, each marked ready or not set up yet. Anything not set up has a guide above, or book a session and we’ll do it with you.', 'If you ever see “We can’t access your accounts” (say, after changing your Facebook password), click Sign in again and log in with Facebook.'] }
 ];
 function setupGuides(open) {
  if (typeof stopResmaraGuide === 'function') stopResmaraGuide();
