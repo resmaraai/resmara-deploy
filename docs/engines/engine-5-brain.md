@@ -291,8 +291,9 @@ CNAME to `resmara.onrender.com` (the live `resmara` service). DNS is at GoDaddy,
 - **DNS: done (22 Nov 2026, 4:48 PM).** `homes` is a CNAME to `resmara.onrender.com` in GoDaddy, the
   same target as `www`. GoDaddy says it takes effect within an hour (up to 48).
 - **Render (Dan):** add `homes.resmara.com` as a custom domain on the `resmara` service (Render then
-  issues its certificate). **Move the service off the free plan before launch:** a free web service
-  sleeps after about 15 minutes idle, so the first person to tap an ad would wait while it wakes up.
+  issues its certificate). The service is on a paid Render plan (Adam, 22 Nov), so it stays awake.
+  (`render.yaml` still says `plan: free`, but the live service was set up in the dashboard and
+  doesn't read that file.)
 - **R2 in production (Dan):** confirm it's on (the Team room's finance tab shows the storage mode).
 - **Photos load through the app (decided with Adam, 22 Nov):** the website asks for each photo at
   `homes.resmara.com/photos/<file>`, and the app fetches it from R2 and sends it on (with a long

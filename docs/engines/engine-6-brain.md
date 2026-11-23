@@ -195,9 +195,10 @@ while another says sold, it shows **Pending** until a clear Sold status appears.
    Nothing ever restarts on its own.
 
 **The clock that runs all of this:** today posting, comment leads and the listing check are run by a
-timer on a Mac Mini, because Render's free plan has no scheduled jobs. If that computer sleeps or goes
-offline, nothing posts and nothing is checked. **Move the timer onto Render** (a paid plan includes
-scheduled jobs) before launch.
+timer on Dan's Mac Mini (`scripts/resmara_clock.sh`, written when Render was on the free plan). If that
+computer sleeps or goes offline, nothing posts and nothing is checked. Render is on a paid plan now
+(Adam, 22 Nov), so **move the timer onto Render's scheduled jobs** before launch, if Dan hasn't
+already.
 
 ## 8. Pause and Resume
 
