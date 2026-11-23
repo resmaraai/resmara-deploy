@@ -14,7 +14,7 @@ out, understood and adjusted without reading the whole app.
 | 2 | **Brand** | During the new client sign-up, right after the Facebook sign-in; Research again on My Brand | `engine-2-brain.md` | Brain written (22 Nov) |
 | 3 | **Listing link** | From + Campaign to the home's file: the link identifies the house, AI researches every source, the gate for the build | `engine-3-brain.md` | Brain written (22 Nov) |
 | 4 | **Campaign build** | From the home's file to a built campaign behind pay to unlock: 14 posts, the ad, the calendar | `engine-4-brain.md` (PR #26) | Brain written (22 Nov) |
-| 5 | **Website** | Built with every campaign: the home's story-based website in the agent's brand, where the ad and posts send people; Preview, Copy link and Share in section 3 | `engine-5-brain.md` | Brain written (22 Nov) |
+| 5 | **Website** | Built with every campaign: the home's story-based website in the agent's brand, where the ad and posts send people; Preview, Copy link and Share in section 3 | `engine-5-brain.md` (PR #27) | Brain written (22 Nov) |
 | 4 | **Active campaign** | From launch to sold or ended: publishing, the ad, the listing watch, leads, reports, Run until sold | `active-campaign-engine.md` | To write |
 | 5 | **Billing** | Adding a card, charging a campaign, renewals, refunds | `billing-engine.md` | To write |
 | 6 | **Support** | The Ask Resmara help chat, setup calls, emails to the agent | `support-engine.md` | To write (spec: Ask Resmara spec) |

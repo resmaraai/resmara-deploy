@@ -1,6 +1,6 @@
 # Engine 5 brain: Website
 
-**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #(filled in when opened) · **Started:** 22 Nov 2026
+**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #27 · **Started:** 22 Nov 2026
 **Existing spec:** `flows/listing-page.md` (19 Nov: how the page is served, the slug, links, the lead endpoints, page states). This brain sets the direction; where they differ, this brain wins.
 
 ---
