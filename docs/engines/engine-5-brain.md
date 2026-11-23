@@ -157,8 +157,8 @@ Call leads, Text leads**, each its own number, and which post or ad brought them
 
 **The short version:** no website is deployed per listing, and nobody touches anything. Every build
 saves a **site record** for the home, the photos sit in **Cloudflare R2**, and one route in the app
-we already run on Render draws the page from the record when anyone opens the link. Cloudflare sits
-can sit in front later to cache it. One template, in code, for every site.
+we already run on Render draws the page from the record when anyone opens the link, and passes the
+photos through from R2. One template, in code, for every site.
 
 **Why not a Cloudflare Pages site per listing** (the first idea): every campaign would need its own
 build and deploy, a second hosting setup, and its own copy of the design, so a design fix would mean
@@ -258,13 +258,14 @@ CNAME to `resmara.onrender.com` (the live `resmara` service). DNS is at GoDaddy,
 - **Render (Dan):** add `homes.resmara.com` as a custom domain on the `resmara` service (Render then
   issues its certificate). **Move the service off the free plan before launch:** a free web service
   sleeps after about 15 minutes idle, so the first person to tap an ad would wait while it wakes up.
-- **R2 in production (Dan):** turn it on. Its built-in `r2.dev` address is rate-limited and not meant
-  for public traffic, so photos need a custom address (for example `media.resmara.com`).
-- **Decision for Adam and Dan, before launch:** R2's custom address and Cloudflare's edge cache both
-  need `resmara.com`'s DNS to be on Cloudflare (free). That means moving the nameservers from GoDaddy
-  to Cloudflare and copying these 8 records over (email records included). It's a one-time move, done
-  carefully at a quiet time. Until then, websites are served straight from Render, which is fine at
-  low traffic.
+- **R2 in production (Dan):** confirm it's on (the Team room's finance tab shows the storage mode).
+- **Photos load through the app (decided with Adam, 22 Nov):** the website asks for each photo at
+  `homes.resmara.com/photos/<file>`, and the app fetches it from R2 and sends it on (with a long
+  cache header). Visitors only ever touch Render, so R2 needs no public address and **the DNS stays
+  at GoDaddy; no move to Cloudflare.** Not a Render disk: a disk stops zero-downtime deploys and pins
+  the app to one server.
+- **Later, only if traffic needs it:** moving the DNS to Cloudflare would add edge caching and a direct
+  photo address. No code changes are needed for that.
 
 ## 10. Decided with Adam (22 Nov 2026)
 
