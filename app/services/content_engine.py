@@ -139,6 +139,42 @@ def _agent_card(boost, openings):
     return card
 
 
+POSITIVE_ONLY_RULE = ("EVERY post, caption and ad is positive and professional: never political, divisive, "
+                      "negative or sarcastic, and never about anyone's family, health, faith or politics, "
+                      "whatever the voice notes say.")
+
+
+def _owner_kit(db, boost) -> dict:
+    """The agent's saved brand kit from My Brand, or {} for an account without one."""
+    try:
+        from app.db.session import User
+        owner = db.query(User).filter(User.id == boost.user_id).first()
+        kit = dict((owner.brand if owner is not None else None) or {})
+    except Exception:  # noqa: BLE001 - the build never fails for want of a brand
+        return {}
+    return kit
+
+
+def voice_of_client_rules(kit: dict) -> str:
+    """What the post writer reads every time (Engine 2, section 4): the Voice of the client box."""
+    kit = kit or {}
+    voc = str(kit.get("voiceOfClient") or "").strip()
+    if not voc and not kit.get("use") and not kit.get("signoff"):
+        return ""
+    parts = []
+    if voc:
+        parts.append(f"VOICE OF THE CLIENT (the agent's own brief; write every caption, the ad and the "
+                     f"listing page in this voice): {voc}")
+    if kit.get("use"):
+        parts.append("PHRASES THEY USE: " + "; ".join(str(x) for x in kit["use"][:5]))
+    if kit.get("avoid"):
+        parts.append("AVOID: " + "; ".join(str(x) for x in kit["avoid"][:5]))
+    if kit.get("signoff"):
+        parts.append(f"THEIR SIGN-OFF: {kit['signoff']}")
+    parts.append(POSITIVE_ONLY_RULE)
+    return " ".join(parts)
+
+
 def _trunc(text, limit: int) -> str:
     text = text or ""
     return text[:limit]
@@ -1267,6 +1303,19 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
     property_page_text = _first(card.get("property_page_text"), "")
     brand_kit = _first(card.get("brand_kit"), "none")
 
+    # The brand kit the brand engine built (Engine 2), as the agent last saved it on My Brand.
+    # It fills anything the agent card left blank, and its Voice of the client shapes every word.
+    saved_kit = _owner_kit(db, boost)
+    agent = agent or _first(saved_kit.get("agent"), "")
+    phone = phone or _first(saved_kit.get("phone"), "")
+    license_ = license_ or _first(saved_kit.get("license"), "")
+    brokerage = brokerage or _first(saved_kit.get("company"), saved_kit.get("brokerage"), "")
+    instagram = instagram or _first(saved_kit.get("instagram"), "")
+    website = website or _first(saved_kit.get("website"), "")
+    voice_rules = voice_of_client_rules(saved_kit)
+    if voice_rules:
+        brand_kit = (brand_kit if brand_kit != "none" else "") + "\n" + voice_rules
+
     days = _clamp_days(getattr(boost, "campaign_days", None))
     per_day = _clamp_per_day(_first(card.get("per_day"), 1))
     total_posts = days * per_day
@@ -1383,6 +1432,8 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
         reasoning_effort="low",
     )
     brand_json = brand if isinstance(brand, str) else json.dumps(brand)
+    if voice_rules:
+        brand_json = brand_json + "\n" + voice_rules
 
     # --- R3: style recipe (Responses API, web search) -----------------------
     r3_input = prompts.R3_STYLE_RECIPE.format(

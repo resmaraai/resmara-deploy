@@ -15,7 +15,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -143,8 +143,9 @@ async def facebook_start(request: Request, payload: dict | None = None, db: Sess
 
 
 @router.get("/facebook/callback")
-async def facebook_callback(request: Request, code: str = "", state: str = "", error: str = "",
-                            error_description: str = "", format: str = "", db: Session = Depends(get_db)):
+async def facebook_callback(request: Request, background: BackgroundTasks, code: str = "", state: str = "",
+                            error: str = "", error_description: str = "", format: str = "",
+                            db: Session = Depends(get_db)):
     """Facebook's return trip. Everything here is Meta's answer or a refusal; nothing is assumed."""
     if error:
         return _back({"fb": "cancelled", "reason": (error_description or error)[:120]}, format)
@@ -220,6 +221,16 @@ async def facebook_callback(request: Request, code: str = "", state: str = "", e
         await meta_engine.check(db, user, "connect", force=True)
     except Exception:  # noqa: BLE001 - the audit must never cost a sign-in
         db.rollback()
+
+    # The brand engine starts the moment they sign in, in the background, while the robot works
+    # through the sign-up checks (Engine 2, section 1). Once built, it only reruns on Research again.
+    if created or not (user.brand or {}).get("build"):
+        from app.services import brand_investigator
+        brand = dict(user.brand or {})
+        brand["build"] = {"status": "running", "reason": "signup"}
+        user.brand = brand
+        db.commit()
+        background.add_task(brand_investigator.build_for_user, user.id, reason="signup")
 
     if created:
         _notify_owner_new_account(db, user, created, bool(user.meta_connected_at))
