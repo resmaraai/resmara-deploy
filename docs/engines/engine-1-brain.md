@@ -36,6 +36,14 @@ Facebook account is required. A personal account is fine; a business Page is not
   **Let's get started** open the same pop-up, "Log in with Facebook". If that Facebook account is
   already on Resmara it signs them in; if not, it creates the account and starts the Meta
   connection in the same step.
+- **Agreeing to the Terms (Adam, 22 Nov; Terms §1 and §17).** In the "Log in with Facebook" pop-up,
+  above the Facebook button: an **unticked** box, "I agree to the Terms of Service and Privacy
+  Policy, including the arbitration agreement and class action waiver in section 17 of the Terms",
+  with both links. The Facebook button stays disabled until it's ticked. Only new accounts see it;
+  returning clients see it again only when the Terms version changes (a pop-up on next sign-in).
+  The server records the version, time, IP and browser on the account **before** the Facebook
+  redirect, and refuses to create an account without it. (The email sign-up form has this box now,
+  sending `terms_accepted` and `terms_version`.)
 - **No Facebook account:** "You'll need one to use Resmara. It's free: create one on Facebook,
   then come back here."
 - **No email and password sign-up, and no Google sign-in.**
