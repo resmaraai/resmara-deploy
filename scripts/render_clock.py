@@ -48,6 +48,16 @@ def post(path: str, timeout: float) -> tuple[int, str]:
         return 0, f"{type(exc).__name__}: {exc}"
 
 
+def get(path: str, timeout: float) -> tuple[int, str]:
+    """GET with the machine token. Returns (status, short body); never raises."""
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.get(BASE + path, headers={"X-Resmara-Token": TOKEN})
+        return resp.status_code, resp.text[:400]
+    except Exception as exc:  # noqa: BLE001
+        return 0, f"{type(exc).__name__}: {exc}"
+
+
 def run_step(name: str, path: str, timeout: float, quiet_when: str = "") -> None:
     status, body = post(path, timeout)
     if status == 200 and quiet_when and quiet_when in body.replace(" ", ""):
@@ -65,6 +75,14 @@ def main() -> int:
     run_step("leads", "/api/admin/leads/scan", 240, quiet_when='"leads":0')
     run_step("buildroom", "/api/admin/buildroom/sync", 180,
              quiet_when='"created":[]"status":[]"tested":[]')
+
+    # The console's System page claims it runs every 15 minutes; this is the call that makes it
+    # true. Quiet unless a check actually fails.
+    status, body = get("/api/admin/system-check?refresh=1", 120)
+    if status != 200:
+        say(f"system-check: {status or 'ERR'} {body}")
+    elif '"fail"' in body:
+        say(f"system-check found a failure: {body}")
 
     now = datetime.now(timezone.utc)
     if now.hour % 6 == 0 and now.minute < 15:
