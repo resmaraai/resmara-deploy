@@ -118,7 +118,7 @@ def main() -> int:
               str(d.get("databaseName")))
         check("database region is spelled out and matches", d.get("region") == LIVE_DB_REGION,
               str(d.get("region")))
-        check("database plan matches", d.get("plan") == "free", str(d.get("plan")))
+        check("database plan matches", d.get("plan") == "0.1c-256mb", str(d.get("plan")))
         check("database is private-network only", d.get("ipAllowList") == [],
               str(d.get("ipAllowList")))
 

@@ -55,7 +55,7 @@ databases:
     databaseName: resmara
     user: resmara
     region: virginia       # must match the live database, or a sync tries to move it
-    plan: free             # free Postgres is DELETED on its expiry date (see DEPLOY.md §3b)
+    plan: 0.1c-256mb       # paid: free Postgres is DELETED on its expiry date (see DEPLOY.md §3b)
     ipAllowList: []        # private network only: the service reaches it, the internet does not.
                            # To connect from a laptop, add that IP in the dashboard.
 
@@ -63,7 +63,7 @@ services:
   - type: web
     name: resmara
     runtime: docker
-    plan: free             # free web services sleep after ~15 min idle; see DEPLOY.md §3b
+    plan: starter          # paid: free web services sleep after ~15 min idle; see DEPLOY.md §3b
     region: virginia
     repo: https://github.com/resmaraai/resmara-deploy
     branch: main
