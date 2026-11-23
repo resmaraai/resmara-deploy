@@ -122,7 +122,7 @@ function homeShowTab(k){const t=HOME_TABS[k];if(!t)return;
  const h=document.querySelector('#home-tab-title'),p=document.querySelector('#home-tab-text');if(h)h.textContent=t.title;if(p)p.textContent=t.text;
 }
 // The sample calendar is laid out at full width and scaled to fit its box, so it reads like the real one.
-function homeFitCalendar(){const f=document.querySelector('.rmh .rh-panel[data-tab="posts"] .rh-frame'),c=f&&f.querySelector('.home-calendar-preview');if(!c||!f.clientWidth)return;const z=Math.max(.62,Math.min(1,f.clientWidth/880));c.style.zoom=z}
+function homeFitCalendar(){const f=document.querySelector('.rmh .rh-panel[data-tab="posts"] .rh-frame'),c=f&&f.querySelector('.home-calendar-preview');if(!c||!f.clientWidth)return;const z=Math.min(1,f.clientWidth/880);c.style.zoom=z}
 window.addEventListener('resize',()=>{if(document.querySelector('.rmh'))homeFitCalendar()});
 // Nav links to homepage sections work from any page: they open the homepage first if needed.
 function homeGo(id){const go=()=>{const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})};if(!document.querySelector('.rmh')){home();setTimeout(go,60)}else go()}
