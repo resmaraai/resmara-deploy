@@ -30,6 +30,15 @@ def _startup_migrations() -> None:
     locked = encrypt_stored_tokens()
     print(f"[resmara] startup migrations: {len(added)} columns added, {locked} token(s) encrypted")
 
+
+@app.on_event("startup")
+def _startup_clock_image() -> None:
+    """The clock is a second Render service with its own image, and Render never rebuilds a cron
+    job on a commit — so without this the clock runs yesterday's script forever. One GET, and its
+    deploy is started when the two builds differ. Never raises (see app/services/clock_image.py)."""
+    from app.services.clock_image import keep_in_step
+    keep_in_step()
+
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
