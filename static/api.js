@@ -231,10 +231,16 @@
     return body;
   }
 
+  // Change together with the "Last updated" date on terms.html and privacy.html.
+  var TERMS_VERSION = '2026-11-22';
+
   function register(email, password, name, inviteCode) {
     // invite_code is only sent when there is one: the open-signup path keeps the exact body
     // it always had, and the beta gate treats a missing code the same as an empty one.
-    var body = { email: email, password: password, name: name };
+    // terms_version: the Terms and Privacy Policy the agent ticked "I agree" to (Terms §1). The
+    // server records it with the time and IP so the agreement can be proved later.
+    var body = { email: email, password: password, name: name,
+                 terms_accepted: true, terms_version: TERMS_VERSION };
     if (inviteCode) body.invite_code = inviteCode;
     return json('/api/auth/register', 'POST', body);
   }
@@ -283,7 +289,10 @@
   // builds and charges the next round from this flag, so the toggle has to reach it. A campaign
   // whose listing is already pending or sold answers 409 with the sentence to show the agent.
   function setUntilSold(id, on) {
-    return request('/api/boosts/' + segment(id) + '/until-sold?until_sold=' + (on === false ? 'false' : 'true'),
+    // Turning it on carries the auto-renewal consent the agent just ticked (Terms §8), so the
+    // server can keep proof of it; turning it off needs none.
+    return request('/api/boosts/' + segment(id) + '/until-sold?until_sold=' + (on === false ? 'false' : 'true') +
+        (on === false ? '' : '&renewal_consent=' + segment(TERMS_VERSION)),
       { method: 'POST' });
   }
 

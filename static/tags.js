@@ -35,6 +35,10 @@
 
   function metaPixel(id) {
     if (!/^[0-9]{10,20}$/.test(id)) return;            // a pixel id is digits only
+    // Privacy Policy: a Global Privacy Control signal, or the "Do not share my information for
+    // ads" button on privacy.html, opts this browser out of the pixel (CCPA "sharing").
+    if (navigator.globalPrivacyControl) return;
+    try { if (localStorage.getItem('resmara_no_ad_sharing') === '1') return; } catch (e) { /* storage blocked */ }
     /* Meta's standard base code, unchanged apart from the id */
     !function (f, b, e, v, n, t, s) {
       if (f.fbq) return; n = f.fbq = function () {

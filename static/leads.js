@@ -333,19 +333,38 @@ function untilSoldPanel(i, locked) {
   // The navy box on the launch details. Off: the two buttons. On: the buttons go and a box on the
   // right confirms it's on (Turn off sits under it until the launch details are confirmed).
   const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);
-  return `<div class="until-sold${on ? ' is-on' : ''}"><div class="until-sold-copy"><b class="until-sold-title">Run it until it sells</b><p class="until-sold-sub">A fresh campaign every 2 weeks until it’s under contract. $39 per renewal.</p><div class="until-sold-line"><div class="eyebrow">TELL YOUR SELLERS</div><p>“${UNTIL_SOLD_LINE}”</p></div>${on ? '' : `<div class="until-sold-actions"><button type="button" class="campaign-primary" onclick="setUntilSold(${i},true,'scope')">Run it until it sells</button><button type="button" class="until-sold-how" onclick="untilSoldInfo(${i},'scope')">How it works</button></div>`}</div>${on ? `<div class="until-sold-on-box"><b>✓ Run it until it sells is on</b><span>A fresh 14 days every 2 weeks, $39 each, until it’s under contract.</span>${locked ? '' : `<button type="button" class="until-sold-off" onclick="setUntilSold(${i},false,'scope')">Turn off</button>`}</div>` : ''}</div>`;
+  return `<div class="until-sold${on ? ' is-on' : ''}"><div class="until-sold-copy"><b class="until-sold-title">Run it until it sells</b><p class="until-sold-sub">A fresh campaign every 2 weeks until it’s under contract. $39 per renewal.</p><div class="until-sold-line"><div class="eyebrow">TELL YOUR SELLERS</div><p>“${UNTIL_SOLD_LINE}”</p></div>${on ? '' : `<div class="until-sold-actions"><button type="button" class="campaign-primary" onclick="untilSoldInfo(${i},'consent')">Run it until it sells</button><button type="button" class="until-sold-how" onclick="untilSoldInfo(${i},'scope')">How it works</button></div>`}</div>${on ? `<div class="until-sold-on-box"><b>✓ Run it until it sells is on</b><span>A fresh 14 days every 2 weeks, $39 each, until it’s under contract.</span>${locked ? '' : `<button type="button" class="until-sold-off" onclick="setUntilSold(${i},false,'scope')">Turn off</button>`}</div>` : ''}</div>`;
 }
 function untilSoldInfo(i, from) {
   const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);
   const r = state.reviews && state.reviews[typeof reviewKey === 'function' ? reviewKey(c, i) : 'review-' + (c.reviewId || i)];
   const budget = r && Number(r.scope && r.scope.budget) > 0 ? Number(r.scope.budget) : 50;
-  show(`<span class="eyebrow">RUN IT UNTIL IT SELLS</span><h2>Fresh marketing every 2 weeks, until it’s under contract.</h2><ul class="until-sold-list"><li><b>A brand-new campaign every 2 weeks.</b> 14 new posts and a new ad each round. Nothing is repeated.</li><li><b>Every round gets smarter.</b> Resmara looks at which posts and ad reached the most people and got the most clicks, and builds the next round around what worked.</li><li><b>You stay in control.</b> The next round is ready to look over 3 days before it starts. Change anything you like, or leave it and it goes live on its own.</li><li><b>$39 per renewal</b>, charged to your card on file when the new round is built. Your $${budget} ad budget runs again each round and is billed by Meta, as always.</li><li><b>It stops by itself</b> when your listing shows pending or sold. You can turn it off any time.</li></ul><div class="until-sold-quote"><span class="eyebrow">TELL YOUR SELLERS</span><p>“${UNTIL_SOLD_LINE}”</p></div>${from === 'scope'
+  show(`<span class="eyebrow">RUN IT UNTIL IT SELLS</span><h2>Fresh marketing every 2 weeks, until it’s under contract.</h2><ul class="until-sold-list"><li><b>A brand-new campaign every 2 weeks.</b> 14 new posts and a new ad each round. Nothing is repeated.</li><li><b>Every round gets smarter.</b> Resmara looks at which posts and ad reached the most people and got the most clicks, and builds the next round around what worked.</li><li><b>You stay in control.</b> The next round is ready to look over 3 days before it starts. Change anything you like, or leave it and it goes live on its own.</li><li><b>$39 per renewal</b>, charged to your card on file when the new round is built. Your $${budget} ad budget runs again each round and is billed by Meta, as always.</li><li><b>Pending pauses it; sold ends it.</b> No round is built or charged while the listing is pending. You can turn it off any time.</li></ul><div class="until-sold-quote"><span class="eyebrow">TELL YOUR SELLERS</span><p>“${UNTIL_SOLD_LINE}”</p></div>${from === 'scope'
     ? `<div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Got it</button></div>`
     : `<div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">${on ? 'Keep it on' : 'Not now'}</button>${on
       ? `<button class="campaign-primary" onclick="setUntilSold(${i},false,'${from}')">Turn off</button>`
-      : `<button class="campaign-primary" onclick="setUntilSold(${i},true,'${from}')">Run it until it sells</button>`}</div>`}</div>`);
+      : `<button class="campaign-primary" id="usConsentBtn" disabled onclick="setUntilSold(${i},true,'${from === 'consent' ? 'scope' : from}',true)">Run it until it sells</button>`}</div>`}</div>`);
+  if (!on && from !== 'scope') untilSoldConsentBox();
 }
-function setUntilSold(i, on, from) {
+// Automatic renewal consent (Terms §8; California Bus. & Prof. Code §17602): the renewal terms
+// sit right next to their own unticked box, separate from the Terms agreed at sign-up, and the
+// button stays disabled until it's ticked.
+function untilSoldConsentBox() {
+  const btn = document.getElementById('usConsentBtn'); if (!btn) return;
+  const box = document.createElement('label');
+  box.className = 'us-consent';
+  box.style.cssText = 'display:flex;gap:10px;align-items:flex-start;margin:16px 0 4px;padding:14px 16px;border:1px solid #d8effd;border-radius:14px;background:#fff;font-size:14px;line-height:1.5;color:#12354d;cursor:pointer';
+  box.innerHTML = '<input type="checkbox" id="usConsent" style="margin-top:3px;width:18px;height:18px;flex:0 0 18px">' +
+    '<span><b>I agree to automatic renewal.</b> Resmara will charge <b>$39 (plus any tax) to my saved card every 2 weeks</b>, when each new round is built, ' +
+    '<b>with no end date</b>, until this listing is marked sold or I turn it off. I can turn it off any time from the campaign card or Billing; ' +
+    'the round already running isn’t refunded. I’ll get an email for every charge. See section 8 of the <a href="terms.html" target="_blank" rel="noopener" style="color:#12354d;font-weight:700;text-decoration:underline">Terms</a>.</span>';
+  const actions = btn.closest('.modal-actions');
+  actions.parentNode.insertBefore(box, actions);
+  box.querySelector('input').addEventListener('change', function () { btn.disabled = !this.checked; });
+}
+function setUntilSold(i, on, from, consented) {
+  // Never turn it on without the auto-renewal consent box: any other path opens the pop-up.
+  if (on && !consented) { untilSoldInfo(i, from === 'scope' ? 'consent' : from); return; }
   const c = [...state.campaigns, ...examples][i];
   const boostId = (typeof campaignBoostId === 'function') ? campaignBoostId(c) : null;
   // A real campaign writes to the record, and only re-renders when the server has accepted it: a
