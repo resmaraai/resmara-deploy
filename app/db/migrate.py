@@ -239,6 +239,12 @@ def migrate() -> list[str]:
     if failed:
         log.error("migrate: %d column(s) could not be added: %s", len(failed), "; ".join(failed))
     migrate._failed = failed
+    # Columns are not the whole schema: the unique facebook_id is the promise that one Facebook
+    # account is one Resmara account, and ADD COLUMN cannot carry a constraint.
+    try:
+        ensure_unique_indexes()
+    except Exception as exc:  # noqa: BLE001 - an index problem must not stop the boot
+        log.error("migrate: unique indexes: %s: %s", type(exc).__name__, str(exc)[:160])
     return added
 
 
@@ -249,8 +255,30 @@ def _ddl_for(ddl: str, dialect: str) -> str:
         # It also has no truthy integer where a boolean is expected: "BOOLEAN DEFAULT 0" is a
         # syntax error there, so the SQLite spelling is translated rather than duplicated in
         # ADDITIONS (which every other table reads as SQLite).
-        return ddl.replace("DATETIME", "TIMESTAMP").replace("BOOLEAN DEFAULT 0", "BOOLEAN DEFAULT FALSE")
+        return (ddl.replace("DATETIME", "TIMESTAMP")
+                   .replace("BOOLEAN DEFAULT 0", "BOOLEAN DEFAULT FALSE")
+                   .replace("BOOLEAN DEFAULT 1", "BOOLEAN DEFAULT TRUE"))
     return ddl
+
+
+def ensure_unique_indexes() -> list[str]:
+    """Indexes ADD COLUMN cannot carry (a unique facebook_id, a unique Page).
+
+    Postgres and SQLite both accept a unique index on an existing column, and both ignore a
+    duplicate, so this is safe on every boot. The Facebook one is the promise behind "the same
+    Facebook account always lands on the same Resmara account": without it, a race between two
+    sign-ins could create two accounts for one person.
+    """
+    wanted = [("users", "ix_users_facebook_id_unique", "facebook_id")]
+    done = []
+    for table, index, column in wanted:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(f"CREATE UNIQUE INDEX IF NOT EXISTS {index} ON {table} ({column})"))
+            done.append(index)
+        except Exception as exc:  # noqa: BLE001 - a duplicate row must not stop the boot
+            log.error("migrate: unique index %s skipped: %s: %s", index, type(exc).__name__, str(exc)[:160])
+    return done
 
 
 def failed_additions() -> list[str]:
