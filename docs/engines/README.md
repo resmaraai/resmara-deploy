@@ -16,6 +16,7 @@ out, understood and adjusted without reading the whole app.
 | 4 | **Campaign build** | From the home's file to a built campaign behind pay to unlock: 14 posts, the ad, the calendar | `engine-4-brain.md` (PR #26) | Brain written (22 Nov) |
 | 5 | **Website** | Built with every campaign: the home's story-based website in the agent's brand, where the ad and posts send people; Preview, Copy link and Share in section 3 | `engine-5-brain.md` (PR #27) | Brain written (22 Nov) |
 | 6 | **Active campaign** | From Approve and launch to the end: posting, the live ad audit, comment and website leads, pending and sold (pauses right away), pause, the agent report and the seller version | `engine-6-brain.md` (PR #28) | Brain written (22 Nov) |
+| 8 | **Run it until it sells** | Set it and forget it: a fresh 14 days every 2 weeks for $39 (built, then charged, then live automatically) until it sells; pending pauses it, back on the market picks it up, emails at every turn; Run it again · $39 for everyone else | `engine-8-brain.md` | Brain written (22 Nov) |
 | 5 | **Billing** | Adding a card, charging a campaign, renewals, refunds | `billing-engine.md` | To write |
 | 6 | **Support** | The Ask Resmara help chat, setup calls, emails to the agent | `support-engine.md` | To write (spec: Ask Resmara spec) |
 | 7 | **Team room** | Operator console: accounts, releases, system checks | `team-room-engine.md` | To write |
