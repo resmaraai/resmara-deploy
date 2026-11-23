@@ -1,6 +1,6 @@
 # Engine 6 brain: Active campaign
 
-**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #(filled in when opened) · **Started:** 22 Nov 2026
+**Status:** greenlit by Adam (22 Nov) · **Builds in:** PR #28 · **Started:** 22 Nov 2026
 **Existing specs:** `engine-specs/resmara-ad-engine-spec.md` (v1.3: launch, pause, listing watcher, ad results), `engine-specs/resmara-post-engine-spec.md` (publishing, leads, reports), `claude/dan-deploy-package.md`. This brain sets the direction; where they differ, this brain wins.
 
 ---
