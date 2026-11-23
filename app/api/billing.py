@@ -86,9 +86,11 @@ def require_paid(boost: Boost, user: User, db: Session) -> None:
 
 # --- Build first, then pay to unlock (sign-up tour engine, section 5) -------------------------
 def is_built(boost: Boost, db: Session) -> bool:
-    """The build finished and left posts behind."""
+    """Resmara's build finished and left posts behind (posts added by hand don't count)."""
     from app.db.session import Post
-    return db.query(Post).filter(Post.boost_id == boost.id).first() is not None
+    if db.query(Post).filter(Post.boost_id == boost.id).first() is None:
+        return False
+    return db.query(Event).filter(Event.boost_id == boost.id, Event.event_type == "campaign_built").first() is not None
 
 
 def is_locked(boost: Boost, user: User, db: Session) -> bool:

@@ -36,7 +36,7 @@ log = logging.getLogger("resmara.brand_investigator")
 # Fields the build prints on posts: found with a source, or left empty. Never guessed.
 POST_FACTS = ("phone", "license", "company", "brokerLicense")
 # Fields the agent can edit; an edited field is never overwritten by Research again.
-KIT_FIELDS = ("agent", "title", "phone", "email", "website", "license", "company", "brokerLicense",
+KIT_FIELDS = ("agent", "title", "phone", "email", "website", "license", "company", "brokerage", "brokerLicense",
               "market", "palette", "fonts", "voice", "voiceOfClient", "use", "avoid", "signoff",
               "logoUrl", "headshotUrl", "instagram")
 PERSONAL_WORDS = re.compile(
@@ -124,16 +124,19 @@ def legal_lines(kit: Dict[str, Any]) -> List[str]:
         out.append(who)
     if kit.get("license"):
         out.append(f"License #{kit['license']}")
-    if kit.get("company"):
-        out.append(kit["company"] + (f" · License #{kit['brokerLicense']}" if kit.get("brokerLicense") else ""))
+    company = kit.get("company") or kit.get("brokerage")
+    if company:
+        out.append(company + (f" · License #{kit['brokerLicense']}" if kit.get("brokerLicense") else ""))
     out.append("Equal Housing Opportunity")
     return out
 
 
 def missing_post_facts(kit: Dict[str, Any]) -> List[str]:
     """What Engine 4 asks for on + Campaign before building (section 6a)."""
-    names = {"phone": "phone", "license": "license", "company": "brokerage"}
-    return [names[k] for k in ("phone", "license", "company") if not str(kit.get(k) or "").strip()]
+    out = [k for k in ("phone", "license") if not str(kit.get(k) or "").strip()]
+    if not str(kit.get("company") or kit.get("brokerage") or "").strip():
+        out.append("brokerage")
+    return out
 
 
 # --------------------------------------------------------------------------- reading
@@ -203,6 +206,7 @@ def assemble(found: Dict[str, Any], facts: Dict[str, Any]) -> Dict[str, Any]:
     kit["website"] = _clean(found.get("website"), 200) or facts.get("website") or ""
     kit["license"] = fact("license", found.get("license"), found.get("license_source"))
     kit["company"] = fact("company", found.get("company"), found.get("company_source"))
+    kit["brokerage"] = kit["company"]  # My Brand's name for it
     kit["brokerLicense"] = fact("brokerLicense", found.get("brokerLicense"), found.get("brokerLicense_source"))
     kit["market"] = _clean(found.get("market"), 160)
     kit["instagram"] = _clean(found.get("instagram"), 60).lstrip("@") or facts.get("instagram") or ""

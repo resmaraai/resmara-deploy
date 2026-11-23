@@ -694,6 +694,8 @@
     base: BASE,           // the detected mount prefix ('' or '/resmara'); read-only
     media: mediaUrl,      // prefix an API media path for the current mount
 
+    // The raw caller, for endpoints without a named helper (the Meta audit, the brand build, unlock).
+    request: request,
     token: token,
     setToken: setToken,
     logout: logout,

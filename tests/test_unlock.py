@@ -16,7 +16,7 @@ _tmp.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp.name}"
 
 from fastapi import HTTPException  # noqa: E402
-from app.db.session import Base, engine, SessionLocal, User, Boost, Post  # noqa: E402
+from app.db.session import Base, engine, SessionLocal, User, Boost, Post, Event  # noqa: E402
 from app.api import billing as api  # noqa: E402
 from app.services import billing  # noqa: E402
 
@@ -56,6 +56,7 @@ def campaign(address):
 def build(b):
     for d in range(1, 15):
         db.add(Post(boost_id=b.id, day=d, slot=1, caption=f"Day {d}", image_url=f"/uploads/{d}.jpg"))
+    db.add(Event(user_id=u.id, boost_id=b.id, event_type="campaign_built", payload={}))
     db.commit()
 
 
@@ -86,6 +87,13 @@ try:
 except HTTPException as exc:
     d = exc.detail
 ok("  ...names the waiting one", d["boost_id"] == first.id and "Unlock 905 Laurel Bend first" in d["message"], d)
+
+hand = campaign("1 Hand Made Ln")
+db.add(Post(boost_id=hand.id, day=1, slot=1, caption="typed in"))
+db.commit()
+ok("posts added by hand (no Resmara build) never lock", not api.is_locked(hand, u, db))
+hand.hidden = True
+db.commit()
 
 print("Locked preview")
 from app.api.engine import list_posts, get_plan  # noqa: E402

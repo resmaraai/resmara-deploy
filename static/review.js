@@ -480,7 +480,9 @@ async function buildCampaignFromBackend(){
  }catch(e){
   // 402 = this campaign has not been paid for. The API says so in a machine-readable detail,
   // so show the price and the checkout button instead of "build paused" and a dead end.
-  if(e&&e.status===402){ReviewStudio.building.delete(r);showPaywall(boostId,e.detail);return}
+  if(e&&e.status===402){ReviewStudio.building.delete(r);if(typeof unlockCard==='function'){unlockCard(boostId,([...state.campaigns,...examples][ReviewStudio.active]||{}).address,{price_cents:e.detail&&e.detail.price_cents});return}showPaywall(boostId,e.detail);return}
+  // One locked campaign at a time: unlock (or replace) the waiting one first.
+  if(e&&e.status===409&&e.detail&&e.detail.error==='unlock_first'&&typeof unlockFirst==='function'){ReviewStudio.building.delete(r);unlockFirst(e.detail);return}
   if(progress?.isConnected&&modal.open)show(`<h2>Campaign build paused</h2><p>${esc(e.message)}</p><p class="fine">Your approved scope is saved. You can retry any time.</p><div class="modal-actions"><button class="alt" onclick="modal.close()">Back to campaign</button></div>`);
  }finally{ReviewStudio.building.delete(r)}
 }
