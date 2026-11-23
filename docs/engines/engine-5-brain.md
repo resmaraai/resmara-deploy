@@ -165,6 +165,28 @@ build and deploy, a second hosting setup, and its own copy of the design, so a d
 redeploying hundreds of sites. With one route and one template, a fix reaches every website at once,
 and there's nothing to deploy when a campaign is built.
 
+### How each house gets its own address (no DNS work per house)
+
+The DNS change above is the **only** DNS change, ever. It points the whole of `homes.resmara.com`
+at the app. Every house is then just a path under it, created by the system on every build:
+
+1. **The build makes the slug** from the street address in the home's file (Engine 3):
+   `1248 Oakridge Drive` → `1248-oakridge-drive`. Code does this, not the AI, so it's always the
+   same rule: lowercase, letters, numbers and dashes. If it's already taken (same street name in
+   another city, or an older campaign of another agent's), add the city (`-austin`), then `-2`, `-3`.
+2. **It saves the slug on the site record** (and the campaign), and never changes it, so links
+   already shared keep working. A new round of Run it until it sells reuses it.
+3. **The app answers every `homes.resmara.com/<anything>`**: it looks the slug up in `listing_sites`
+   and draws that home's page. Unknown slug: a friendly "This home isn't here" page with a link to
+   Resmara, never an error page.
+4. **The link is what goes everywhere automatically:** section 3 of the campaign, the Facebook
+   captions and the ad's destination (Engine 4, with tracking tags), the share card, the reports.
+   Nobody types or pastes it.
+
+**Where the AI comes in:** the AI writes the website's words (the story, the chapters, the note) and
+picks the photos for each chapter during the build. The address, the storage and the serving are
+plain code, so they work the same way every time.
+
 ### What happens on every campaign, step by step
 
 1. **The build runs** (after the link is in and the campaign is purchased, alongside Engines 3 and 4).
@@ -231,7 +253,8 @@ Close to nothing: R2 is about a tenth of a cent per campaign a year past its fre
 Checked in GoDaddy on 22 Nov: `resmara.com` is an A record to Render (216.24.57.1) and `www` is a
 CNAME to `resmara.onrender.com` (the live `resmara` service). DNS is at GoDaddy, not Cloudflare.
 
-- **DNS (Adam):** add `homes` as a CNAME to `resmara.onrender.com`, the same target as `www`.
+- **DNS: done (22 Nov 2026, 4:48 PM).** `homes` is a CNAME to `resmara.onrender.com` in GoDaddy, the
+  same target as `www`. GoDaddy says it takes effect within an hour (up to 48).
 - **Render (Dan):** add `homes.resmara.com` as a custom domain on the `resmara` service (Render then
   issues its certificate). **Move the service off the free plan before launch:** a free web service
   sleeps after about 15 minutes idle, so the first person to tap an ad would wait while it wakes up.
