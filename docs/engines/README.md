@@ -5,6 +5,32 @@ engine has one document here. It records what the engine does, the code behind i
 uses, the data it touches, and the settings you can change. That way any engine can be pulled
 out, understood and adjusted without reading the whole app.
 
+## How we know it's done: the five stages (Adam and Dan, 23 Nov 2026)
+
+Every engine is always at exactly one stage. **The Build room is where it's tracked**: one task per
+engine, moving down this table, closing only at Live.
+
+| Stage | Means | Done when | Whose | In the Build room |
+|---|---|---|---|---|
+| **1. Planned** | We know what to build | The brain is written and Adam approved the clickable mockup | Adam and Claude | To do, assigned to Adam |
+| **2. Ready for Dan** | The front end is built and Dan has a clear build list | The handoff checklist below is all ticked | Adam and Claude | To do, assigned to Dan |
+| **3. Built** | The server side is done | It works on the PR's preview link with real data, not "coming soon" | Dan | Review |
+| **4. Tested** | Used start to finish | Adam ran it on the preview with a real account and nothing broke | Adam | Tested ticked |
+| **5. Live** | Agents have it | Merged, deployed and checked on resmara.com | Dan merges, Claude checks | Done |
+
+**Ready for Dan, the handoff checklist.** All five must be true:
+1. The screens are real code in `static/` (not a mockup) and look exactly like what Adam approved.
+2. They run on the PR's preview link; anything still waiting on the server shows a plain "coming soon" state, never a broken page.
+3. The PR has **Dan's build list**: every endpoint the screens call, what each sends and gets back, and any new tables or scheduled jobs, in build order. Build from that list; the brain is the background.
+4. Adam approved it on the preview link.
+5. The help guide (`static/help/resmara-guide.md`) is updated for anything an agent will see.
+
+**PR titles start with the stage:** `Plan:` (brain, screenshots, mockup: no app code, never counts as
+progress), `Ready for Dan:`, `Built:` or `Fix:`.
+
+**Note:** the engine PRs up to #36 were plans (brain, screenshots and a preview mockup). They changed
+no app code. Every engine is at **1. Planned** as of 23 Nov 2026.
+
 ## The engines
 
 | # | Engine | Runs when | Doc | Status |
