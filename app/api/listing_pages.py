@@ -61,6 +61,10 @@ def listing_page(slug: str, preview: str = "", db: Session = Depends(get_db)):
     boost = db.query(Boost).filter(Boost.id == site.boost_id).first() if site else None
     if site is None or boost is None:
         return HTMLResponse(ls.not_found_page(), status_code=404)
+    if ls.state(boost, site) == "closed":
+        return HTMLResponse(ls.not_found_page().replace("This home isn't here", "This page is no longer available")
+                            .replace("The link may be mistyped, or the listing has been taken down.", ""),
+                            status_code=410)
     is_preview = bool(preview) and ls.preview_ok(site, preview)
     if not is_preview and not ls.is_public(boost):
         return HTMLResponse(ls.not_found_page(), status_code=404)

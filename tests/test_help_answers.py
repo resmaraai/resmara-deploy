@@ -142,9 +142,9 @@ check("the reply counts as unread", row.get("unread_replies") == 1, str(row))
 msgs = row.get("messages") or []
 check("and the reply itself is flagged", any(m.get("unread") for m in msgs), str(msgs))
 check("the reply is the last thing said", (msgs[-1] or {}).get("from") == "admin" if msgs else False, str(msgs))
-# A reply does not quietly change the ticket's status: the operator's own dropdown decides
-# whose turn it is, and a status invented by the reply path disagrees with that.
-check("replying leaves the status the operator set", row.get("status") == "open", str(row.get("status")))
+# Engine 11, section 4: a team reply makes the request Answered (the Team room's dropdown can
+# say Waiting on you instead, when the team asked the agent something).
+check("a reply makes the request Answered", row.get("status") == "answered", str(row.get("status")))
 
 db = SessionLocal()
 ev = (db.query(Event).filter(Event.event_type == "ticket_reply_notified")

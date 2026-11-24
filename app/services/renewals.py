@@ -360,7 +360,8 @@ async def renew(db: Session, boost: Boost, owner, *, now: Optional[datetime] = N
 
     paid_at = datetime.now(timezone.utc)
     db.add(Order(user_id=owner.id, boost_id=fresh.id, amount_cents=cents, currency=billing.CURRENCY,
-                 status="paid", paid_at=paid_at, stripe_payment_intent=charge.get("payment_intent")))
+                 status="paid", paid_at=paid_at, stripe_payment_intent=charge.get("payment_intent"),
+                 tax_cents=charge.get("tax_cents") or 0, kind="round" if until_sold else "run_again"))
     fresh.paid_at, fresh.paid_amount_cents = paid_at, cents
     # The waiting round goes live on its day, or the next morning if the old round already ended.
     live = round_start(fresh)
@@ -417,6 +418,10 @@ async def apply(db: Session, now: Optional[datetime] = None, limit: int = MAX_RE
         owner = db.get(User, boost.user_id)
         if owner is None:
             results.append({**row, "status": "skipped", "why": "the campaign has no owner"})
+            continue
+        if getattr(owner, "billing_hold", None):
+            # Engine 10, section 9: a chargeback pauses Run it until it sells and new charges.
+            results.append({**row, "status": "skipped", "why": "payments on this account are paused (dispute)"})
             continue
         try:
             out = await renew(db, boost, owner, now=now, charge_fn=charge_fn, cards_fn=cards_fn,

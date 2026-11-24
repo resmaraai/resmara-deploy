@@ -183,7 +183,9 @@ async function after(promiseDelay) {
      (markup.match(/class="pw-eye"/g) || []).length >= 3,
      String((markup.match(/class="pw-eye"/g) || []).length));
   const billing = fs.readFileSync(path.join(__dirname, '..', 'static', 'billing.js'), 'utf8');
-  ok('closing an account can show the password too', /class="pw-eye"/.test(billing));
+  // Engine 10: Facebook login has no password, so closing asks for the account email instead.
+  ok('closing an account asks for the email, not a password',
+     /Type your email to confirm/.test(billing) && !/name="password"/.test(billing));
 
   console.log(`\n${checks - failures}/${checks} passed`);
   if (failures) process.exit(1);

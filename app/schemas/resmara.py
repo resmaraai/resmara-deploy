@@ -173,6 +173,8 @@ class LaunchPayload(BaseModel):
 class SupportTicketCreate(BaseModel):
     subject: str
     message: str
+    boost_id: Optional[int] = None
+    page: Optional[str] = None
 
 class SupportTicketOut(BaseModel):
     id: int
@@ -186,6 +188,15 @@ class SupportTicketOut(BaseModel):
     # the sum of these, so it has to come from the server: a browser that was closed when
     # the reply arrived has no other way of knowing.
     unread_replies: int = 0
+    # Engine 11: the plain status, the listing, the promise.
+    status_label: str = ""
+    boost_id: Optional[int] = None
+    address: Optional[str] = None
+    page: Optional[str] = None
+    snapshot: Optional[dict] = None
+    reply_by: Optional[datetime] = None
+    reply_by_label: str = ""
+    due: str = ""
     # Only the operator list fills this in, so an operator can see who is writing
     # without a second lookup per row.
     client_email: Optional[str] = None

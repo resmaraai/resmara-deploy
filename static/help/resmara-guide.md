@@ -117,14 +117,24 @@ the calendar updates. If it still fails, the team sees it and replies on Support
 
 ## Billing — go: billing
 
-- **Purchases**: every campaign bought, with date and amount.
-- **Payment method**: the saved card. **Add a card** opens Stripe's secure page — go: add-card.
-  Resmara never sees or stores the card number. The first campaign also saves the card.
-- Charges happen only when you click **Build my campaign**. $49 each.
+From the top:
+- **Card on file**: the saved card and when it expires. **Change card** opens Stripe's card form right
+  in the pop-up (go: add-card); the new card replaces the old one for everything. **Remove** takes it
+  off, except while Run it until it sells is on (add a new card or turn that off first). Resmara never
+  sees or stores the card number. The first campaign also saves the card.
+- **Coming up** (only with Run it until it sells on): each listing, its next charge and roughly when,
+  and **Turn off** right there.
+- **Purchases**: each one with the date, the listing, what it was (Campaign, Run it again, Round 3),
+  the amount, any sales tax, the status (Paid, Refunded, Declined) and **Receipt** (Stripe's receipt).
+- Sales tax is added only in states that tax it, worked out from the address on the card.
 - The ad budget is billed by Meta to your own ad account, not by Resmara.
-- **Close my account** is at the bottom of Billing — go: close-account. It closes the account and
-  deletes your data as described on the Data deletion page. Running campaigns stop.
-- Refunds: ask the team on Support.
+- A card expiring within 30 days, while Run it until it sells is on, gets an email to update it.
+- **Close my account** is at the bottom of Billing — go: close-account. Type the account email to
+  confirm (there's no password). Posts and ads stop, Run it until it sells turns off, listing websites
+  come down, the saved card is removed and Facebook is disconnected, all at once. Nothing is refunded.
+  Logging in with Facebook within 30 days reopens it; after that the details are deleted (purchase
+  records are kept for tax).
+- Refunds are made by the team: ask on Support. The refund reaches the card in 5 to 10 days.
 
 ## Accounts (Facebook and Instagram) — go: accounts
 
@@ -152,8 +162,16 @@ the logo or headshot if needed, adjust colours, and save. Changes apply to new p
 
 ## Support — go: support
 
-Write a subject and message and click **Send request**. The team replies on this page and by
-email; an orange number on Support shows a new reply. Opening Support clears it.
+The chat (Ask Resmara) is an AI assistant: it answers most questions straight away and passes the rest
+to the team. On the Support page, pick **Which listing?** (or Not about a listing), write a subject and
+message and click **Send request**. The team replies within 1 business day (Monday to Friday, Pacific
+time): sent before 5 PM on a business day, answered by 5 PM the next one. The page shows "We'll reply
+by ..." and the same comes by email.
+
+Each request shows its status: **Received** (with us), **Answered**, **Waiting on you** (we asked you
+something) or **Closed**. Reply on the request itself; a closed one reopens. A request closes itself 7
+days after it's answered if there's no reply. Replies also come by email, and an orange number on
+Support shows a new one. Opening Support clears it.
 
 ## Signing in and passwords — go: password
 

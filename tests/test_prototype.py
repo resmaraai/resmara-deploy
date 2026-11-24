@@ -162,7 +162,7 @@ print(f"Support Tickets: {resp.status_code}, count={len(tickets)}, newest from={
 assert metrics["support"]["waiting_on_us"] >= 1, metrics["support"]
 
 # Reply to ticket
-resp = client.patch(f"/api/admin/support/{ticket['id']}?status=in_progress&reply=Your ads are scheduled to go live on Nov 10.", headers=admin_headers)
+resp = client.patch(f"/api/admin/support/{ticket['id']}?status=answered&reply=Your ads are scheduled to go live on Nov 10.", headers=admin_headers)
 assert resp.status_code == 200, resp.text
 assert resp.json()["messages"][-1]["from"] == "admin", resp.json()
 print(f"Ticket Update: {resp.status_code}, {resp.json()}")
@@ -171,7 +171,7 @@ print(f"Ticket Update: {resp.status_code}, {resp.json()}")
 mine = client.get("/api/support", headers=headers).json()
 answered = [t for t in mine if t["id"] == ticket["id"]][0]
 assert answered["messages"][-1]["text"].startswith("Your ads are scheduled"), answered
-assert answered["status"] == "in_progress", answered
+assert answered["status"] == "answered", answered
 print(f"Client sees reply: {answered['messages'][-1]['from']} -> {answered['messages'][-1]['text'][:40]}...")
 
 after = client.get("/api/admin/metrics", headers=admin_headers).json()

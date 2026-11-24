@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 import os
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -432,3 +432,50 @@ def finance_daily(days: int = 30, db: Session = Depends(get_db),
 
     return {"days": list(buckets.values()), "window_days": days,
             "total_usd": round(sum(d["revenue_usd"] for d in buckets.values()), 2)}
+
+
+# ---------------------------------------------------------------- Engine 10: refunds and disputes
+class RefundBody(BaseModel):
+    cents: Optional[int] = None      # empty = the full amount (with tax)
+    reason: str
+
+
+@router.get("/admin/finance/purchases")
+def purchases(db: Session = Depends(get_db), current_user: User = Depends(team_access.needs("money"))):
+    """Every purchase, newest first, with Refund; open disputes at the top (Engine 10, section 11)."""
+    from app.db.session import Order, Boost, Event
+    rows = db.query(Order).order_by(Order.id.desc()).limit(200).all()
+    users = {u.id: u for u in db.query(User).filter(User.id.in_({o.user_id for o in rows})).all()} if rows else {}
+    boosts = {b.id: b for b in db.query(Boost).filter(Boost.id.in_({o.boost_id for o in rows})).all()} if rows else {}
+    opened = {e.payload.get("payment_intent"): e for e in db.query(Event).filter(Event.event_type == "dispute_opened").all()
+              if isinstance(e.payload, dict)}
+    closed = {e.payload.get("payment_intent") for e in db.query(Event).filter(Event.event_type == "dispute_closed").all()
+              if isinstance(e.payload, dict)}
+    out = []
+    for o in rows:
+        u, b = users.get(o.user_id), boosts.get(o.boost_id)
+        disputed = o.stripe_payment_intent in opened and o.stripe_payment_intent not in closed
+        out.append({"id": o.id, "agent": getattr(u, "email", None), "address": getattr(b, "address", None),
+                    "status": o.status, "amount_cents": o.amount_cents, "tax_cents": o.tax_cents or 0,
+                    "refunded_cents": o.refunded_cents or 0, "paid_at": o.paid_at, "receipt_url": o.receipt_url,
+                    "disputed": disputed,
+                    "can_refund": o.status in ("paid", "partially_refunded") and bool(o.stripe_payment_intent)})
+    out.sort(key=lambda r: (not r["disputed"],))
+    return {"purchases": out, "open_disputes": sum(1 for r in out if r["disputed"])}
+
+
+@router.post("/admin/finance/purchases/{order_id}/refund")
+async def refund_purchase(order_id: int, body: RefundBody, db: Session = Depends(get_db),
+                          current_user: User = Depends(team_access.needs("money"))):
+    """Refund a purchase (full or partial) with a reason; the agent gets the refund email (Terms §7)."""
+    from app.db.session import Order
+    from app.services import account_close
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Purchase not found")
+    if not (body.reason or "").strip():
+        raise HTTPException(status_code=400, detail="Give a reason for the refund.")
+    try:
+        return await account_close.team_refund(db, order, body.cents, body.reason.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))

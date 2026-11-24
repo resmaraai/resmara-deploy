@@ -279,18 +279,20 @@ def facebook_reactivate(payload: dict | None = None, db: Session = Depends(get_d
 
 
 @router.post("/me/close")
-def close_my_account(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Close my account: reversible, and it stops anything scheduled. Campaigns are kept."""
+async def close_my_account(payload: dict | None = None, current_user: User = Depends(get_current_user),
+                           db: Session = Depends(get_db)):
+    """Close my account (Engine 10, section 10): confirmed by typing the account email (Facebook
+    login has no password). Everything stops right away; nothing is refunded. Logging in within 30 days
+    offers to reopen it (Engine 1, section 5); after that the details are deleted."""
     if current_user.is_admin:
         raise HTTPException(status_code=400,
                             detail="Operator accounts are removed from the console, not closed from the site.")
+    typed = str((payload or {}).get("email") or "").strip().lower()
+    if not typed or typed != (current_user.email or "").strip().lower():
+        raise HTTPException(status_code=400, detail="That email doesn't match this account.")
+    from app.services import account_close
     current_user.closed_at = datetime.now(timezone.utc)
-    current_user.is_active = False
-    db.add(Event(user_id=current_user.id, event_type="account_closed", payload={"kept": "campaigns, leads, reports"}))
-    db.commit()
-    return {"status": "closed",
-            "detail": "Your account is closed and nothing more will be sent. Log in with Facebook any time "
-                      "to reactivate it."}
+    return await account_close.close(db, current_user)
 
 
 @router.patch("/me/email")

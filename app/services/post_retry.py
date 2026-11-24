@@ -321,7 +321,7 @@ def _open_agent_ticket(db, post: Post, boost: Optional[Boost], reason: str, kind
             db.add(existing)
             ticket_id, created = existing.id, False
         else:
-            ticket = SupportTicket(user_id=owner_id, subject=subject, status="open",
+            ticket = SupportTicket(user_id=owner_id, subject=subject, status="received",
                                    messages=[message])
             db.add(ticket)
             db.flush()

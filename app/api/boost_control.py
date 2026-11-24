@@ -484,7 +484,9 @@ async def renewals_run(x_resmara_token: str = Header(default=""), db: Session = 
 
 @router.post("/admin/campaigns/daily")
 async def campaigns_daily(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db)):
-    """The once-a-day emails: day 7 and 14 reports, and Run it again on day 12 and at the end."""
+    """The once-a-day steps: day 7 and 14 reports, Run it again on day 12 and at the end, card-expiring
+    emails, deleting the details of accounts closed over 30 days ago, and closing support requests
+    answered 7 days ago with no reply."""
     from app.core.config import settings as _settings
     from app.services import campaign_daily
 
@@ -492,7 +494,13 @@ async def campaigns_daily(x_resmara_token: str = Header(default=""), db: Session
         raise HTTPException(status_code=503, detail="RESMARA_PUBLISH_TOKEN is not configured")
     if x_resmara_token != _settings.PUBLISH_TOKEN:
         raise HTTPException(status_code=403, detail="Bad publish token")
-    return campaign_daily.run(db)
+    from app.services import account_close
+    out = campaign_daily.run(db)
+    out["cards_expiring"] = await campaign_daily.cards_expiring(db)
+    out["accounts_wiped"] = len(account_close.wipe_due(db)["wiped"])
+    from app.services import support
+    out["requests_closed"] = support.auto_close(db)
+    return out
 
 
 @router.post("/boosts/{boost_id}/run-again")

@@ -149,8 +149,14 @@ def main():
                      name="Owner", is_active=True, is_admin=True)
         db.add_all([buyer, admin])
         db.commit()
+        # SQLite hands a deleted user's id to the next one: drop campaigns another test left on it.
+        db.query(Boost).filter(Boost.user_id == buyer.id).delete()
+        db.commit()
         boost = Boost(user_id=buyer.id, address="9 Unpaid Way")
         db.add(boost)
+        db.commit()
+        from app.db.session import Post
+        db.query(Post).filter(Post.boost_id == boost.id).delete()   # ids are reused here too
         db.commit()
         boost_id, buyer_id = boost.id, buyer.id
     finally:
@@ -165,10 +171,9 @@ def main():
           state.text[:160])
     check("and quotes the price", state.json()["price_label"] == "$49")
 
-    # Build first, then pay to unlock (the sign-up tour's engine 5 rule): the build endpoint no
-    # longer asks for a card, so what must still refuse is the money gate. Ask the gates
-    # themselves — a POST here would start a real engine run, which is the one thing a test
-    # must never do.
+    # Engine 4 (slice 1): build first, pay to unlock. The first build needs no card, so what
+    # must still refuse is the money gate. Ask the gates themselves - a POST here would start a
+    # real engine run, which is the one thing a test must never do.
     from fastapi import HTTPException
     from app.api.billing import allow_build, require_paid
     db = SessionLocal()
@@ -177,9 +182,9 @@ def main():
         unpaid_user = db.query(User).filter(User.email == "pay-test@example.com").first()
         try:
             allow_build(unpaid_boost, unpaid_user, db)
-            check("an unpaid campaign may build (no card before the build)", True)
+            check("an unpaid campaign builds first (pay to unlock)", True)
         except HTTPException as e:  # noqa: BLE001 - the build gate must be open here
-            check("an unpaid campaign may build (no card before the build)", False,
+            check("an unpaid campaign builds first (pay to unlock)", False,
                   "%s %s" % (e.status_code, e.detail))
         try:
             require_paid(unpaid_boost, unpaid_user, db)
@@ -194,6 +199,8 @@ def main():
 
     launch = client.post("/api/boosts/%d/launch" % boost_id, json={}, headers=auth)
     check("an unpaid campaign cannot launch", launch.status_code == 402, launch.status_code)
+    check("the refusal is machine-readable",
+          (launch.json().get("detail") or {}).get("error") in ("locked", "payment_required"), launch.text[:200])
 
     checkout = client.post("/api/billing/checkout", json={"boost_id": boost_id}, headers=auth)
     check("checkout says billing is unconfigured rather than pretending",
