@@ -546,12 +546,45 @@ async def get_report(boost_id: int, day: int = 7, current_user: User = Depends(g
             "ad_clicks": paid.get("clicks"),
         },
         "generated_at": datetime.utcnow().isoformat(),
+        **_report_extras(db, boost, current_user),
     }
+
+
+def _report_extras(db: Session, boost, user) -> dict:
+    """Engine 6, section 9: leads by source, the website's visits and what sent them, the ad audit
+    log, and who the seller version is prepared by."""
+    from sqlalchemy import func as _f
+    from app.db.session import Event, Lead
+    leads = {"ad_comments": 0, "post_comments": 0, "website_form": 0, "calls": 0, "texts": 0}
+    for source, channel, n in (db.query(Lead.source, Lead.channel, _f.count(Lead.id))
+                               .filter(Lead.boost_id == boost.id).group_by(Lead.source, Lead.channel).all()):
+        src = (source or "").lower()
+        key = {"web": "website_form", "form": "website_form", "call": "calls", "text": "texts",
+               "ad_comment": "ad_comments"}.get(src)
+        if key is None:
+            key = "ad_comments" if (channel or "").lower().endswith(" ad") else "post_comments"
+        leads[key] += n
+    website = {}
+    try:
+        from app.services import listing_site
+        site = listing_site.site_for(db, boost, adopt=False)
+        stats = listing_site.stats(db, site, boost.id)
+        website = {"visits": stats["visits"], "sources": stats["sources"],
+                   "url": listing_site.public_url(site) if site else None}
+    except Exception:  # noqa: BLE001
+        website = {}
+    audit = [{"at": e.created_at.isoformat() if e.created_at else None, "line": (e.payload or {}).get("line")}
+             for e in db.query(Event).filter(Event.boost_id == boost.id, Event.event_type == "ad_audit")
+             .order_by(Event.id.asc()).all() if (e.payload or {}).get("line")]
+    kit = dict(getattr(user, "brand", None) or {})
+    return {"leads": leads, "website": website, "audit": audit,
+            "prepared_by": {"agent": kit.get("agent") or getattr(user, "name", "") or "",
+                            "brokerage": kit.get("company") or kit.get("brokerage") or ""}}
 
 
 @router.get("/reports/{boost_id}/download")
 async def download_report(boost_id: int, day: int = 7, current_user: User = Depends(get_current_user),
-                          db: Session = Depends(get_db), fmt: str = "pdf"):
+                          db: Session = Depends(get_db), fmt: str = "pdf", version: str = "agent"):
     """The report as a file. ``fmt=json`` keeps the old behaviour for anyone scripting it.
 
     Day 7 and Day 14 are the same endpoint with a different ``day``; the PDF is generated from the
@@ -562,9 +595,11 @@ async def download_report(boost_id: int, day: int = 7, current_user: User = Depe
         return report
     from app.services.report_pdf import campaign_report_pdf
     from fastapi import Response as _Response
-    pdf = campaign_report_pdf(report)
+    seller = version == "seller"
+    pdf = campaign_report_pdf(report, version="seller" if seller else "agent")
     safe = "".join(ch if ch.isalnum() or ch in "- _" else "_" for ch in str(report.get("address") or "campaign"))
     safe = "_".join(safe.split())[:60] or "campaign"
     return _Response(content=pdf, media_type="application/pdf", headers={
-        "Content-Disposition": f'attachment; filename="Resmara Day {day} - {safe}.pdf"',
+        "Content-Disposition": (f'attachment; filename="{safe} - Day {day} marketing report.pdf"' if seller
+                                else f'attachment; filename="Resmara Day {day} - {safe}.pdf"'),
         "Cache-Control": "no-store"})

@@ -62,7 +62,7 @@ words = text_of(pdf)
 check("the address is in the file", "123 Elm St, Austin TX" in words, words[:200])
 check("  ...and the day", "Day 7 report" in words, words[:200])
 check("  ...and the period", "Day 1 to Day 7" in words)
-check("  ...and the real numbers", "Reach: 1840" in words and "Interactions: 96" in words, words[:400])
+check("  ...and the real numbers", "Reach: 1,840" in words and "Engagement: 96" in words, words[:400])
 check("  ...and the spend, labelled as Meta's", "Ad spend: $31.40" in words, words[-400:])
 
 print("\n=== nothing measured says so, and never says zero ===")
@@ -71,7 +71,7 @@ quiet["organic"] = {"ok": False, "reason": "Meta not connected yet (no usable ac
 quiet["paid"] = {"ok": False, "reason": "No Meta ad account connected"}
 pdf2 = campaign_report_pdf(quiet)
 words2 = text_of(pdf2)
-check("reach reads Not measured", "Reach: Not measured" in words2, words2[:400])
+check("reach not shared by Meta shows as a dash, never a guess (Engine 6, section 9)", "Reach: -" in words2, words2[:400])
 check("  ...with Meta's own reason", "no usable access token" in words2, words2[:400])
 check("  ...and no invented zero reaches the page",
       "Reach: 0" not in words2 and "Interactions: 0" not in words2, words2[:400])
@@ -117,6 +117,11 @@ with TestClient(app) as client:
     check("day 14 downloads too", r14.status_code == 200 and r14.content.startswith(b"%PDF-1.4"),
           r14.text[:120] if r14.status_code != 200 else "")
     check("  ...and it says day 14", "Day 14 report" in text_of(r14.content))
+
+    seller = client.get(f"/api/content/reports/{bid}/download?day=7&version=seller", headers=h)
+    st = text_of(seller.content).lower()
+    check("the seller version downloads", seller.status_code == 200 and "marketing report" in st, st[:200])
+    check("  ...with no cost, spend or cost per click anywhere", "spend" not in st and "cost" not in st and "$" not in st, st[:400])
 
     js = client.get(f"/api/content/reports/{bid}/download?day=7&fmt=json", headers=h)
     check("fmt=json still gives the old payload", js.status_code == 200 and "report_day" in js.text,
