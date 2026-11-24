@@ -34,6 +34,7 @@ class User(Base):
     # The Stripe Customer this account pays as. Created on the first checkout and reused after
     # that, so Checkout can show the saved card instead of asking for it again.
     stripe_customer_id = Column(String, nullable=True)
+    billing_hold = Column(String, nullable=True)       # Engine 10: "dispute" pauses new charges
     # Campaigns this account has already paid for and not yet built. A pack purchase is what
     # makes this non-zero and building a campaign spends one (api/billing.require_paid). It is
     # a pre-paid balance, not credit we invented: every unit arrived as a Stripe payment.
@@ -564,6 +565,12 @@ class Order(Base):
     checkout_url = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     paid_at = Column(DateTime(timezone=True), nullable=True)
+    # Engine 10
+    tax_cents = Column(Integer, nullable=True)
+    receipt_url = Column(Text, nullable=True)
+    refunded_cents = Column(Integer, nullable=True)
+    refund_reason = Column(Text, nullable=True)
+    kind = Column(String, nullable=True)            # campaign | run_again | round
 
 # --- Campaign packs (repeat business) ---
 class CreditPurchase(Base):

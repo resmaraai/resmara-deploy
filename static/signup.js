@@ -362,6 +362,7 @@
     stripeJs = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://js.stripe.com/v3/'; s.onload = () => res(window.Stripe); s.onerror = () => rej(new Error('Stripe could not load.')); document.head.appendChild(s); });
     return stripeJs;
   }
+  window.loadStripe = loadStripe;
   let checkoutInstance = null;
   window.unlockCard = async function (boostId, address, opts) {
     opts = opts || {};

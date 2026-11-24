@@ -161,6 +161,12 @@ def checkout_payload(boost_id: int, user_id: int, address: str, base_url: str,
         ("payment_intent_data[metadata][price_type]", price_type),
         ("payment_intent_data[metadata][price_cents]", str(cents)),
     ]
+    if tax_enabled():
+        # Engine 10, section 6: Stripe Tax adds tax where a state requires it, from the card's ZIP.
+        pairs.append(("automatic_tax[enabled]", "true"))
+        pairs.append(("line_items[0][price_data][tax_behavior]", "exclusive"))
+        pairs.append(("line_items[0][price_data][product_data][tax_code]", TAX_CODE))
+        pairs.append(("billing_address_collection", "auto"))
     if customer_id:
         pairs.append(("customer", customer_id))
         # A customer moving house should not leave checkout with a stale billing address.
@@ -303,16 +309,21 @@ async def list_cards(customer_id: str, client: httpx.AsyncClient | None = None) 
 # (3-D Secure, a decline) falls back to the normal Checkout page, which can ask them.
 
 
-def card_setup_payload(customer_id: str, user_id: int, base_url: str) -> list:
-    """The body for a Checkout session that only saves a card (mode=setup): no charge."""
+def card_setup_payload(customer_id: str, user_id: int, base_url: str, embedded: bool = False) -> list:
+    """The body for a Checkout session that only saves a card (mode=setup): no charge.
+
+    embedded=True is Stripe's form inside the Resmara pop-up (Engine 10, section 4), never a
+    separate Stripe page."""
     base = (base_url or "").rstrip("/")
+    urls = ([("ui_mode", "embedded"), ("return_url", "%s/?card=saved&session_id={CHECKOUT_SESSION_ID}" % base),
+             ("redirect_on_completion", "if_required")] if embedded else
+            [("success_url", "%s/?card=saved" % base), ("cancel_url", "%s/?card=cancelled" % base)])
     return [
         ("mode", "setup"),
         ("customer", customer_id),
         ("currency", CURRENCY),
         ("payment_method_types[0]", "card"),
-        ("success_url", "%s/?card=saved" % base),
-        ("cancel_url", "%s/?card=cancelled" % base),
+        *urls,
         # kind=card_setup tells the webhook this session has no campaign and no order behind it.
         ("metadata[kind]", "card_setup"),
         ("metadata[user_id]", str(user_id)),
@@ -321,11 +332,11 @@ def card_setup_payload(customer_id: str, user_id: int, base_url: str) -> list:
 
 
 async def create_card_setup_session(customer_id: str, user_id: int, base_url: str,
-                                    client: httpx.AsyncClient | None = None) -> dict:
+                                    client: httpx.AsyncClient | None = None, embedded: bool = False) -> dict:
     """Create the 'add a card' Checkout session and return its JSON (id + url)."""
     if not billing_enabled():
         raise RuntimeError("Stripe is not configured: set STRIPE_SECRET_KEY on the service.")
-    body, headers = form_body(card_setup_payload(customer_id, user_id, base_url))
+    body, headers = form_body(card_setup_payload(customer_id, user_id, base_url, embedded=embedded))
     owns = client is None
     client = client or httpx.AsyncClient(timeout=30)
     try:
@@ -376,8 +387,13 @@ async def charge_saved_card(customer_id: str, payment_method_id: str, cents: int
     """
     if not billing_enabled():
         raise RuntimeError("Stripe is not configured: set STRIPE_SECRET_KEY on the service.")
-    body, headers = form_body(saved_card_charge_payload(
-        customer_id, payment_method_id, cents, boost_id, user_id, address, round_no))
+    # Engine 10, section 6: tax on top where the state requires it (0 when Stripe Tax is off).
+    tax = await tax_for(customer_id, cents, "boost-%s-round-%s" % (boost_id, int(round_no or 0)), client=client)
+    pairs = saved_card_charge_payload(customer_id, payment_method_id, cents, boost_id, user_id, address, round_no)
+    if tax["tax_cents"]:
+        pairs = [(k, str(tax["total_cents"]) if k == "amount" else v) for k, v in pairs]
+        pairs += [("metadata[tax_cents]", str(tax["tax_cents"])), ("metadata[tax_calculation]", tax["calculation"] or "")]
+    body, headers = form_body(pairs)
     # The card is in the key too: after a decline the agent can add a new card and the retry must
     # reach Stripe instead of replaying the cached decline.
     headers["Idempotency-Key"] = "resmara-boost-%s-round-%s-%s-%s" % (
@@ -400,7 +416,8 @@ async def charge_saved_card(customer_id: str, payment_method_id: str, cents: int
             resp.raise_for_status()
         status = data.get("status")
         if status == "succeeded":
-            return {"paid": True, "payment_intent": data.get("id"), "message": ""}
+            await record_tax(tax["calculation"], data.get("id"), client=client)
+            return {"paid": True, "payment_intent": data.get("id"), "message": "", "tax_cents": tax["tax_cents"]}
         return {"paid": False, "payment_intent": data.get("id"),
                 "message": "Your bank wants to confirm this payment."}
     finally:
@@ -560,3 +577,124 @@ async def refund_failed_build(boost, db) -> dict:
                  payload={"amount_cents": amount, "error": message}))
     db.commit()
     return {"refunded": False, "error": message, "amount_cents": amount}
+
+
+# ── Engine 10: tax, the card, receipts, refunds, disputes ──────────────────────
+TAX_CODE = "txcd_10103000"   # Software as a service, personal/business use
+
+
+def tax_enabled() -> bool:
+    """On only once Adam has switched Stripe Tax on in Stripe (RESMARA_STRIPE_TAX=1)."""
+    return os.getenv("RESMARA_STRIPE_TAX", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+async def stripe_call(method: str, path: str, pairs: list | None = None, params: dict | None = None,
+                      idem: str | None = None, client: httpx.AsyncClient | None = None) -> dict:
+    """One Stripe API call. Raises httpx.HTTPStatusError on a refusal (with Stripe's JSON kept)."""
+    if not billing_enabled():
+        raise RuntimeError("Stripe is not configured: set STRIPE_SECRET_KEY on the service.")
+    owns = client is None
+    client = client or httpx.AsyncClient(timeout=30)
+    try:
+        if method == "GET":
+            resp = await client.get("%s%s" % (STRIPE_API, path), params=params or {},
+                                    headers={"Authorization": "Bearer %s" % secret_key()})
+        else:
+            body, headers = form_body(pairs or [])
+            if idem:
+                headers["Idempotency-Key"] = idem
+            resp = await client.request(method, "%s%s" % (STRIPE_API, path), content=body, headers=headers)
+        resp.raise_for_status()
+        return resp.json()
+    finally:
+        if owns:
+            await client.aclose()
+
+
+async def tax_for(customer_id: str, cents: int, reference: str, client=None) -> dict:
+    """Stripe Tax for an off-session charge: {"tax_cents", "total_cents", "calculation"}.
+    No tax (Stripe Tax off, or the state doesn't tax it, or no address yet) -> tax 0."""
+    if not tax_enabled() or not customer_id:
+        return {"tax_cents": 0, "total_cents": int(cents), "calculation": None}
+    try:
+        calc = await stripe_call("POST", "/tax/calculations", [
+            ("currency", CURRENCY), ("customer", customer_id),
+            ("line_items[0][amount]", str(int(cents))), ("line_items[0][reference]", reference[:200]),
+            ("line_items[0][tax_code]", TAX_CODE), ("line_items[0][tax_behavior]", "exclusive"),
+        ], client=client)
+    except Exception:  # noqa: BLE001 - an address Stripe can't place: no tax, never a failed charge
+        return {"tax_cents": 0, "total_cents": int(cents), "calculation": None}
+    return {"tax_cents": int(calc.get("tax_amount_exclusive") or 0),
+            "total_cents": int(calc.get("amount_total") or cents), "calculation": calc.get("id")}
+
+
+async def record_tax(calculation: str | None, payment_intent: str | None, client=None) -> None:
+    if not calculation or not payment_intent:
+        return
+    try:
+        await stripe_call("POST", "/tax/transactions/create_from_calculation",
+                          [("calculation", calculation), ("reference", payment_intent)], client=client)
+    except Exception:  # noqa: BLE001 - logged in Stripe; the charge stands
+        pass
+
+
+async def detach_card(payment_method_id: str, client=None) -> bool:
+    try:
+        await stripe_call("POST", "/payment_methods/%s/detach" % payment_method_id, [], client=client)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+async def keep_only_card(customer_id: str, keep_id: str, client=None) -> int:
+    """Change card: the new card replaces the old one for everything (Engine 10, section 4)."""
+    removed = 0
+    for card in await list_cards(customer_id, client=client):
+        if card.get("id") and card["id"] != keep_id and await detach_card(card["id"], client=client):
+            removed += 1
+    try:
+        await stripe_call("POST", "/customers/%s" % customer_id,
+                          [("invoice_settings[default_payment_method]", keep_id)], client=client)
+    except Exception:  # noqa: BLE001
+        pass
+    return removed
+
+
+async def setup_session_card(session_id: str, client=None) -> str | None:
+    """The card a finished card-setup session saved."""
+    session = await stripe_call("GET", "/checkout/sessions/%s" % session_id,
+                                params={"expand[]": "setup_intent"}, client=client)
+    intent = session.get("setup_intent") or {}
+    if isinstance(intent, str):
+        intent = await stripe_call("GET", "/setup_intents/%s" % intent, client=client)
+    return intent.get("payment_method") if intent.get("status") == "succeeded" else None
+
+
+async def receipt(payment_intent: str, client=None) -> dict:
+    """{"receipt_url", "tax_cents"} for a payment, read back from Stripe."""
+    try:
+        pi = await stripe_call("GET", "/payment_intents/%s" % payment_intent,
+                               params={"expand[]": "latest_charge"}, client=client)
+    except Exception:  # noqa: BLE001
+        return {}
+    charge = pi.get("latest_charge") or {}
+    return {"receipt_url": charge.get("receipt_url") if isinstance(charge, dict) else None,
+            "tax_cents": int((pi.get("metadata") or {}).get("tax_cents") or 0)}
+
+
+async def refund(payment_intent: str, cents: int | None = None, reason: str = "", client=None) -> dict:
+    pairs = [("payment_intent", payment_intent), ("metadata[reason]", (reason or "")[:300])]
+    if cents:
+        pairs.append(("amount", str(int(cents))))
+    return await stripe_call("POST", "/refunds", pairs, idem="resmara-refund-%s-%s" % (payment_intent, cents or "full"),
+                             client=client)
+
+
+def dispute_outcome(event: dict) -> dict | None:
+    """charge.dispute.created / closed -> {"event", "payment_intent", "status", "amount"}."""
+    kind = (event or {}).get("type") or ""
+    if not kind.startswith("charge.dispute."):
+        return None
+    obj = ((event or {}).get("data") or {}).get("object") or {}
+    return {"event": kind, "dispute": obj.get("id"), "payment_intent": obj.get("payment_intent"),
+            "status": obj.get("status"), "amount": _as_int(obj.get("amount")), "reason": obj.get("reason")}

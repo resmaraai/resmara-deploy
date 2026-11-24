@@ -15,6 +15,7 @@ log = logging.getLogger("resmara.migrate")
 ADDITIONS = {
     # A brand profile the customer entered has to outlive the browser it was typed in.
     "users": [
+        ("billing_hold", "VARCHAR"),     # Engine 10: a chargeback pauses new charges
         ("brand", "JSON"),
         ("stripe_customer_id", "VARCHAR"),
         # Prepaid campaigns from a pack. An existing account keeps working with 0; the ALTER is
@@ -176,6 +177,12 @@ ADDITIONS = {
         ("wants", "VARCHAR"),
     ],
     "orders": [
+        # Engine 10: tax, the Stripe receipt, refunds and what the purchase was.
+        ("tax_cents", "INTEGER"),
+        ("receipt_url", "TEXT"),
+        ("refunded_cents", "INTEGER"),
+        ("refund_reason", "TEXT"),
+        ("kind", "VARCHAR"),
         ("user_id", "INTEGER"),
         ("boost_id", "INTEGER"),
         ("amount_cents", "INTEGER"),

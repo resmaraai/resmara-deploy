@@ -169,35 +169,72 @@ function pricing() {
 }
 
 async function myCredits() {
-  // Same route the sidebar has always used ('credits'); the page is now Billing.
-  // The shell paints first: an await before innerHTML leaves the previous screen on the page
-  // when the network is slow, which on a free instance is most of the time.
-  $('#content').innerHTML = `<div class="welcome billing-head"><h1>Billing</h1></div><div class="notice page-intro">Your Resmara purchases and the card we charge when you build a campaign. Your ad budget is billed by Meta to your own ad account, so it doesn’t show here.</div>
+  // Same route the sidebar has always used ('credits'); the page is Billing (Engine 10, section 7).
+  // The shell paints first: an await before innerHTML leaves the previous screen up on a slow network.
+  $('#content').innerHTML = `<div class="welcome billing-head"><h1>Billing</h1></div>
+    <section class="panel billing-panel"><div class="billing-pm-head"><h3>Card on file</h3><span class="billing-card-actions"></span></div>
+      <div id="billing-cards"><p class="fine">Checking your saved card…</p></div></section>
+    <section class="panel billing-panel" id="billing-upcoming-panel" hidden><h3>Coming up</h3>
+      <div id="billing-upcoming"></div></section>
     <section class="panel billing-panel"><h3>Purchases</h3>
       <div id="billing-orders"><p class="fine">Loading your purchases…</p></div></section>
-    <section class="panel billing-panel"><div class="billing-pm-head"><h3>Payment method</h3><button type="button" class="nc-cancel billing-add-card" onclick="addPaymentCard()">Add a card</button></div>
-      <div id="billing-cards"><p class="fine">Checking your saved card…</p></div></section>
+    <p class="fine billing-meta-line">Your ad budget is billed by Meta to your own ad account, so it isn’t here.</p>
     <div class="billing-close"><button class="campaign-primary" onclick="closeAccount()">Close my account</button></div>`;
+  billingCard();
+  billingUpcoming();
+  billingOrders();
+}
 
-  // The balance is the repeat-customer number: campaigns paid for, not yet built.
-  // Saved card: Stripe keeps it on your customer record, so the next campaign is one click.
-  var cardBox = document.getElementById('billing-cards');
-  if (cardBox && RM.savedCards) {
-    RM.savedCards().then(function (res) {
-      var cards = (res && res.cards) || [];
-      var addBtn = document.querySelector('.billing-add-card');
-      if (addBtn) addBtn.textContent = cards.length ? 'Change card' : 'Add a card';
-      cardBox.innerHTML = cards.length
-        ? '<ul class="campaign-report-list">' + cards.map(function (c) {
-            return '<li><strong>' + esc(c.label) + '</strong><span class="fine">Each campaign you build is charged to this card.</span></li>';
-          }).slice(0, 1).join('') + '</ul><p class="fine">Stored by Stripe. Your card number never reaches Resmara.</p>'
-        : '<p class="fine">' + esc((res && res.note) || 'No card saved yet.') +
-          ' Add one now, or when you build your first campaign.</p>';
-    }).catch(function () {
-      cardBox.innerHTML = '<p class="fine">Could not read your saved card right now.</p>';
-    });
+function billingCard() {
+  var box = document.getElementById('billing-cards');
+  var actions = document.querySelector('.billing-card-actions');
+  if (!box || !RM.savedCards) return;
+  RM.savedCards().then(function (res) {
+    var c = ((res && res.cards) || [])[0];
+    if (!c) {
+      box.innerHTML = '<p class="fine">No card saved yet. You’ll add one when you unlock your first campaign.</p>';
+      if (actions) actions.innerHTML = '<button type="button" class="billing-add-card" onclick="addPaymentCard()">Add a card</button>';
+      return;
+    }
+    var exp = c.exp_month ? ' · expires ' + String(c.exp_month).padStart(2, '0') + '/' + String(c.exp_year || '').slice(-2) : '';
+    box.innerHTML = '<p><strong>' + esc((c.label || 'Card').split(',')[0]) + '</strong><span class="fine">' + esc(exp) + '</span></p>' +
+      '<p class="fine">Stored by Stripe. Your card number never reaches Resmara.</p>';
+    if (actions) actions.innerHTML = '<button type="button" class="billing-add-card" onclick="addPaymentCard()">Change card</button>' +
+      '<button type="button" class="billing-remove-card" onclick="removePaymentCard()">Remove</button>';
+  }).catch(function () {
+    box.innerHTML = '<p class="fine">Could not read your saved card right now.</p>';
+  });
+}
+
+function billingUpcoming() {
+  var panel = document.getElementById('billing-upcoming-panel');
+  var box = document.getElementById('billing-upcoming');
+  if (!panel || !box || !RM.upcoming) return;
+  RM.upcoming().then(function (res) {
+    var rows = (res && res.upcoming) || [];
+    if (!rows.length) return;
+    panel.hidden = false;
+    box.innerHTML = '<ul class="campaign-report-list">' + rows.map(function (u) {
+      var street = String(u.address || 'Your listing').split(',')[0];
+      var when = u.paused ? 'paused' : (u.about ? 'about ' + u.about : 'next round');
+      return '<li class="billing-upcoming-row"><span><strong>' + esc(street) + '</strong><span class="fine">' +
+        esc(u.amount_label) + ' · ' + esc(when) + ' · Round ' + esc(u.round) + '</span></span>' +
+        '<button type="button" class="billing-remove-card" onclick="turnOffUntilSold(' + Number(u.boost_id) + ')">Turn off</button></li>';
+    }).join('') + '</ul>';
+  }).catch(function () {});
+}
+
+async function turnOffUntilSold(boostId) {
+  try {
+    await RM.setUntilSold(boostId, false);
+    toast('Run it until it sells is off. Nothing more will be charged for that listing.');
+    myCredits();
+  } catch (err) {
+    toast((err && err.message) || 'Could not turn it off. Try again.');
   }
+}
 
+async function billingOrders() {
   var box = document.getElementById('billing-orders');
   if (!box) return;
   var rows = [];
@@ -211,11 +248,14 @@ async function myCredits() {
     return v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
   };
   var campaignRows = rows.map(function (o) {
-      var what = o.address || (o.boost_id ? 'Campaign #' + o.boost_id : 'Campaign');
-      return `<li><strong>${esc(what)}</strong>
-        <span class="fine">${esc(o.amount_label || billingMoney(o.amount_cents))} · ${esc(o.status)} · ${date(o.paid_at || o.created_at)}</span></li>`;
+      var street = String(o.address || (o.boost_id ? 'Campaign #' + o.boost_id : 'Campaign')).split(',')[0];
+      var bits = [date(o.paid_at || o.created_at), o.what || 'Campaign', o.amount_label || billingMoney(o.amount_cents)];
+      if (o.tax_label) bits.push(o.tax_label + ' tax');
+      bits.push(o.status_label || o.status);
+      var receipt = o.receipt_url ? ' <a class="billing-receipt" href="' + esc(o.receipt_url) + '" target="_blank" rel="noopener">Receipt</a>' : '';
+      return `<li><strong>${esc(street)}</strong><span class="fine">${esc(bits.join(' · '))}${receipt}</span></li>`;
     }).join('');
-  // A pack bought before they were withdrawn is still a real payment; it stays on the receipt list.
+  // A pack bought before they were withdrawn is still a real payment; it stays on the list.
   var legacyRows = legacy.map(function (p) {
       return `<li><strong>${esc(p.campaigns)}-campaign pack <span class="fine">(no longer sold)</span></strong>
         <span class="fine">${esc(p.amount_label || billingMoney(p.amount_cents))} · ${esc(p.status)} · ${date(p.paid_at || p.created_at)}</span></li>`;
@@ -223,7 +263,88 @@ async function myCredits() {
   var allRows = campaignRows + legacyRows;
   box.innerHTML = allRows
     ? `<ul class="campaign-report-list">${allRows}</ul>`
-    : '<p class="fine">No purchases yet. A campaign is charged when you build it.</p>';
+    : '<p class="fine">No purchases yet. A campaign is charged when you unlock it.</p>';
+}
+
+// ---- the card form, inside the pop-up (Engine 10, section 4) ---------------
+var cardFormInstance = null;
+async function addPaymentCard() {
+  if (!(window.RM && RM.isLoggedIn && RM.isLoggedIn() && RM.addCard)) return;
+  show(`<span class="eyebrow">CARD ON FILE</span><h2>Add your card</h2>
+    <p class="fine">Nothing is charged now. This card pays for every campaign and round from here on.</p>
+    <div id="card-form" class="unlock-checkout"><p class="fine">Loading Stripe’s secure form…</p></div>
+    <p class="fine">Stripe keeps your card. Resmara never sees or stores your card number.</p>
+    <div class="modal-actions"><span></span><button type="button" class="alt" onclick="closeCardForm()">Cancel</button></div>`);
+  try {
+    if (!window.loadStripe) throw new Error('Stripe could not load.');
+    var Stripe = await window.loadStripe();
+    var cfg = await RM.billingConfig();
+    if (!cfg.enabled || !cfg.publishable_key) throw new Error('Card payments aren’t switched on yet.');
+    if (cardFormInstance) { try { cardFormInstance.destroy(); } catch (e) {} cardFormInstance = null; }
+    var sessionId = null;
+    cardFormInstance = await Stripe(cfg.publishable_key).initEmbeddedCheckout({
+      fetchClientSecret: async function () {
+        var r = await RM.addCard(true);
+        sessionId = r.session_id;
+        return r.client_secret;
+      },
+      onComplete: function () { finishCardForm(sessionId); }
+    });
+    var mount = document.getElementById('card-form');
+    if (mount) { mount.innerHTML = ''; cardFormInstance.mount('#card-form'); }
+  } catch (err) {
+    var box = document.getElementById('card-form');
+    if (box) box.innerHTML = '<p class="fine">' + esc((err && err.message) || 'Could not open the card form.') + '</p>';
+  }
+}
+
+function closeCardForm() {
+  if (cardFormInstance) { try { cardFormInstance.destroy(); } catch (e) {} cardFormInstance = null; }
+  modal.close();
+}
+
+async function finishCardForm(sessionId) {
+  try {
+    var r = await RM.cardSaved(sessionId);
+    var c = ((r && r.cards) || [])[0];
+    closeCardForm();
+    toast('Card saved' + (c ? ': ' + String(c.label || '').split(',')[0] : '') + '.');
+  } catch (err) {
+    closeCardForm();
+    toast((err && err.message) || 'The card wasn’t saved. Please try again.');
+  }
+  if (location.hash.indexOf('credits') >= 0 || location.hash.indexOf('billing') >= 0) myCredits();
+}
+
+async function removePaymentCard() {
+  show(`<span class="eyebrow">CARD ON FILE</span><h2>Remove your card?</h2>
+    <p>You’ll add one again when you unlock your next campaign.</p>
+    <p class="fine" role="status"></p>
+    <div class="modal-actions"><button type="button" class="alt" onclick="modal.close()">Keep it</button>
+    <button type="button" class="campaign-primary" onclick="confirmRemoveCard(this)">Remove card</button></div>`);
+}
+
+async function confirmRemoveCard(btn) {
+  var status = btn.closest('.modal-actions').previousElementSibling;
+  btn.disabled = true;
+  try {
+    await RM.removeCard();
+    modal.close();
+    toast('Card removed.');
+    myCredits();
+  } catch (err) {
+    var d = (err && err.detail) || {};
+    status.textContent = d.message || (err && err.message) || 'Could not remove the card.';
+    btn.disabled = false;
+  }
+}
+
+// Prices come from the server, never a copy in this file (Engine 10, section 3).
+if (window.RM && RM.billingConfig) {
+  RM.billingConfig().then(function (cfg) {
+    if (cfg && cfg.price_cents) BILLING_PRICE_CENTS = cfg.price_cents;
+    if (cfg && cfg.repeat_price_cents) window.BILLING_REPEAT_CENTS = cfg.repeat_price_cents;
+  }).catch(function () {});
 }
 
 // ---- returning from Stripe ------------------------------------------------
@@ -234,6 +355,10 @@ async function myCredits() {
   var card = params.get('card');
   if (card) {
     window.history.replaceState({}, document.title, location.pathname + (location.hash || ''));
+    var cardSession = params.get('session_id');
+    if (card === 'saved' && cardSession && window.RM && RM.cardSaved) {
+      RM.cardSaved(cardSession).catch(function () {});
+    }
     toast(card === 'saved' ? 'Card saved. Each campaign you build is charged to it.'
                            : 'No card added. Nothing was charged.');
     if (typeof dashboard === 'function') setTimeout(function () { dashboard('credits'); }, 400);
@@ -261,33 +386,30 @@ async function myCredits() {
   }
 })();
 
-// ── closing an account ────────────────────────────────────────────────────────────
-// The password is asked for again: the server refuses without it, so a token left in a
-// browser cannot wipe someone's account. No `confirm()` — the typed address is stronger.
+// ── closing an account (Engine 10, section 10) ─────────────────────────────────
+// Facebook login has no password, so typing the account email is the confirmation.
 function closeAccount() {
   if (!window.RM) return;
-  show(`<span class="eyebrow">CLOSE YOUR ACCOUNT</span><h2>This cannot be undone.</h2>
-    <p>Your name, email and brand profile are removed and the account stops signing in.
-    Purchases stay on record for accounting.</p>
+  show(`<span class="eyebrow">CLOSE YOUR ACCOUNT</span><h2>Close your account?</h2>
+    <p>Your posts and ads stop, Run it until it sells turns off, your listing websites come down and your saved card is removed. Nothing is refunded.</p>
+    <p class="fine">Log in with Facebook within 30 days to reopen it. After that your details are deleted; purchase records are kept for tax and accounting.</p>
     <form onsubmit="event.preventDefault();submitCloseAccount(this)">
       <label class="field">Type your email to confirm<input name="email" type="email" required autocomplete="off" placeholder="${esc(state.email || '')}"></label>
-      <label class="field">Your password<span class="pw-wrap"><input name="password" type="password" required autocomplete="current-password"><button type="button" class="pw-eye" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false">Show</button></span></label>
       <p class="fine" role="status"></p>
-      <div class="modal-actions"><button type="submit">Close my account</button>
-      <button type="button" class="alt" onclick="modal.close()">Keep my account</button></div>
+      <div class="modal-actions"><button type="button" class="alt" onclick="modal.close()">Keep my account</button>
+      <button type="submit" class="campaign-primary">Close my account</button></div>
     </form>`);
 }
 async function submitCloseAccount(form) {
   var status = form.querySelector('[role="status"]');
   var typed = (form.elements.email.value || '').trim().toLowerCase();
-  var password = form.elements.password.value || '';
-  if (typed !== String(state.email || '').toLowerCase()) {
-    status.textContent = 'That email does not match this account.';
+  if (state.email && typed !== String(state.email).toLowerCase()) {
+    status.textContent = 'That email doesn’t match this account.';
     return;
   }
   status.textContent = 'Closing…';
   try {
-    await RM.deleteAccount(password);
+    await RM.closeAccount(typed);
     state = { name: '', connected: false, campaigns: [] };
     persist();
     modal.close();

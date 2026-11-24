@@ -224,6 +224,9 @@ tr.testrow td{background:#fbfdff;color:#849bae}
 button.ghost.tiny.is-test-on{background:#12354d!important;color:#fff!important;border-color:#12354d!important}
 html.dark .test-note{background:#1d3a50;color:#fff}
 html.dark button.ghost.tiny.is-test-on{background:#fff!important;color:#12354d!important}
+.fin-disputed{background:#fdeee6}.fin-disputed b{color:#d94c0d}
+.fin-refund-btn{margin-left:10px;padding:4px 10px;font-size:12px}
+.fin-refund-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0 12px 0}.fin-refund-form input{padding:6px 8px}
 </style>
 
 <style id="brand-views">
@@ -852,6 +855,7 @@ html.dark .rel-body{color:#d6e6f1}
       <div class="body">
         <div id="finOrders"></div>
         <div class="br-card"><h3 class="card-title">Sales each day</h3><div id="finDaily" class="hint">Loading…</div><div id="finDay"></div></div>
+        <div class="br-card"><h3 class="card-title">Purchases</h3><div id="finPurchases" class="hint">Loading…</div></div>
         <h3 class="card-title" style="margin-top:24px">What each sale is worth</h3>
         <div id="finSquares"><div class="hint">Working the numbers…</div></div>
         <h3 class="card-title" style="margin-top:24px">What an agent is worth</h3>
@@ -3610,7 +3614,50 @@ function finDate(v){
   return isNaN(d) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// ── Engine 10: every purchase with Refund; open chargebacks at the top in orange ──
+let finBuys = null, finRefundOpen = null, finRefundNote = '';
+async function loadFinPurchases(){
+  const el = $('finPurchases'); if (!el) return;
+  try { finBuys = await api('/api/admin/finance/purchases'); } catch (err) { el.className = 'hint'; el.textContent = 'Could not read purchases — ' + err.message; return; }
+  paintFinPurchases();
+}
+function paintFinPurchases(){
+  const el = $('finPurchases'); if (!el || !finBuys) return;
+  const rows = finBuys.purchases || [];
+  if (!rows.length) { el.className = 'hint'; el.textContent = 'No purchases yet.'; return; }
+  el.className = '';
+  el.innerHTML = (finRefundNote ? '<div class="hint">' + esc(finRefundNote) + '</div>' : '') + (finBuys.open_disputes ? '<div class="bad">' + finBuys.open_disputes + ' chargeback(s) open: answer them in Stripe. New charges are paused on those accounts.</div>' : '') +
+    '<div class="log">' + rows.map(o => {
+      const paid = ((o.amount_cents || 0) + (o.tax_cents || 0)) / 100;
+      const bits = [esc(o.agent || ''), esc((o.address || '').split(',')[0]), esc(o.status)];
+      if (o.refunded_cents) bits.push('refunded ' + esc(usd(o.refunded_cents / 100)));
+      const open = finRefundOpen === o.id;
+      return '<div class="log-row' + (o.disputed ? ' fin-disputed' : '') + '"><span class="log-when">' + esc(finDate(o.paid_at)) + '</span><span class="log-text">' +
+        (o.disputed ? '<b>Chargeback</b> · ' : '') + bits.join(' · ') + (o.receipt_url ? ' · <a href="' + esc(o.receipt_url) + '" target="_blank" rel="noopener">Receipt</a>' : '') +
+        '</span><b>' + esc(usd(paid)) + '</b>' + (o.can_refund ? '<button type="button" class="fin-refund-btn" data-fin-refund="' + o.id + '">' + (open ? 'Close' : 'Refund') + '</button>' : '') + '</div>' +
+        (open ? '<div class="fin-refund-form"><label>Amount <input id="finRefundCents" type="number" min="0" step="0.01" placeholder="' + esc(paid.toFixed(2)) + ' (all)"></label>' +
+          '<label>Reason <input id="finRefundReason" type="text" placeholder="Why we are refunding"></label>' +
+          '<button type="button" data-fin-refund-go="' + o.id + '">Refund now</button><span class="msg" id="finRefundMsg"></span></div>' : '');
+    }).join('') + '</div>';
+}
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-fin-refund]');
+  if (t) { const id = Number(t.dataset.finRefund); finRefundOpen = finRefundOpen === id ? null : id; paintFinPurchases(); return; }
+  const go = e.target.closest('[data-fin-refund-go]'); if (!go) return;
+  const msg = $('finRefundMsg'), reason = ($('finRefundReason').value || '').trim(), dollars = parseFloat($('finRefundCents').value);
+  if (!reason) { msg.textContent = 'Give a reason first.'; return; }
+  go.disabled = true; msg.textContent = 'Refunding…';
+  try {
+    const body = { reason: reason };
+    if (dollars > 0) body.cents = Math.round(dollars * 100);
+    const r = await api('/api/admin/finance/purchases/' + go.dataset.finRefundGo + '/refund', { method: 'POST', body: body });
+    finRefundOpen = null; finRefundNote = 'Refunded ' + usd((r.refunded_cents || 0) / 100) + '. The agent has the email.';
+    await loadFinPurchases();
+  } catch (err) { msg.textContent = err.message; go.disabled = false; }
+});
+
 async function loadFinance(){
+  loadFinPurchases();
   try {
     finData = await api('/api/admin/finance');
     renderFinance();

@@ -201,8 +201,10 @@ check("  ...and we ask once for a real one", r.status_code == 200 and
       db_user(facebook_id="fb-2002").email == "nancy@example.com", r.text[:200])
 
 # ------------------------------------------------------------- close, then come back
-r = client.post("/api/auth/me/close", headers={"Authorization": f"Bearer {token}"})
-check("an agent can close their account", r.status_code == 200, r.text[:200])
+r = client.post("/api/auth/me/close", json={"email": "wrong@example.com"}, headers={"Authorization": f"Bearer {token}"})
+check("closing needs the account email typed (no password)", r.status_code == 400, r.text[:200])
+r = client.post("/api/auth/me/close", json={"email": "Jamie@Example.com"}, headers={"Authorization": f"Bearer {token}"})
+check("an agent can close their account", r.status_code == 200 and r.json().get("status") == "closed", r.text[:200])
 r = login_via_facebook("code-jamie")
 closed = r.json() if r.status_code == 200 else {}
 check("  ...and is offered reactivation instead of a silent sign-in", closed.get("fb") == "closed", r.text[:300])

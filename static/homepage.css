@@ -1616,3 +1616,9 @@ html.dark .shell .lp-stats small,html.dark .shell .lp-bar{color:#fff}
 .pause-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
 .pause-choices .campaign-primary{width:100%;margin:0}
 @media (max-width:520px){.pause-choices{grid-template-columns:1fr}}
+/* Engine 10: Billing page */
+.billing-card-actions{display:flex;gap:8px}
+.billing-remove-card{background:#e2f0f8!important;color:#12354d!important;border:0!important;font-size:13px!important;padding:8px 14px!important;min-height:0!important;border-radius:999px;cursor:pointer}
+.billing-upcoming-row{display:flex!important;justify-content:space-between;align-items:center;gap:12px}
+.billing-receipt{color:#12354d;font-weight:600;margin-left:6px}
+.billing-meta-line{margin:4px 0 0}

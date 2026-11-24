@@ -51,3 +51,32 @@ def run(db, now: Optional[datetime] = None) -> Dict[str, Any]:
         elif 14 < day <= 17 and not emails.already(boost, "again-final"):
             sent["run_again"] += int(emails.run_again(db, boost, final=True))
     return sent
+
+
+async def cards_expiring(db, now: Optional[datetime] = None, list_cards=None) -> int:
+    """Once a month per card: each agent on Run it until it sells whose card expires within 30 days
+    gets one email (on their first listing that has it on)."""
+    import calendar
+    from app.db.session import User
+    from app.services import billing
+    now = now or datetime.now(timezone.utc)
+    if not billing.billing_enabled() and list_cards is None:
+        return 0
+    sent, seen = 0, set()
+    for boost in db.query(Boost).filter(Boost.until_sold.is_(True)).order_by(Boost.id.asc()).all():
+        if boost.user_id in seen:
+            continue
+        seen.add(boost.user_id)
+        owner = db.query(User).filter(User.id == boost.user_id).first()
+        if owner is None or not owner.stripe_customer_id:
+            continue
+        cards = await (list_cards or billing.list_cards)(owner.stripe_customer_id)
+        if not cards or not cards[0].get("exp_year"):
+            continue
+        card = cards[0]
+        y, m = int(card["exp_year"]), int(card["exp_month"])
+        last_day = datetime(y, m, calendar.monthrange(y, m)[1], 23, 59, tzinfo=timezone.utc)
+        if 0 <= (last_day - now).days <= 30:
+            ends = last_day.strftime("%B %Y")
+            sent += int(emails.card_expiring(db, boost, card.get("label") or "card", ends))
+    return sent
