@@ -224,6 +224,9 @@ tr.testrow td{background:#fbfdff;color:#849bae}
 button.ghost.tiny.is-test-on{background:#12354d!important;color:#fff!important;border-color:#12354d!important}
 html.dark .test-note{background:#1d3a50;color:#fff}
 html.dark button.ghost.tiny.is-test-on{background:#fff!important;color:#12354d!important}
+.fin-disputed{background:#fdeee6}.fin-disputed b{color:#d94c0d}
+.fin-refund-btn{margin-left:10px;padding:4px 10px;font-size:12px}
+.fin-refund-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0 12px 0}.fin-refund-form input{padding:6px 8px}
 </style>
 
 <style id="brand-views">
@@ -417,6 +420,9 @@ nav#index a{display:flex;align-items:center}
 .tk-turn.them{background:#e2f0f8;color:#12354d}
 .tk-status{font-size:12px;font-weight:700;color:#3d5f75;padding:6px 12px;border-radius:999px;background:#f2f6f9}
 .tk-status.s-resolved,.tk-status.s-closed{background:#dff3e6;color:#1f7a45}
+.tk-due{font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;background:#f2f6f9;color:#12354d}
+.tk-due.soon{background:#fde3d6;color:#12354d}.tk-due.late{background:#d94c0d;color:#fff}
+.tk-snap{font-size:12px;color:#12354d;background:#e2f0f8;border-radius:10px;padding:8px 12px;margin:0 0 10px}
 .tk-toggle{background:#12354d;color:#fff;padding:9px 20px;font-size:13px;font-weight:700;min-width:84px}
 .tk-body{border-top:1px solid #e3eef6;background:#f8fbfd;padding:22px}
 .tk-thread{display:flex;flex-direction:column;gap:12px;margin-bottom:22px}
@@ -818,7 +824,7 @@ html.dark .rel-body{color:#d6e6f1}
           <button class="chip" data-filter="waiting" aria-pressed="true">Waiting on us</button>
           <button class="chip" data-filter="all" aria-pressed="false">All</button>
           <button class="chip" data-filter="open" aria-pressed="false">Open</button>
-          <button class="chip" data-filter="resolved" aria-pressed="false">Resolved</button>
+          <button class="chip" data-filter="resolved" aria-pressed="false">Closed</button>
           <label class="chipbox"><input type="checkbox" id="showTestTickets"> Show <span id="testTicketCount">0</span> test ticket(s)</label>
         </div>
         <div id="ticketsTable" class="tk-list"></div>
@@ -852,6 +858,7 @@ html.dark .rel-body{color:#d6e6f1}
       <div class="body">
         <div id="finOrders"></div>
         <div class="br-card"><h3 class="card-title">Sales each day</h3><div id="finDaily" class="hint">Loading…</div><div id="finDay"></div></div>
+        <div class="br-card"><h3 class="card-title">Purchases</h3><div id="finPurchases" class="hint">Loading…</div></div>
         <h3 class="card-title" style="margin-top:24px">What each sale is worth</h3>
         <div id="finSquares"><div class="hint">Working the numbers…</div></div>
         <h3 class="card-title" style="margin-top:24px">What an agent is worth</h3>
@@ -2916,14 +2923,32 @@ function lastFrom(t){
     ? '<span class="pill ok">client</span>' : '<span class="pill warn">us</span>';
 }
 function isOpen(t){ return String(t.status || '') !== 'resolved' && String(t.status || '') !== 'closed'; }
-function waitingOnUs(t){ return isOpen(t) && lastFrom(t).includes('us'); }
+// Engine 11: Received means it's our turn; Answered and Waiting on you are the agent's.
+function waitingOnUs(t){ return String(t.status || '') === 'received' || (isOpen(t) && !['answered', 'waiting'].includes(String(t.status)) && lastFrom(t).includes('us')); }
 function thread(t){
   const msgs = t.messages || [];
   if (!msgs.length) return '<div class="hint">No messages on this ticket.</div>';
   return '<div class="thread">' + msgs.map(m =>
     '<div class="m"><b>' + esc(m.from || 'unknown') + '</b> <span class="hint">' + fmt(m.at) + '</span><p>' + esc(m.text || '') + '</p></div>').join('') + '</div>';
 }
-const TK_STATUS = {open: 'Open', in_progress: 'Working on it', resolved: 'Resolved', closed: 'Closed'};
+const TK_STATUS = {received: 'Received', answered: 'Answered', waiting: 'Waiting on you', closed: 'Closed'};
+function tkDue(t){
+  if (t.status !== 'received' || !t.reply_by_label) return '';
+  if (t.due === 'late') return '<span class="tk-due late">Past due · was ' + esc(t.reply_by_label) + '</span>';
+  if (t.due === 'soon') return '<span class="tk-due soon">Due soon · ' + esc(t.reply_by_label) + '</span>';
+  return '<span class="tk-due">Reply by ' + esc(t.reply_by_label) + '</span>';
+}
+function tkSnap(t){
+  const s = t.snapshot || {}; if (!Object.keys(s).length && !t.address && !t.page) return '';
+  const bits = [];
+  if (t.address) bits.push('Listing: ' + esc(String(t.address).split(',')[0]));
+  if (t.page) bits.push('Page: ' + esc(t.page));
+  if (Object.keys(s).length) bits.push(esc(s.campaigns || 0) + ' campaign(s), ' + esc(s.live || 0) + ' live',
+    'Facebook ' + (s.facebook ? 'connected' + (s.page ? ' (' + esc(s.page) + ')' : '') : 'not connected'),
+    'Instagram ' + (s.instagram ? '@' + esc(s.instagram) : 'not linked'), 'card ' + (s.card ? 'saved' : 'not saved'),
+    esc(s.failed_posts || 0) + ' failed post(s)');
+  return '<div class="tk-snap">' + bits.join(' · ') + '</div>';
+}
 const openTickets = new Set();
 function ticketRow(t){
   const isOpenNow = openTickets.has(String(t.id));
@@ -2935,13 +2960,13 @@ function ticketRow(t){
       '<div class="tk-main"><b>' + esc(t.subject) + '</b>' +
         '<span>' + esc(t.client_email || ('Agent ' + t.user_id)) + ' · Request #' + esc(t.id) + ' · ' + esc(when(t.created_at)) +
         (t.is_test ? ' · <span class="pill test">test</span>' : '') + '</span></div>' +
-      '<div class="tk-side">' + turn + '<span class="tk-status s-' + esc(t.status) + '">' + esc(TK_STATUS[t.status] || t.status) + '</span>' +
+      '<div class="tk-side">' + tkDue(t) + turn + '<span class="tk-status s-' + esc(t.status) + '">' + esc(TK_STATUS[t.status] || t.status) + '</span>' +
         '<button class="tk-toggle" data-ticket="' + t.id + '">' + (isOpenNow ? 'Close' : 'Open') + '</button></div>' +
     '</div>' +
-    '<div class="tk-body' + (isOpenNow ? '' : ' hidden') + '" id="ticket-' + t.id + '">' +
+    '<div class="tk-body' + (isOpenNow ? '' : ' hidden') + '" id="ticket-' + t.id + '">' + tkSnap(t) +
       '<div class="tk-thread">' + (msgs.length ? msgs.map(m => {
         const team = String(m.from || '').toLowerCase() === 'admin';
-        return '<div class="tk-msg ' + (team ? 'team' : 'agent') + '"><span>' + (team ? 'Resmara team' : esc(t.client_email || 'Agent')) + (m.at ? ' · ' + esc(when(m.at)) : '') + '</span><p>' + esc(m.text || '') + '</p></div>';
+        return '<div class="tk-msg ' + (team ? 'team' : 'agent') + '"><span>' + (team ? (m.by ? esc(m.by) + ' from Resmara' : 'Resmara team') : esc(t.client_email || 'Agent')) + (m.at ? ' · ' + esc(when(m.at)) : '') + '</span><p>' + esc(m.text || '') + '</p></div>';
       }).join('') : '<div class="hint">No messages yet.</div>') + '</div>' +
       '<div class="tk-reply">' +
         '<label for="reply-' + t.id + '">Your reply</label>' +
@@ -2949,7 +2974,8 @@ function ticketRow(t){
         '<div class="tk-foot">' +
           '<label class="tk-statuspick" for="status-' + t.id + '">Status after you send' +
             '<select id="status-' + t.id + '">' + Object.keys(TK_STATUS).map(v =>
-              '<option value="' + v + '"' + (t.status === v ? ' selected' : '') + '>' + TK_STATUS[v] + '</option>').join('') + '</select></label>' +
+              '<option value="' + v + '"' + ((t.status === 'received' ? 'answered' : t.status) === v ? ' selected' : '') + '>' +
+              (v === 'waiting' ? 'Waiting on you (we asked them something)' : TK_STATUS[v]) + '</option>').join('') + '</select></label>' +
           '<div class="tk-btns">' +
             '<button class="tk-kb" data-kb="' + t.id + '" title="Turn this reply into an answer the Ask Resmara chat gives next time">Save as a chat answer</button>' +
             '<button class="tk-send" data-save="' + t.id + '">Send reply</button>' +
@@ -3610,7 +3636,51 @@ function finDate(v){
   return isNaN(d) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// ── Engine 10: every purchase with Refund; open chargebacks at the top in orange ──
+let finBuys = null, finRefundOpen = null, finRefundNote = '';
+async function loadFinPurchases(){
+  const el = $('finPurchases'); if (!el) return;
+  try { finBuys = await api('/api/admin/finance/purchases'); } catch (err) { el.className = 'hint'; el.textContent = 'Could not read purchases — ' + err.message; return; }
+  paintFinPurchases();
+}
+function paintFinPurchases(){
+  const el = $('finPurchases'); if (!el || !finBuys) return;
+  const rows = finBuys.purchases || [];
+  if (!rows.length) { el.className = 'hint'; el.textContent = 'No purchases yet.'; return; }
+  el.className = '';
+  el.innerHTML = (finRefundNote ? '<div class="hint">' + esc(finRefundNote) + '</div>' : '') + (finBuys.open_disputes ? '<div class="bad">' + finBuys.open_disputes + ' chargeback(s) open: answer them in Stripe. New charges are paused on those accounts.</div>' : '') +
+    '<div class="log">' + rows.map(o => {
+      const paid = ((o.amount_cents || 0) + (o.tax_cents || 0)) / 100;
+      const st = {paid: 'Paid', refunded: 'Refunded', partially_refunded: 'Partly refunded', failed: 'Declined'}[o.status] || o.status;
+      const bits = [esc(o.agent || ''), esc((o.address || '').split(',')[0]),
+        esc(st) + (o.status === 'partially_refunded' ? ' (' + esc(usd(o.refunded_cents / 100)) + ' back)' : '')];
+      const open = finRefundOpen === o.id;
+      return '<div class="log-row' + (o.disputed ? ' fin-disputed' : '') + '"><span class="log-when">' + esc(finDate(o.paid_at)) + '</span><span class="log-text">' +
+        (o.disputed ? '<b>Chargeback</b> · ' : '') + bits.join(' · ') + (o.receipt_url ? ' · <a href="' + esc(o.receipt_url) + '" target="_blank" rel="noopener">Receipt</a>' : '') +
+        '</span><b>' + esc(usd(paid)) + '</b>' + (o.can_refund ? '<button type="button" class="fin-refund-btn" data-fin-refund="' + o.id + '">' + (open ? 'Close' : 'Refund') + '</button>' : '') + '</div>' +
+        (open ? '<div class="fin-refund-form"><label>Amount <input id="finRefundCents" type="number" min="0" step="0.01" placeholder="' + esc(paid.toFixed(2)) + ' (all)"></label>' +
+          '<label>Reason <input id="finRefundReason" type="text" placeholder="Why we are refunding"></label>' +
+          '<button type="button" data-fin-refund-go="' + o.id + '">Refund now</button><span class="msg" id="finRefundMsg"></span></div>' : '');
+    }).join('') + '</div>';
+}
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-fin-refund]');
+  if (t) { const id = Number(t.dataset.finRefund); finRefundOpen = finRefundOpen === id ? null : id; paintFinPurchases(); return; }
+  const go = e.target.closest('[data-fin-refund-go]'); if (!go) return;
+  const msg = $('finRefundMsg'), reason = ($('finRefundReason').value || '').trim(), dollars = parseFloat($('finRefundCents').value);
+  if (!reason) { msg.textContent = 'Give a reason first.'; return; }
+  go.disabled = true; msg.textContent = 'Refunding…';
+  try {
+    const body = { reason: reason };
+    if (dollars > 0) body.cents = Math.round(dollars * 100);
+    const r = await api('/api/admin/finance/purchases/' + go.dataset.finRefundGo + '/refund', { method: 'POST', body: body });
+    finRefundOpen = null; finRefundNote = 'Refunded ' + usd((r.refunded_cents || 0) / 100) + '. The agent has the email.';
+    await loadFinPurchases();
+  } catch (err) { msg.textContent = err.message; go.disabled = false; }
+});
+
 async function loadFinance(){
+  loadFinPurchases();
   try {
     finData = await api('/api/admin/finance');
     renderFinance();

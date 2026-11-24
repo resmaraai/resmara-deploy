@@ -34,6 +34,7 @@ class User(Base):
     # The Stripe Customer this account pays as. Created on the first checkout and reused after
     # that, so Checkout can show the saved card instead of asking for it again.
     stripe_customer_id = Column(String, nullable=True)
+    billing_hold = Column(String, nullable=True)       # Engine 10: "dispute" pauses new charges
     # Campaigns this account has already paid for and not yet built. A pack purchase is what
     # makes this non-zero and building a campaign spends one (api/billing.require_paid). It is
     # a pre-paid balance, not credit we invented: every unit arrived as a Stripe payment.
@@ -511,8 +512,12 @@ class SupportTicket(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     subject = Column(String, nullable=False)
-    status = Column(String, default="open")  # open, in_progress, resolved, closed
+    status = Column(String, default="received")  # received, answered, waiting, closed (app/services/support.py)
     messages = Column(JSON, default=[])
+    boost_id = Column(Integer, nullable=True)     # Which listing? (optional)
+    page = Column(String, nullable=True)          # the page they were on
+    snapshot = Column(JSON, default=dict)         # the account at the time, so the team doesn't have to ask
+    reply_by = Column(DateTime(timezone=True), nullable=True)  # the 1 business day promise
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -564,6 +569,12 @@ class Order(Base):
     checkout_url = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     paid_at = Column(DateTime(timezone=True), nullable=True)
+    # Engine 10
+    tax_cents = Column(Integer, nullable=True)
+    receipt_url = Column(Text, nullable=True)
+    refunded_cents = Column(Integer, nullable=True)
+    refund_reason = Column(Text, nullable=True)
+    kind = Column(String, nullable=True)            # campaign | run_again | round
 
 # --- Campaign packs (repeat business) ---
 class CreditPurchase(Base):

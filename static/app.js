@@ -398,7 +398,7 @@ if(window.RM&&RM.onSessionLost)RM.onSessionLost(()=>{
 });
 
 // Resmara stays available across the workspace and homepage.
-const pipDock=document.createElement('div');pipDock.id='pip-dock';pipDock.innerHTML='<button class="pip-launcher" onclick="togglePip()" aria-label="Ask Resmara for help"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><span>Ask Resmara</span><span class="pip-online"></span></button><section id="pip-chat" class="pip-chat" hidden aria-label="Resmara support chat"><header class="flex"><div class="flex"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><div><b>Resmara</b><small>Real Estate Social Marketing, Analytics & Reporting Assistant</small></div></div><button class="pip-close" onclick="togglePip()" aria-label="Close Resmara chat">×</button></header><div id="pip-messages" class="pip-messages" aria-live="polite"><div class="pip-reply">Hi, I’m Resmara! I’ll help you get settled, build your campaign and find your way around. What can I help with?</div></div><div class="pip-questions"><button onclick="pipAnswer(0)">Start my first campaign</button><button onclick="pipAnswer(1)">Connect social accounts</button><button onclick="pipAnswer(2)">Fees and ad spend</button><button onclick="pipAnswer(3)">Find my reports</button></div><form class="pip-input" onsubmit="event.preventDefault();pipFreeText(this.question.value);this.reset()"><input name="question" aria-label="Message Resmara" required placeholder="Ask Resmara a question…"><button aria-label="Send message">Send</button></form><p class="pip-demo-note">Guided answers · anything else can be sent to the team as a real support request.</p></section>';document.body.append(pipDock);function togglePip(){const panel=document.querySelector('#pip-chat');panel.hidden=!panel.hidden}function pipMessage(t,mine=false){const e=document.createElement('div');e.className=mine?'pip-user':'pip-reply';e.textContent=t;document.querySelector('#pip-messages').append(e);e.scrollIntoView({block:'nearest'})}function pipAnswer(n){const questions=['How do I start my first campaign?','How do I connect my social accounts?','How do fees and ad spend work?','Where are my reports?'];const answers=['Start with My Brand, then add the listing: the address, the MLS or listing link, and your photos and videos. Resmara builds the 14-day calendar and you approve it before anything goes out. A campaign is $49, paid when you build it.','Open Accounts and connect your Facebook Page and Instagram account. Publishing runs through Meta, so the connection has to be yours — Resmara never posts without it.','One property campaign is $49, paid once when you build it. No subscription, no credits, nothing to top up. Meta ad spend is separate and goes to Meta from your own ad account.','Open the campaign’s report for the day 7 and day 14 views. Before a campaign has been running there are no numbers to show; it fills in from your connected accounts.'];pipMessage(questions[n],true);pipMessage(answers[n])}function pipFreeText(q){if(/start|first|campaign|listing/i.test(q))return pipAnswer(0);if(/connect|facebook|instagram|meta account/i.test(q))return pipAnswer(1);if(/cost|fee|price|budget|spend|pay/i.test(q))return pipAnswer(2);if(/report|result|performance/i.test(q))return pipAnswer(3);pipMessage(q,true);pipMessage('I keep to the guided answers above for setup, social connections, fees and reports. For anything else, send it to the team and a person will reply on your Support page.');pipOfferTicket(q)}
+const pipDock=document.createElement('div');pipDock.id='pip-dock';pipDock.innerHTML='<button class="pip-launcher" onclick="togglePip()" aria-label="Ask Resmara for help"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><span>Ask Resmara</span><span class="pip-online"></span></button><section id="pip-chat" class="pip-chat" hidden aria-label="Resmara support chat"><header class="flex"><div class="flex"><span class="robot-avatar" role="img" aria-label="Resmara, your three-dimensional robot guide"></span><div><b>Resmara</b><small>Real Estate Social Marketing, Analytics & Reporting Assistant</small></div></div><button class="pip-close" onclick="togglePip()" aria-label="Close Resmara chat">×</button></header><div id="pip-messages" class="pip-messages" aria-live="polite"><div class="pip-reply">I’m Ask Resmara, an AI assistant. I can answer most questions, and I’ll pass anything else to our team.</div></div><div class="pip-questions"><button onclick="pipAnswer(0)">Start my first campaign</button><button onclick="pipAnswer(1)">Connect social accounts</button><button onclick="pipAnswer(2)">Fees and ad spend</button><button onclick="pipAnswer(3)">Find my reports</button></div><form class="pip-input" onsubmit="event.preventDefault();pipFreeText(this.question.value);this.reset()"><input name="question" aria-label="Message Resmara" required placeholder="Ask Resmara a question…"><button aria-label="Send message">Send</button></form><p class="pip-demo-note">Guided answers · anything else can be sent to the team as a real support request.</p></section>';document.body.append(pipDock);function togglePip(){const panel=document.querySelector('#pip-chat');panel.hidden=!panel.hidden}function pipMessage(t,mine=false){const e=document.createElement('div');e.className=mine?'pip-user':'pip-reply';e.textContent=t;document.querySelector('#pip-messages').append(e);e.scrollIntoView({block:'nearest'})}function pipAnswer(n){const questions=['How do I start my first campaign?','How do I connect my social accounts?','How do fees and ad spend work?','Where are my reports?'];const answers=['Start with My Brand, then add the listing: the address, the MLS or listing link, and your photos and videos. Resmara builds the 14-day calendar and you approve it before anything goes out. A campaign is $49, paid when you build it.','Open Accounts and connect your Facebook Page and Instagram account. Publishing runs through Meta, so the connection has to be yours — Resmara never posts without it.','One property campaign is $49, paid once when you build it. No subscription, no credits, nothing to top up. Meta ad spend is separate and goes to Meta from your own ad account.','Open the campaign’s report for the day 7 and day 14 views. Before a campaign has been running there are no numbers to show; it fills in from your connected accounts.'];pipMessage(questions[n],true);pipMessage(answers[n])}function pipFreeText(q){if(/start|first|campaign|listing/i.test(q))return pipAnswer(0);if(/connect|facebook|instagram|meta account/i.test(q))return pipAnswer(1);if(/cost|fee|price|budget|spend|pay/i.test(q))return pipAnswer(2);if(/report|result|performance/i.test(q))return pipAnswer(3);pipMessage(q,true);pipMessage('I keep to the guided answers above for setup, social connections, fees and reports. For anything else, send it to the team and a person will reply on your Support page.');pipOfferTicket(q)}
 
 
 function confirmDemoCampaignCredit(button){
@@ -581,10 +581,13 @@ async function startCampaignScope(button){
 function supportSignedIn(){return !!(window.RM&&RM.isLoggedIn())}
 function supportPage(){
  const signedIn=supportSignedIn();
+ const camps=(state.campaigns||[]).filter(c=>c&&c.boostId&&c.address);
  $('#content').innerHTML=`<div class="welcome"><h1>Support.</h1></div>
+ <div class="notice page-intro">We reply within 1 business day (Monday to Friday, Pacific time). Most questions are answered faster in the chat.</div>
  ${signedIn?'':'<div class="notice">Requests live in your workspace, so sign in first and we can see which campaign you mean and answer you in the same place.</div>'}
  <div class="grid2">
-  <div class="panel"><span class="eyebrow">OPEN A REQUEST</span><h3>Tell us what you need.</h3>
+  <div class="panel" id="ticketForm"><span class="eyebrow">OPEN A REQUEST</span><h3>Tell us what you need.</h3>
+   <label class="field">Which listing?<select id="ticketListing"><option value="">Not about a listing</option>${camps.map(c=>`<option value="${esc(c.boostId)}">${esc(String(c.address).split(',')[0])}</option>`).join('')}</select></label>
    <label class="field">Subject<input id="ticketSubject" maxlength="120" placeholder="e.g. Instagram post failed on day 1"></label>
    <label class="field">Message<textarea id="ticketMessage" rows="5" maxlength="4000" placeholder="What happened, and what did you expect instead?"></textarea></label>
    <p class="fine" id="ticketFormMsg" role="status"></p>
@@ -597,25 +600,32 @@ function supportPage(){
  </div>`;
  if(signedIn)loadMyTickets();
 }
+function ticketWho(t,m){
+ if(m.auto||m.role==='team'&&!m.by)return 'Resmara';
+ if(String(m.from||'').toLowerCase()==='admin')return (m.by?m.by+' from Resmara':'Resmara team');
+ return 'You';
+}
 async function loadMyTickets(){
  const box=document.querySelector('#ticketList');if(!box)return;
  try{
   const rows=await RM.tickets();
   if(!rows.length){box.innerHTML='<p class="fine">Nothing yet. Anything you send appears here with our reply.</p>';return}
-  box.innerHTML=rows.map(t=>`<article class="panel" style="margin:0 0 12px">
-   <div class="flex"><b>${esc(t.subject)}</b><span class="pill">${esc(t.status)}</span></div>
-   <p class="fine">Request #${esc(t.id)} · raised ${esc(String(t.created_at||'').replace('T',' ').slice(0,16))} UTC</p>
-   ${(t.messages||[]).map(m=>`<div class="${m.unread?'ticket-msg-new':''}" style="border-left:2px solid ${m.unread?'#e8892b':'#c7e2f2'};padding-left:10px;margin:8px 0">
-     <span class="eyebrow">${esc(m.from||'')}${m.unread?' · NEW':''}</span><p style="white-space:pre-wrap;margin:2px 0 0">${esc(m.text||'')}</p></div>`).join('')}
-  </article>`).join('');
+  box.innerHTML=rows.map(t=>{
+   const st=t.status||'received';
+   const line=st==='received'&&t.reply_by_label?'We’ll reply by '+t.reply_by_label+'.':st==='closed'?'Closed. Reply any time to reopen it.':st==='waiting'?'We asked you something below.':'';
+   return `<article class="panel ticket-card" style="margin:0 0 12px">
+   <div class="flex"><b>${esc(t.subject)}</b><span class="pill ticket-st st-${esc(st)}">${esc(t.status_label||st)}</span></div>
+   <p class="fine">Request #${esc(t.id)}${t.address?' · '+esc(String(t.address).split(',')[0]):''} · ${esc(new Date(t.created_at||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric'}))}${line?' · '+esc(line):''}</p>
+   ${(t.messages||[]).map(m=>`<div class="${m.unread?'ticket-msg-new':''}" style="border-left:2px solid ${m.unread?'#d94c0d':'#d8effd'};padding-left:10px;margin:8px 0">
+     <span class="eyebrow">${esc(ticketWho(t,m))}${m.unread?' · NEW':''}</span><p style="white-space:pre-wrap;margin:2px 0 0">${esc(m.text||'')}</p></div>`).join('')}
+   <div class="ticket-reply"><textarea id="treply-${esc(t.id)}" rows="2" maxlength="4000" placeholder="Reply to this request…"></textarea><button type="button" class="campaign-primary" onclick="replyTicket(${Number(t.id)})">Send reply</button></div>
+  </article>`}).join('');
   // Opening this page is reading the replies: clear the badge server-side so it stays
-  // cleared in the next browser too, not just this tab. The list above was drawn before the
-  // clear, so the NEW marker on it is turned off by hand afterwards — the reply is still
-  // worth seeing marked once, it just must not stay marked after being read.
+  // cleared in the next browser too. The NEW marker drawn above is turned off afterwards.
   if(RM.markSupportRead)RM.markSupportRead().then(()=>{
     state.supportUnread=0;persist();if(typeof paintSupportBadge==='function')paintSupportBadge();
     document.querySelectorAll('#ticketList .ticket-msg-new').forEach(el=>{
-      el.classList.remove('ticket-msg-new');el.style.borderLeftColor='#c7e2f2';
+      el.classList.remove('ticket-msg-new');el.style.borderLeftColor='#d8effd';
       const tag=el.querySelector('.eyebrow');if(tag)tag.textContent=tag.textContent.replace(/\s*·\s*NEW$/,'');
     });
   }).catch(()=>{});
@@ -624,19 +634,25 @@ async function loadMyTickets(){
   box.innerHTML='<p class="fine">'+esc(detail)+'</p>';
  }
 }
+async function replyTicket(id){
+ const ta=document.querySelector('#treply-'+id);const text=(ta&&ta.value||'').trim();
+ if(!text)return toast('Write your reply first.');
+ try{await RM.replyTicket(id,text);toast('Sent. We’ll reply within 1 business day.');loadMyTickets()}
+ catch(error){toast('Not sent: '+((error&&error.message)||'unknown error'))}
+}
 async function submitTicket(){
  const subject=(document.querySelector('#ticketSubject')||{}).value||'';
  const message=(document.querySelector('#ticketMessage')||{}).value||'';
+ const listing=(document.querySelector('#ticketListing')||{}).value||'';
  const msg=document.querySelector('#ticketFormMsg');
  const say=(text,cls)=>{if(msg){msg.className='fine '+(cls||'');msg.textContent=text}};
  if(!supportSignedIn())return say('Sign in first - a request is attached to your workspace.','bad');
  if(!subject.trim()||!message.trim())return say('A subject and a message, please.','bad');
  say('Sending…');
  try{
-  const t=await RM.createTicket(subject.trim(),message.trim());
-  say('Sent as request #'+t.id+'. The answer appears on this page.','ok');
-  document.querySelector('#ticketSubject').value='';
-  document.querySelector('#ticketMessage').value='';
+  const t=await RM.createTicket(subject.trim(),message.trim(),{boost_id:listing?Number(listing):null,page:typeof view!=='undefined'?view:''});
+  const form=document.querySelector('#ticketForm');
+  if(form)form.innerHTML=`<span class="eyebrow">REQUEST #${esc(t.id)} SENT</span><h3>Got it. We’ll reply by ${esc(t.reply_by_label||'the next business day')}.</h3><p class="fine">We emailed you the same. The reply shows here and in your email.</p><button class="campaign-primary" onclick="supportPage()">Send another request</button>`;
   loadMyTickets();
  }catch(error){say('Not sent: '+((error&&error.message)||'unknown error'),'bad')}
 }
@@ -652,7 +668,7 @@ function pipOfferTicket(q){
   btn.disabled=true;btn.textContent='Sending…';
   try{
    const t=await RM.createTicket(String(q||'').slice(0,120)||'Question from the Resmara assistant',String(q||''));
-   pipMessage('Sent as request #'+t.id+'. The answer will appear on your Support page.');
+   pipMessage('Sent as request #'+t.id+'. We’ll reply by '+(t.reply_by_label||'the next business day')+', here and by email.');
    btn.remove();
   }catch(error){btn.disabled=false;btn.textContent='Send to support';pipMessage('Could not send that: '+((error&&error.message)||'unknown error'))}
  });

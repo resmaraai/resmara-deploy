@@ -104,7 +104,7 @@ def main():
         calls.append(kw)
         return {"paid": False, "payment_intent": "pi_no", "message": "Your card was declined."}
 
-    async def setup_ok(customer_id, user_id, base_url, client=None):
+    async def setup_ok(customer_id, user_id, base_url, client=None, embedded=False):
         return {"id": "cs_setup", "url": "https://checkout.stripe.com/c/pay/cs_setup"}
 
     try:

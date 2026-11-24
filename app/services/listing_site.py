@@ -497,6 +497,8 @@ def ends_on(boost: Boost) -> Optional[datetime]:
 def state(boost: Boost, site: Optional[ListingSite] = None, now: Optional[datetime] = None) -> str:
     """built (locked) | live | pending | sold | ended | gone (30 days after the end: the agent card)."""
     now = now or _now()
+    if site is not None and (site.content or {}).get("closed"):
+        return "closed"            # the account was closed (Engine 10, section 10)
     if not getattr(boost, "paid_at", None):
         return "built"
     status = (getattr(boost, "listing_status", None) or "").lower()

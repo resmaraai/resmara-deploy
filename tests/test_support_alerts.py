@@ -96,8 +96,11 @@ try:
                                           "message": "Second try: the gallery link shows one photo."},
                     headers=headers)
     check("a ticket is accepted with mail configured", r.status_code == 201, r.text)
-    check("one message per operator", len(sent) == 2, str(len(sent)))
-    tos = sorted(str(m.get("to")) for m in sent)
+    ops = [m for m in sent if "we got your request" not in str(m.get("subject", ""))]
+    check("one message per operator", len(ops) == 2, str(len(ops)))
+    check("and the agent gets the reply-by promise (Engine 11)",
+          any("we got your request" in str(m.get("subject", "")) for m in sent), str(sent))
+    tos = sorted(str(m.get("to")) for m in ops)
     check("both operator addresses were used", tos == ["owner@example.com", "second@example.com"], str(tos))
     blob = " ".join(str(m.get("body", "")) for m in sent)
     check("the ticket id is in the mail", str(r.json().get("id")) in blob, blob[:200])

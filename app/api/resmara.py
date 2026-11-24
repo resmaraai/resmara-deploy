@@ -28,6 +28,7 @@ from app.core.config import settings
 from app.api.auth import reset_link, RESET_TTL_MINUTES
 from app.services import mail
 from app.services import team_access
+from app.services import support as support_svc
 
 router = APIRouter()
 
@@ -444,23 +445,91 @@ def withdraw_post(post_id: int, current_user=Depends(get_current_user), db: Sess
 # --- Support ---
 @router.post("/support", response_model=SupportTicketOut, status_code=201)
 def create_ticket(ticket: SupportTicketCreate, current_user=Depends(get_current_user), db: Session = Depends(get_db)):
-    new_ticket = SupportTicket(user_id=current_user.id, subject=ticket.subject, messages=[{"from": current_user.email, "text": ticket.message, "at": datetime.utcnow().isoformat()}])
+    """A support request (Engine 11, section 4): the listing, the page and the account snapshot go
+    with it, the 1 business day reply-by time is set, the team is told and the agent gets the same
+    promise by email."""
+    boost_id = None
+    if ticket.boost_id:
+        owned = db.query(Boost).filter(Boost.id == ticket.boost_id, Boost.user_id == current_user.id).first()
+        boost_id = owned.id if owned else None
+    now = datetime.now(timezone.utc)
+    new_ticket = SupportTicket(
+        user_id=current_user.id, subject=(ticket.subject or "").strip()[:200] or "Support request",
+        status="received", boost_id=boost_id, page=(ticket.page or "")[:200] or None,
+        snapshot=support_svc.snapshot(db, current_user), reply_by=support_svc.reply_by(now),
+        messages=[{"from": current_user.email, "text": ticket.message, "at": now.isoformat()}])
     db.add(new_ticket)
     db.flush()
     db.add(Event(user_id=current_user.id, event_type="ticket_created",
-                 payload={"ticket_id": new_ticket.id, "subject": ticket.subject[:120]}))
+                 payload={"ticket_id": new_ticket.id, "subject": new_ticket.subject[:120]}))
     db.commit()
     db.refresh(new_ticket)
-    # Tell the operators. A ticket that only lands in the console is a complaint in a drawer:
-    # nobody is looking at that page while a customer waits. With no mail provider this is a
-    # no-op (nothing is claimed as sent) and the console's Support count is the only signal.
+    # Tell the operators. A ticket that only lands in the console is a complaint in a drawer.
     notify_operators(new_ticket, current_user, db)
-    return new_ticket
+    when = support_svc.reply_by_label(new_ticket.reply_by)
+    if current_user.email and not getattr(current_user, "needs_email", False) and mail.mail_configured():
+        first = (current_user.name or "").split(" ")[0] or "there"
+        try:
+            mail.send_email(current_user.email, f"Resmara support #{new_ticket.id}: we got your request",
+                            f"Hi {first},\n\nGot it. We'll reply by {when} (Pacific time).\n\n"
+                            f"Your request: {new_ticket.subject}\n\n"
+                            f"See your requests: {support_link()}\n\n- Resmara")
+        except Exception:  # noqa: BLE001 - the request is saved either way
+            pass
+    return ticket_out(db, new_ticket)
+
+
+def support_link() -> str:
+    return (getattr(settings, "PUBLIC_BASE_URL", "") or "https://www.resmara.com").rstrip("/") + "/#support"
+
+
+def ticket_out(db: Session, t: SupportTicket, person: User | None = None) -> SupportTicketOut:
+    row = SupportTicketOut.model_validate(t)
+    row.unread_replies = sum(1 for m in (t.messages or []) if isinstance(m, dict) and m.get("unread"))
+    row.status = support_svc.status_of(t.status)
+    row.status_label = support_svc.label(t.status)
+    row.reply_by_label = support_svc.reply_by_label(t.reply_by) if row.status == "received" else ""
+    row.due = support_svc.due_state(t.reply_by, t.status)
+    if t.boost_id:
+        b = db.query(Boost).filter(Boost.id == t.boost_id).first()
+        row.address = b.address if b else None
+    if person is not None:
+        row.client_email = person.email
+    return row
+
+
+class AgentReplyIn(BaseModel):
+    text: str
+
+
+@router.post("/support/{ticket_id}/reply", response_model=SupportTicketOut)
+def agent_reply(ticket_id: int, body: AgentReplyIn, current_user=Depends(get_current_user),
+                db: Session = Depends(get_db)):
+    """The agent answers on the Support page. A closed request reopens; the promise starts again."""
+    t = db.query(SupportTicket).filter(SupportTicket.id == ticket_id, SupportTicket.user_id == current_user.id).first()
+    if t is None:
+        raise HTTPException(status_code=404, detail="Request not found")
+    text = (body.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Write your reply first.")
+    now = datetime.now(timezone.utc)
+    t.messages = list(t.messages or []) + [{"from": current_user.email, "text": text[:5000], "at": now.isoformat()}]
+    t.status = "received"
+    t.reply_by = support_svc.reply_by(now)
+    t.updated_at = now
+    db.add(Event(user_id=current_user.id, event_type="ticket_agent_replied", payload={"ticket_id": t.id}))
+    db.commit()
+    notify_operators(t, current_user, db, follow_up=True)
+    return ticket_out(db, t)
 
 
 def operator_addresses(db: Session) -> list[str]:
     """Who hears about a new support request: RESMARA_ADMIN_EMAILS plus every admin row."""
     from app.services.access import parse_allowlist
+    # Engine 11: the one shared inbox (support@resmara.com) once it exists; until then the operators.
+    inbox = (os.getenv("RESMARA_SUPPORT_EMAIL") or "").strip().lower()
+    if inbox:
+        return [inbox]
     listed = sorted(parse_allowlist(settings.ADMIN_EMAILS))
     rows = [u.email for u in db.query(User).filter(User.is_admin.is_(True), User.is_active.is_(True)).all()]
     out: list[str] = []
@@ -471,14 +540,29 @@ def operator_addresses(db: Session) -> list[str]:
     return out
 
 
-def _ticket_body(ticket: SupportTicket, author: User) -> str:
-    first = (ticket.messages or [{}])[0] if ticket.messages else {}
-    return ("A customer raised a support request.\n\n"
-            f"From: {author.email} ({author.name or 'no name'})\n"
+def _ticket_body(ticket: SupportTicket, author: User, follow_up: bool = False) -> str:
+    msgs = ticket.messages or [{}]
+    latest = (msgs[-1] if follow_up else msgs[0]) if msgs else {}
+    snap = ticket.snapshot or {}
+    listing = ""
+    if ticket.boost_id:
+        listing = f"Listing: campaign #{ticket.boost_id}\n"
+    account = ""
+    if snap:
+        account = ("Account: " + f"{snap.get('campaigns', 0)} campaign(s), {snap.get('live', 0)} live, "
+                   f"Facebook {'connected' if snap.get('facebook') else 'not connected'}"
+                   + (f" ({snap.get('page')})" if snap.get("page") else "")
+                   + f", card {'saved' if snap.get('card') else 'not saved'}, "
+                   f"{snap.get('failed_posts', 0)} failed post(s)\n")
+    due = support_svc.reply_by_label(ticket.reply_by)
+    return (("The agent replied on a support request.\n\n" if follow_up else "A customer raised a support request.\n\n")
+            + f"From: {author.email} ({author.name or 'no name'})\n"
             f"Ticket: #{ticket.id}\n"
-            f"Subject: {ticket.subject}\n\n"
-            f"{first.get('text', '')}\n\n"
-            "Reply from the operator console: https://www.resmara.com/admin.html\n")
+            f"Subject: {ticket.subject}\n"
+            + listing + (f"Page: {ticket.page}\n" if ticket.page else "") + account
+            + (f"Reply by: {due} Pacific\n" if due else "")
+            + f"\n{latest.get('text', '')}\n\n"
+            "Reply from the Team room: https://www.resmara.com/admin.html\n")
 
 
 def _alert_webhook() -> str:
@@ -492,7 +576,7 @@ def _alert_webhook() -> str:
     return (os.getenv("RESMARA_ALERT_WEBHOOK") or "").strip()
 
 
-def notify_operators(ticket: SupportTicket, author: User, db: Session) -> dict:
+def notify_operators(ticket: SupportTicket, author: User, db: Session, follow_up: bool = False) -> dict:
     """Tell the operators about a new ticket, and record what actually happened.
 
     Returns {'channel': 'email'|'webhook'|'none', 'delivered': [...], 'failed': [...],
@@ -500,8 +584,8 @@ def notify_operators(ticket: SupportTicket, author: User, db: Session) -> dict:
     answer that is not a shrug — the previous version returned silently when no provider was
     configured, which made a failed delivery look exactly like a successful one.
     """
-    body = _ticket_body(ticket, author)
-    subject = f"Resmara support #{ticket.id}: {ticket.subject}"[:180]
+    body = _ticket_body(ticket, author, follow_up=follow_up)
+    subject = (("Re: " if follow_up else "") + f"Resmara support #{ticket.id}: {ticket.subject}")[:180]
     outcome = {"channel": "none", "delivered": [], "failed": [], "reason": ""}
 
     addresses = operator_addresses(db)
@@ -572,19 +656,10 @@ def admin_reset_link(user_id: int, request: Request, current_user=Depends(team_a
 
 @router.get("/support", response_model=list[SupportTicketOut])
 def list_tickets(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
-    """The agent's own requests, each with how many team replies they have not read.
-
-    Read state lives on the message itself (`unread: true`), not on a separate table: a
-    reply is written once by the operator and read once by the agent, and a boolean on the
-    message is the whole state machine. POST /api/support/read clears them.
-    """
-    tickets = db.query(SupportTicket).filter(SupportTicket.user_id == current_user.id).all()
-    out = []
-    for t in tickets:
-        row = SupportTicketOut.model_validate(t)
-        row.unread_replies = sum(1 for m in (t.messages or []) if isinstance(m, dict) and m.get("unread"))
-        out.append(row)
-    return out
+    """The agent's own requests, newest first, each with its plain status and unread team replies."""
+    tickets = (db.query(SupportTicket).filter(SupportTicket.user_id == current_user.id)
+               .order_by(SupportTicket.id.desc()).all())
+    return [ticket_out(db, t) for t in tickets]
 
 
 @router.post("/support/read")
@@ -647,16 +722,21 @@ def admin_mark_test(user_id: int, body: TestFlagIn, current_user=Depends(team_ac
 
 @router.get("/admin/support", response_model=list[SupportTicketOut])
 def admin_support(current_user=Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
-    """Every ticket, newest first, with the client's email so a reply has a name on it."""
-    tickets = db.query(SupportTicket).order_by(SupportTicket.created_at.desc()).all()
+    """Every request: the ones waiting on us first, oldest reply-by first; then the rest, newest first."""
+    tickets = db.query(SupportTicket).all()
     people = {u.id: u for u in db.query(User).all()}
     out = []
     for t in tickets:
-        row = SupportTicketOut.model_validate(t)
         person = people.get(t.user_id)
-        row.client_email = person.email if person else None
+        row = ticket_out(db, t, person)
         row.is_test = is_test_user(person) if person else is_test_email(row.client_email)
         out.append(row)
+    far = datetime.max.replace(tzinfo=timezone.utc)
+
+    def key(r):
+        due = r.reply_by.replace(tzinfo=r.reply_by.tzinfo or timezone.utc) if r.reply_by else far
+        return (r.status != "received", due if r.status == "received" else far, -r.id)
+    out.sort(key=key)
     return out
 
 @router.patch("/admin/support/{ticket_id}")
@@ -665,13 +745,16 @@ def admin_update_ticket(ticket_id: int, status: str = None, reply: str = None, c
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     if status:
-        ticket.status = status
+        ticket.status = support_svc.status_of(status)
+    elif reply:
+        ticket.status = "answered"     # or "waiting" when the team asked the agent something
     if reply:
         msgs = list(ticket.messages or [])
         # `unread` is what becomes the orange number on the agent's sidebar; the flag is
         # cleared by POST /api/support/read when they open Support.
-        msgs.append({"from": "admin", "text": reply, "at": datetime.utcnow().isoformat(),
-                     "unread": True})
+        # Signed with the team member's first name ("Adam from Resmara").
+        msgs.append({"from": "admin", "by": (current_user.name or current_user.email or "").split(" ")[0].split("@")[0],
+                     "text": reply, "at": datetime.now(timezone.utc).isoformat(), "unread": True})
         ticket.messages = msgs
         db.add(Event(user_id=ticket.user_id, event_type="ticket_replied",
                      payload={"ticket_id": ticket.id, "by": current_user.email}))
@@ -681,11 +764,12 @@ def admin_update_ticket(ticket_id: int, status: str = None, reply: str = None, c
         delivered = False
         if owner and mail.mail_configured():
             try:
+                first = (owner.name or "").split(" ")[0] or "there"
+                signer = (current_user.name or "").split(" ")[0] or "The Resmara team"
                 delivered = bool(mail.send_email(
                     owner.email, f"Resmara support #{ticket.id}: we replied",
-                    f"We answered your support request.\n\n"
-                    f"Subject: {ticket.subject}\n\n{reply}\n\n"
-                    f"Read it in your workspace: https://www.resmara.com/#dashboard\n"))
+                    f"Hi {first},\n\nWe replied to your request \"{ticket.subject}\":\n\n{reply}\n\n"
+                    f"See the reply: {support_link()}\n\n{signer} from Resmara"))
             except Exception:
                 delivered = False
         db.add(Event(user_id=ticket.user_id, event_type="ticket_reply_notified",

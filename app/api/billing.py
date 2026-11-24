@@ -9,7 +9,8 @@ same listing is simply another $49 campaign, started with POST /boosts/{id}/agai
 `credit_purchases` table and `users.campaign_credits` stay readable so a balance already paid
 for is still spendable, but no pack is offered and no pack checkout can be created.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -144,11 +145,12 @@ def require_unlocked(boost: Boost, user: User, db: Session) -> None:
 
 
 def record_paid(db: Session, boost: Boost, user: User, cents: int, *, via: str, payment_intent=None,
-                session_id=None, card_label=None) -> Order:
+                session_id=None, card_label=None, tax_cents: int = 0) -> Order:
     now = datetime.utcnow()
     order = Order(user_id=user.id, boost_id=boost.id, amount_cents=cents, currency=billing.CURRENCY,
                   status="paid", paid_at=now, stripe_payment_intent=payment_intent,
-                  stripe_session_id=session_id)
+                  stripe_session_id=session_id, tax_cents=tax_cents or 0,
+                  kind="round" if billing.round_of(boost) else "campaign")
     db.add(order)
     boost.paid_at = now
     boost.paid_amount_cents = cents
@@ -225,6 +227,10 @@ def billing_config():
     return {
         "price_cents": billing.price_cents(),
         "price_label": billing.price_label(),
+        # Engine 10, section 3: every screen reads the prices from here, never from its own copy.
+        "repeat_price_cents": billing.repeat_price_cents(),
+        "repeat_price_label": billing.price_label(billing.repeat_price_cents()),
+        "tax": billing.tax_enabled(),
         "currency": billing.CURRENCY,
         "enabled": billing.billing_enabled(),
         "publishable_key": billing.publishable_key(),
@@ -425,6 +431,10 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Bad signature")
 
     event = billing.load_event(payload)
+    dispute = billing.dispute_outcome(event)
+    if dispute:
+        from app.services import account_close
+        return account_close.dispute(db, dispute)
     outcome = billing.checkout_outcome(event)
     if outcome.get("ignored"):
         return {"received": True, "ignored": outcome["event"]}
@@ -513,8 +523,13 @@ async def my_cards(current_user: User = Depends(get_current_user)):
     }
 
 
+class AddCardBody(BaseModel):
+    embedded: bool = False
+
+
 @router.post("/billing/card")
-async def add_card(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def add_card(body: Optional[AddCardBody] = None, current_user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
     """Start Stripe's 'add a card' page (nothing is charged) and return its URL.
 
     The card is saved on the account's Stripe customer. Adding another later makes the new one
@@ -527,7 +542,8 @@ async def add_card(current_user: User = Depends(get_current_user), db: Session =
     customer_id = await customer_for(current_user, db)
     try:
         session = await billing.create_card_setup_session(
-            customer_id=customer_id, user_id=current_user.id, base_url=settings.PUBLIC_BASE_URL)
+            customer_id=customer_id, user_id=current_user.id, base_url=settings.PUBLIC_BASE_URL,
+            embedded=bool(body and body.embedded))
     except httpx.HTTPStatusError as e:
         detail = "Stripe refused to open the card page"
         try:
@@ -540,7 +556,8 @@ async def add_card(current_user: User = Depends(get_current_user), db: Session =
     db.add(Event(user_id=current_user.id, event_type="card_setup_started",
                  payload={"session_id": session.get("id")}))
     db.commit()
-    return {"url": session.get("url"), "session_id": session.get("id")}
+    return {"url": session.get("url"), "session_id": session.get("id"),
+            "client_secret": session.get("client_secret")}
 
 
 class ChargeRequest(BaseModel):
@@ -568,6 +585,9 @@ async def charge_campaign(body: ChargeRequest, current_user: User = Depends(get_
         return {"status": "paid", "already": True, "boost_id": boost.id}
     if not billing.billing_enabled():
         raise HTTPException(status_code=503, detail="Card payments are not switched on yet.")
+    if getattr(current_user, "billing_hold", None):
+        raise HTTPException(status_code=402, detail={
+            "error": "billing_hold", "message": "Payments on this account are paused. Please contact support."})
     customer_id = current_user.stripe_customer_id
     cards = []
     if customer_id:
@@ -609,7 +629,8 @@ async def charge_campaign(body: ChargeRequest, current_user: User = Depends(get_
     now = datetime.utcnow()
     order = Order(user_id=current_user.id, boost_id=boost.id, amount_cents=cents,
                   currency=billing.CURRENCY, status="paid", paid_at=now,
-                  stripe_payment_intent=result.get("payment_intent"))
+                  stripe_payment_intent=result.get("payment_intent"),
+                  tax_cents=result.get("tax_cents") or 0, kind="round" if round_no else "campaign")
     db.add(order)
     boost.paid_at = now
     boost.paid_amount_cents = cents
@@ -625,21 +646,111 @@ async def charge_campaign(body: ChargeRequest, current_user: User = Depends(get_
 
 
 @router.get("/billing/orders")
-def my_orders(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """This account's purchases, newest first — the receipts list behind the Billing page."""
+async def my_orders(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """This account's purchases, newest first: what it was, amount, tax, status and Stripe's receipt."""
     q = db.query(Order)
     if not current_user.is_admin:
         q = q.filter(Order.user_id == current_user.id)
     rows = q.order_by(Order.id.desc()).limit(50).all()
-    addresses = {b.id: b.address for b in db.query(Boost).filter(
+    boosts = {b.id: b for b in db.query(Boost).filter(
         Boost.id.in_([o.boost_id for o in rows if o.boost_id])).all()} if rows else {}
+    fetched = 0
+    for o in rows:
+        # The receipt link is read once from Stripe and kept (at most 5 lookups per page view).
+        if o.status in ("paid", "refunded") and o.stripe_payment_intent and not o.receipt_url \
+                and billing.billing_enabled() and fetched < 5:
+            fetched += 1
+            got = await billing.receipt(o.stripe_payment_intent)
+            if got.get("receipt_url"):
+                o.receipt_url = got["receipt_url"]
+                if got.get("tax_cents") and not o.tax_cents:
+                    o.tax_cents = got["tax_cents"]
+    db.commit()
+
+    def what(o):
+        if o.kind == "run_again":
+            return "Run it again"
+        b = boosts.get(o.boost_id)
+        rnd = int(getattr(b, "repeat_round", 0) or 0) if b else 0
+        return f"Round {rnd + 1}" if rnd else "Campaign"
+
+    status_label = {"paid": "Paid", "refunded": "Refunded", "failed": "Declined", "expired": "Not completed",
+                    "pending": "Not completed", "partially_refunded": "Partly refunded"}
     return [{
         "id": o.id, "boost_id": o.boost_id,
-        "address": addresses.get(o.boost_id), "status": o.status,
+        "address": getattr(boosts.get(o.boost_id), "address", None), "status": o.status,
+        "status_label": status_label.get(o.status, (o.status or "").title()), "what": what(o),
         "amount_cents": o.amount_cents, "amount_label": billing.price_label(o.amount_cents or 0),
+        "tax_cents": o.tax_cents or 0, "tax_label": billing.price_label(o.tax_cents) if o.tax_cents else "",
+        "refunded_cents": o.refunded_cents or 0, "receipt_url": o.receipt_url,
         "currency": o.currency, "session_id": o.stripe_session_id,
         "created_at": o.created_at, "paid_at": o.paid_at,
     } for o in rows]
+
+
+@router.get("/billing/upcoming")
+def upcoming(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Coming up (Engine 10, section 7): each Run it until it sells listing, its next charge and Turn off."""
+    from app.services import renewals
+    out = []
+    for b in db.query(Boost).filter(Boost.user_id == current_user.id, Boost.until_sold.is_(True)).all():
+        ends = renewals.round_ends_on(b)
+        charge_on = ends - timedelta(days=renewals.BUILD_AHEAD_DAYS) if ends else None
+        cents = billing.repeat_price_cents()
+        out.append({"boost_id": b.id, "address": b.address, "amount_cents": cents,
+                    "amount_label": billing.price_label(cents) + (" + tax" if billing.tax_enabled() else ""),
+                    "about": charge_on.strftime("%b %-d") if charge_on else None,
+                    "round": int(b.repeat_round or 0) + 2,
+                    "paused": bool(b.paused_at), "status": (b.listing_status or "")})
+    return {"upcoming": out}
+
+
+class SavedCardBody(BaseModel):
+    session_id: str
+
+
+@router.post("/billing/card/saved")
+async def card_saved(body: SavedCardBody, current_user: User = Depends(get_current_user),
+                     db: Session = Depends(get_db)):
+    """The pop-up's card form finished: the new card replaces the old one for everything, and any
+    round waiting on a declined card is charged now (Engine 8, section 6)."""
+    if not current_user.stripe_customer_id:
+        raise HTTPException(status_code=409, detail="No Stripe customer on this account yet.")
+    try:
+        pm = await billing.setup_session_card(body.session_id)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Stripe didn't confirm the card ({type(exc).__name__}).")
+    if not pm:
+        raise HTTPException(status_code=409, detail="The card wasn't saved. Please try again.")
+    removed = await billing.keep_only_card(current_user.stripe_customer_id, pm)
+    db.add(Event(user_id=current_user.id, event_type="card_changed", payload={"removed": removed}))
+    db.commit()
+    retried = None
+    from app.services import renewals
+    if renewals.apply_enabled():
+        try:
+            retried = (await renewals.card_saved(db, current_user.id)).get("counts")
+        except Exception as exc:  # noqa: BLE001
+            retried = {"error": str(exc)[:200]}
+    cards = await billing.list_cards(current_user.stripe_customer_id)
+    return {"status": "saved", "cards": cards, "renewals": retried}
+
+
+@router.delete("/billing/card")
+async def remove_card(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Remove card, unless Run it until it sells is on: nothing is ever left on with no card."""
+    on = db.query(Boost).filter(Boost.user_id == current_user.id, Boost.until_sold.is_(True)).all()
+    if on:
+        names = ", ".join(sorted({(b.address or "").split(",")[0] for b in on}))
+        raise HTTPException(status_code=409, detail={
+            "error": "until_sold_on",
+            "message": f"Run it until it sells is on for {names}. Add a new card, or turn it off first."})
+    removed = 0
+    for card in await billing.list_cards(current_user.stripe_customer_id or ""):
+        removed += int(await billing.detach_card(card["id"]))
+    db.add(Event(user_id=current_user.id, event_type="card_removed", payload={"removed": removed}))
+    db.commit()
+    return {"status": "removed", "removed": removed}
 
 
 @router.get("/billing/boost/{boost_id}")

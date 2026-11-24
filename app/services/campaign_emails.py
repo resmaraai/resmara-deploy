@@ -144,3 +144,11 @@ def run_again(db, boost: Boost, *, final: bool = False) -> bool:
                 "fresh posts and a fresh ad built from what worked, live the next morning. Or turn on Run it until "
                 "it sells and we'll keep it going every 2 weeks until it's under contract.",
                 "Run it again · $39", campaign_link(boost))
+
+
+def card_expiring(db, boost: Boost, label: str, ends: str) -> bool:
+    """Engine 10, section 4: 30 days before the saved card expires, while Run it until it sells is on."""
+    return send(db, boost, f"card-expiring-{ends}", "Your card on file expires soon",
+                f"The {label} that pays for Run it until it sells on {street(boost)} expires at the end of "
+                f"{ends}. Add your new card so the next round isn't held up.",
+                "Update your card", billing_link())

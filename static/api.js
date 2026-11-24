@@ -261,10 +261,9 @@
     return json('/api/auth/me/email', 'PATCH', { email: email });
   }
 
-  // "Close my account" is reversible (campaigns, leads and reports are kept); deleting the
-  // data is the permanent one and stays on deleteAccount().
-  function closeAccount() {
-    return request('/api/auth/me/close', { method: 'POST' }).then(function (r) { logout(); return r; });
+  // Close my account (Engine 10, section 10): everything stops, confirmed by typing the email.
+  function closeAccount(email) {
+    return json('/api/auth/me/close', 'POST', { email: email }).then(function (r) { logout(); return r; });
   }
 
   // Change together with the "Last updated" date on terms.html and privacy.html.
@@ -498,9 +497,24 @@
     return json('/api/billing/checkout', 'POST', { boost_id: boostId });
   }
 
-  function addCard() {
-    // Stripe's "add a card" page: nothing is charged. Returns { url }.
-    return json('/api/billing/card', 'POST', {});
+  function addCard(embedded) {
+    // Add or change the card (nothing is charged). embedded: Stripe's form inside the pop-up,
+    // returns { client_secret, session_id }; otherwise Stripe's page, returns { url }.
+    return json('/api/billing/card', 'POST', { embedded: !!embedded });
+  }
+
+  function cardSaved(sessionId) {
+    // The pop-up's form finished: the new card replaces the old one, and a held round is retried.
+    return json('/api/billing/card/saved', 'POST', { session_id: sessionId });
+  }
+
+  function removeCard() {
+    return request('/api/billing/card', { method: 'DELETE' });
+  }
+
+  function upcoming() {
+    // Coming up: each listing on Run it until it sells and its next charge.
+    return request('/api/billing/upcoming');
   }
 
   function chargeSaved(boostId) {
@@ -622,12 +636,21 @@
   // The client's own support desk: raising a request and reading the replies are the
   // same two calls the Support page and the "Ask Resmara" assistant both use, so a
   // question asked in the chat lands in the operator console as a real ticket.
-  async function createTicket(subject, message) {
+  async function createTicket(subject, message, extra) {
+    // extra: { boost_id, page } - which listing it's about and where they were.
+    var body = { subject: String(subject || '').slice(0, 200), message: String(message || '') };
+    if (extra && extra.boost_id) body.boost_id = extra.boost_id;
+    var page = (extra && extra.page) || '';
+    if (page) body.page = String(page);
     return request('/api/support', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: String(subject || '').slice(0, 200), message: String(message || '') }),
+      body: JSON.stringify(body),
     });
+  }
+
+  async function replyTicket(id, text) {
+    return json('/api/support/' + segment(id) + '/reply', 'POST', { text: String(text || '') });
   }
 
   async function tickets() {
@@ -732,6 +755,9 @@
     generateContent: generateContent,
     billingConfig: billingConfig,
     savedCards: savedCards,
+    cardSaved: cardSaved,
+    removeCard: removeCard,
+    upcoming: upcoming,
     checkout: checkout,
     addCard: addCard,
     chargeSaved: chargeSaved,
@@ -757,6 +783,7 @@
     withdrawPost: withdrawPost,
     tagAssets: tagAssets,
     createTicket: createTicket,
+    replyTicket: replyTicket,
     tickets: tickets,
     markSupportRead: markSupportRead,
     metaConnect: metaConnect,
