@@ -21,6 +21,7 @@ Everything here is admin-only: this is the operators' board, not a customer surf
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -34,6 +35,11 @@ from app.db.session import BuildroomTask, get_db
 from app.services import team_access
 
 router = APIRouter()
+
+# A row the release sync created carries the pull request it came from in its notes. Parsing the
+# number back out is what lets the console offer that row's preview environment — the marker is
+# written by app/services/buildroom_sync.py and nowhere else.
+_PR_MARK = re.compile(r"\[auto:pr #(\d+)")
 
 AREAS = ("front_end", "back_end", "both")
 STATUSES = ("todo", "doing", "review", "done", "blocked")
@@ -96,6 +102,17 @@ def _append_note(task: BuildroomTask, line: str) -> None:
     task.notes = ((task.notes + "\n") if task.notes else "") + f"[{stamp}] {line}"
 
 
+def _pr_of(task: BuildroomTask) -> Optional[int]:
+    """The pull request this row came from, or None for a task somebody typed by hand."""
+    match = _PR_MARK.search(task.notes or "")
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except (TypeError, ValueError):
+        return None
+
+
 def _out(task: BuildroomTask) -> dict:
     today = date.today()
     overdue = bool(task.due_on and task.status != "done" and task.due_on < today)
@@ -115,6 +132,7 @@ def _out(task: BuildroomTask) -> dict:
         "tested_by": task.tested_by,
         "tested_at": (_aware(task.tested_at) or None).isoformat() if task.tested_at else None,
         "test_note": task.test_note or "",
+        "pr": _pr_of(task),
         "created_by": task.created_by,
         "created_at": (_aware(task.created_at) or None).isoformat() if task.created_at else None,
         "updated_at": (_aware(task.updated_at) or None).isoformat() if task.updated_at else None,
@@ -404,6 +422,33 @@ def mark_tested(task_id: int, payload: TestedIn, db: Session = Depends(get_db),
     db.commit()
     db.refresh(task)
     return _out(task)
+
+
+@router.get("/admin/buildroom/{task_id}/preview")
+def task_preview(task_id: int, db: Session = Depends(get_db),
+                 _admin=Depends(team_access.needs("build"))):
+    """The Render preview environment for this task's pull request.
+
+    A preview link is a live URL, so this asks GitHub every time the button is pressed rather
+    than writing it onto the row: a row's link would be stale the moment the pull request is
+    updated, and a stale link on a "Preview" button is worse than no button. The service module
+    caches the answer for a minute, which is what keeps a room full of clicks off the API.
+
+    Expected states answer 200 with ``ok: false`` and a sentence, because "no preview yet" is an
+    answer, not an error: a hand-written task has no pull request, and a PR has no preview until
+    a Blueprint is linked.
+    """
+    from app.services import previews
+
+    task = db.get(BuildroomTask, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="No such task")
+    pr = _pr_of(task)
+    if not pr:
+        return {"ok": False, "pr": None, "url": None, "reason": "no_pr",
+                "why": "This task is not linked to a pull request, so there is nothing to preview. "
+                       "Rows the release sync creates from a PR carry the preview."}
+    return previews.preview_for_pr(pr)
 
 
 @router.delete("/admin/buildroom/{task_id}")
