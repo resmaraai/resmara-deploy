@@ -30,7 +30,10 @@ run() {
     printf 'ok   %-26s %s\n' "$label" "$(printf '%s' "$out" | tail -1)"
   else
     printf 'FAIL %-26s\n' "$label"
-    printf '%s\n' "$out" | tail -15
+    # A suite that prints one line per check buries the failing checks above the last 15 lines,
+    # which is exactly how a red CI run became unreadable. Name the failures first, then the tail.
+    printf '%s\n' "$out" | grep -E "FAIL|Traceback|Error:|assert" | head -20
+    printf '%s\n' "$out" | tail -6
     fail=1
   fi
 }
@@ -46,6 +49,8 @@ else
   run test_client_workspace node tests/test_client_workspace.js
   run test_new_campaign_flow node tests/test_new_campaign_flow.js
   run test_review_scope node tests/test_review_scope.js
+  run test_signup_flow node tests/test_signup_flow.js
+  run test_campaign_build node tests/test_campaign_build.js
   if [ -n "${CI_SKIP_DEPLOYED_UI:-}" ]; then
     echo "skip test_deployed_ui (CI_SKIP_DEPLOYED_UI set: it reads a deployment's public URL)"
   else

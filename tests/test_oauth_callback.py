@@ -52,10 +52,21 @@ class Graph(BaseHTTPRequestHandler):
                 self._json({"access_token": SHORT_TOKEN, "expires_in": 5183})
         elif u.path == "/me/adaccounts":
             self._json({"data": [{"id": "act_555", "name": "Test Ad Account",
-                                 "currency": "USD", "account_status": 1}]})
+                                 "currency": "USD", "account_status": 1,
+                                 "funding_source_details": {"type": 1}}]})
         elif u.path == "/me/accounts":
-            self._json({"data": [{"id": "page_900", "name": "Test Page",
+            self._json({"data": [{"id": "page_900", "name": "Test Page", "tasks": ["MANAGE", "CREATE_CONTENT"],
+                                  "is_published": True,
                                   "instagram_business_account": {"id": "ig_700", "username": "test_page"}}]})
+        # The connection engine's checks (Engine 1 Part B, C1-C2): the login and its permissions.
+        elif u.path == "/debug_token":
+            self._json({"data": {"is_valid": True, "expires_at": 4102444800}})
+        elif u.path == "/me":
+            self._json({"id": "fb_1", "name": "OAuth Check"})
+        elif u.path == "/me/permissions":
+            self._json({"data": [{"permission": p, "status": "granted"} for p in
+                                 ("pages_show_list", "pages_manage_posts", "instagram_basic",
+                                  "instagram_content_publish", "ads_management")]})
         else:
             self._json({"error": {"message": "unexpected " + u.path}}, 404)
 
@@ -129,7 +140,7 @@ body = r.json() if r.headers.get("content-type", "").startswith("application/jso
 ok("the callback completes with no bearer token (the browser case)",
    r.status_code == 200 and isinstance(body, dict) and body.get("meta") == "connected", f"{r.status_code} {str(body)[:160]}")
 ok("  ...and reports the ad account it stored", body.get("accounts") == 1, str(body)[:160])
-ok("  ...and the Page + linked Instagram account", body.get("page_id") == "page_900" and body.get("ig") == "ig_700",
+ok("  ...and the Page + linked Instagram account", body.get("page_id") == "page_900" and body.get("ig") == "test_page",
    str(body)[:160])
 
 # --- 3. the stored token is the LONG-LIVED one, not the 1-hour code token ---

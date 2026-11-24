@@ -463,8 +463,9 @@ const SAMPLE_BRAND={agent:'Morgan Ellis',brokerage:'Morgan & Co. Property Adviso
 function brandKitData(){
  const b=campaignBrandProfile()||{},demo=!(window.RM&&RM.isLoggedIn&&RM.isLoggedIn())&&!b.website,d=demo?SAMPLE_BRAND:{};
  const palette=b.palette||(b.colours?String(b.colours).split(/[,\s]+/).filter(x=>/^#?[0-9a-f]{6}$/i.test(x)).map((h,i)=>[['Primary','Accent','Text','Tint','Page'][i]||'Colour',h[0]==='#'?h:'#'+h]):null)||d.palette||[];
- return {demo,agent:b.agent||state.name||d.agent||'',brokerage:b.brokerage||state.company||d.brokerage||'',license:b.license||d.license||'',website:b.website||d.website||'',market:b.market||d.market||'',brandLink:b.brandLink||d.brandLink||'',
+ return {demo,agent:b.agent||state.name||d.agent||'',brokerage:b.brokerage||b.company||state.company||d.brokerage||'',license:b.license||d.license||'',website:b.website||d.website||'',market:b.market||d.market||'',brandLink:b.brandLink||d.brandLink||'',
   palette,fonts:b.fonts||d.fonts||['Playfair Display','Jost'],voice:b.voice||d.voice||'',use:b.use||d.use||[],avoid:b.avoid||d.avoid||[],theme:b.theme||d.theme||'Match my brand',legal:b.legal||d.legal||[],sources:b.sources||d.sources||[],researched:b.researched||d.researched||'',
+  ownTag:b.ownTag||'',phone:b.phone||d.phone||'',brokerLicense:b.brokerLicense||d.brokerLicense||'',voiceOfClient:b.voiceOfClient||d.voiceOfClient||'',factSources:b.factSources||{},missing:demo?[]:(b.build?(b.missing||[]):[]),built:!!b.build,
   logo:state.brandMedia?.[b.logoId]||'',headshot:state.brandMedia?.[b.headshotId]||''};
 }
 function brandKitSections(k){
@@ -473,21 +474,28 @@ function brandKitSections(k){
  const img=(kind,label,url,found)=>`<div class="mb-asset"><div class="mb-asset-img ${kind}">${url?`<img src="${esc(url)}" alt="${label}">`:(kind==='logo'?`<span class="mb-mono">${esc(initials)}</span>`:'<span class="mb-face"></span>')}</div><div><b>${label}</b><small>${url||k.demo?found:'Not found yet. Add one.'}</small><label class="mb-replace">Replace<input name="${kind}" type="file" accept="image/png,image/jpeg,image/webp" hidden></label></div></div>`;
   return `
   <header class="mb-head"><div class="mb-id">${k.logo?`<img src="${esc(k.logo)}" alt="Logo">`:`<span class="mb-mono lg">${esc(initials)}</span>`}<div><b>${esc(k.brokerage||k.agent)}</b><small>${esc(k.agent)}${k.market?' · '+esc(k.market):''}</small></div></div><span class="mb-tag">BRAND KIT</span></header>
-  <section class="mb-sec"><h4>YOU</h4><div class="mb-grid">${field('agent','Agent name',k.agent,'Website')}${field('company','Brokerage',k.brokerage,'Brokerage profile')}${field('license','License number',k.license,'Brokerage profile')}${field('website','Website',k.website,'','url')}${field('market','Markets you serve',k.market,'Your listings')}${field('brandLink','Instagram or brand guide',k.brandLink,'Found','url')}</div></section>
+  <section class="mb-sec"><h4>YOU</h4><div class="mb-grid">${field('agent','Agent name',k.agent,'Website')}${field('phone','Phone',k.phone,brandSrc(k,'phone'),'tel')}${field('company','Brokerage',k.brokerage,brandSrc(k,'company')||(k.brokerage&&!k.built?'Brokerage profile':''))}${field('license','License number',k.license,brandSrc(k,'license')||(k.license&&!k.built?'Brokerage profile':''))}${field('brokerLicense','Broker license number',k.brokerLicense,brandSrc(k,'brokerLicense'))}${field('website','Website',k.website,'','url')}${field('market','Markets you serve',k.market,'Your listings')}${field('brandLink','Instagram or brand guide',k.brandLink,'Found','url')}</div>${k.missing.length?`<p class="mb-missing">${brandMissingLine(k.missing)}</p>`:''}</section>
+  <section class="mb-sec vc-sec"><h4>VOICE OF THE CLIENT</h4><textarea name="voiceOfClient" rows="6" placeholder="How you come across, what it’s like to work with you, the areas you serve and how you talk online.">${esc(k.voiceOfClient)}</textarea><p class="vc-note">Resmara reads this every time it writes your posts, captions, ad and listing page. Rewrite it any time.</p></section>
   <section class="mb-sec"><h4>LOGO &amp; HEADSHOT</h4><div class="mb-assets">${img('logo','Logo',k.logo,'Found on your website')}${img('headshot','Headshot',k.headshot,'Found on your brokerage profile')}</div></section>
   <section class="mb-sec"><h4>COLOURS</h4><div class="mb-swatches">${k.palette.map(([role,hex],i)=>`<label class="mb-sw"><input type="color" value="${esc(hex)}" oninput="this.nextElementSibling.querySelector('code').textContent=this.value.toUpperCase();brandColoursSync(this.form)"><span><b>${esc(role)}</b><code>${esc(hex.toUpperCase())}</code></span></label>`).join('')}</div><small>Click a colour to change it.</small><input type="hidden" name="colours" value="${esc(k.palette.map(p=>p[1]).join(', '))}"></section>
   <div class="mb-two"><section class="mb-sec"><h4>TYPOGRAPHY</h4><p class="mb-type-h" style="font-family:'${esc(k.fonts[0])}',serif">The long view</p>${fontPicker('fontHead','Headlines',k.fonts[0],'.mb-type-h')}<p class="mb-type-b" style="font-family:'${esc(k.fonts[1])}',sans-serif">Morning light, wide oak floors and room to breathe.</p>${fontPicker('fontBody','Body',k.fonts[1],'.mb-type-b')}<small>Resmara picked these to match your brand. Change either one any time.</small></section>
   <section class="mb-sec"><h4>VOICE</h4><textarea name="voice" rows="2">${esc(k.voice)}</textarea><div class="mb-chips">${k.use.map(w=>`<span class="ok">“${esc(w)}”</span>`).join('')}${k.avoid.map(w=>`<span class="no">${esc(w)}</span>`).join('')}</div></section></div>
-  <div class="mb-two"><section class="mb-sec"><h4>YOUR LOOK</h4><input type="hidden" name="theme" value="${esc(k.theme)}"><div class="mb-looks">${['Modern','Classic','Rustic','Match my brand'].map(t=>`<button type="button" class="${t===k.theme?'on':''}" onclick="const f=this.form;f.elements.theme.value='${t}';this.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===this));brandMarkDirty()">${t}</button>`).join('')}</div><small>Change your look any time. New campaigns use it once you save.</small></section>
+  <div class="mb-two"><section class="mb-sec"><h4>WHAT RESMARA LEARNED ABOUT YOU</h4><ul class="mb-learned" data-learned><li>${k.demo?'You like overlaid text, no boxes and short headlines.':'Give posts a 👍 or 👎 in your campaigns and Resmara learns your style. Approving a campaign untouched counts too.'}</li></ul><label class="mb-field"><span>Your own hashtag<em>On every post</em></span><input name="ownTag" value="${esc(k.ownTag||'')}" placeholder="#SellingWith${esc(String(k.agent||'You').split(' ')[0])}"></label></section>
   <section class="mb-sec"><h4>ON EVERY POST</h4><ul class="mb-legal">${k.legal.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><small>Your brokerage’s rules, checked.</small></section></div>
   <section class="mb-sec"><h4>WHERE RESMARA LOOKED</h4><div class="mb-sources">${k.sources.map(([t,v])=>`<span>✓ <b>${esc(t)}</b> ${esc(v)}</span>`).join('')}</div></section>
   `}
+// Where a fact on My Brand was found (Engine 2: every fact has a source), as a short label.
+function brandSrc(k,key){const src=(k.factSources||{})[key];if(!src)return '';if(/^https?:/.test(src)){try{return 'Found on '+new URL(src).hostname.replace(/^www\./,'')}catch(e){return 'Found'}}return 'Found on '+src.replace(/^Your /,'your ')}
+// Phone, license and brokerage go on every post: missing ones are highlighted, never guessed.
+function brandMissingLine(m){const names={phone:'phone number',license:'license number',brokerage:'brokerage'};const list=m.map(x=>names[x]||x);return 'We couldn’t find your '+(list.length>1?list.slice(0,-1).join(', ')+' and '+list.slice(-1):list[0])+'. '+(list.length>1?'They go':'It goes')+' on every post, so add '+(list.length>1?'them':'it')+' here or when you start your first campaign.'}
 function myBrand(){
  const k=brandKitData();
  $('#content').innerHTML=`<div class="welcome mb-page-head"><h1>My Brand</h1></div><div class="notice page-intro">This is the brand kit Resmara built from your website, socials and brokerage. Every post and ad follows it, so check it over, fix anything that’s off and save.</div>
  <form class="mb" onsubmit="saveBrandProfile(event,this,false)" oninput="brandMarkDirty()" onchange="brandMarkDirty()">${brandKitSections(k)}<p class="fine" data-brand-error role="alert"></p>
   <div class="mb-foot"><div class="mb-status"><button class="mb-research" type="button" onclick="brandResearchAgain(this)">Research again</button><span>✓ Researched ${esc(k.researched||'from your website')}</span><span class="mb-unsaved" hidden>Unsaved changes</span></div><button class="campaign-primary">Save my brand</button></div>
  </form>`;
+ if(!k.demo&&window.RM&&RM.isLoggedIn&&RM.isLoggedIn())RM.request('/api/me/style-profile').then(p=>{const ul=document.querySelector('[data-learned]');if(ul&&p&&p.lines&&p.lines.length)ul.innerHTML=p.lines.map(l=>'<li>'+esc(l)+'</li>').join('')}).catch(()=>{});
+ k.missing.forEach(m=>{const f=document.querySelector('form.mb [name="'+({brokerage:'company'}[m]||m)+'"]');if(f)f.closest('.mb-field')?.classList.add('miss')});
  window.brandDirty=false;
  [k.fonts[0],k.fonts[1]].forEach(loadGoogleFont);
 }
@@ -547,8 +555,14 @@ function brandMarkDirty(){window.brandDirty=true;const u=document.querySelector(
 // Research again rebuilds the kit from the agent's Facebook Page and website. What they typed is
 // kept; Meta's facts only fill empty fields (brandFromPage).
 function brandResearchAgain(btn){
- if(window.RM&&RM.brandFromMeta&&(state.metaConnected||(state.connected&&state.connected.meta)))return brandFromPage(btn);
- toast('Resmara is researching your brand again. This takes a minute.');
+ if(!(window.RM&&RM.isLoggedIn&&RM.isLoggedIn())){toast('Resmara is researching your brand again. This takes a minute.');return}
+ // The brand engine reruns in the background; anything you changed yourself is kept.
+ if(btn){btn.disabled=true;btn.textContent='Researching…'}
+ RM.request('/api/auth/me/brand/research',{method:'POST'}).then(async()=>{
+  toast('Resmara is researching your brand again. Anything you changed stays as you set it.');
+  const until=Date.now()+120000;
+  while(Date.now()<until){await new Promise(r=>setTimeout(r,3000));const b=await RM.request('/api/auth/me/brand/build').catch(()=>null);const st=b&&b.build&&b.build.status;if(st==='done'||st==='failed'){if(b.brand){state.brand={...b.brand};if(b.brand.brokerage||b.brand.company)state.company=b.brand.brokerage||b.brand.company;persist()}if(view==='brand')myBrand();toast(st==='done'?'Your brand kit is up to date.':'The research didn’t finish. Your brand kit is unchanged.');return}}
+ }).catch(e=>toast((e&&e.message)||'Research didn’t start.')).finally(()=>{if(btn&&btn.isConnected){btn.disabled=false;btn.textContent='Research again'}});
 }
 // Leaving My Brand with unsaved changes asks first. Returns true when it stopped the move.
 let brandAfterSave=null;
@@ -641,6 +655,11 @@ async function saveBrandProfile(event,form,onboarding){
   const name=fields.agent.value.trim(),company=fields.company.value.trim(),market=fields.market.value.trim();
   if(!name)throw new Error('Enter your agent name.');
   const brand={...state.brand,website,brandLink,market,license:fields.license.value.trim(),colours:fields.colours.value.trim(),voice:fields.voice.value.trim()};
+  if(fields.phone)brand.phone=fields.phone.value.trim();
+  if(fields.brokerLicense)brand.brokerLicense=fields.brokerLicense.value.trim();
+  if(fields.voiceOfClient)brand.voiceOfClient=fields.voiceOfClient.value.trim();
+  if(fields.ownTag)brand.ownTag=fields.ownTag.value.trim()?'#'+fields.ownTag.value.trim().replace(/^#+/,'').replace(/[^A-Za-z0-9_]/g,''):'';
+  brand.brokerage=company;
   if(fields.fontHead&&fields.fontBody)brand.fonts=[fields.fontHead.value.trim()||'Playfair Display',fields.fontBody.value.trim()||'Jost'];
   if(fields.theme)brand.theme=fields.theme.value;
   if(fields.colours&&form.querySelector('.mb-sw'))brand.palette=[...form.querySelectorAll('.mb-sw')].map(l=>[l.querySelector('b').textContent,l.querySelector('input').value.toUpperCase()]);

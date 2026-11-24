@@ -4,7 +4,7 @@ import json
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -224,10 +224,51 @@ def put_my_brand(payload: dict, current_user: User = Depends(get_current_user),
     if len(json.dumps(brand)) > 32_000:
         raise HTTPException(status_code=413, detail="brand profile is too large (32 KB limit)")
     cleaned = {k: v for k, v in brand.items() if isinstance(k, str) and isinstance(v, (str, int, float, bool, list))}
+    # The brand engine owns its own bookkeeping (where each fact came from, the build status,
+    # what was chosen rather than found); a save from the form never wipes it. Every kit field the
+    # agent changed is remembered, so Research again never overwrites it (Engine 2, section 4).
+    from app.services import brand_investigator as bi
+    before = dict(current_user.brand or {})
+    for key in ("build", "factSources", "chosen", "sources", "researched", "note", "coloursFrom"):
+        if key in before and key not in cleaned:
+            cleaned[key] = before[key]
+    edited = set(before.get("edited") or []) | set(cleaned.get("edited") or [])
+    aliases = {"company": ("company", "brokerage")}
+    for field in bi.KIT_FIELDS:
+        names = aliases.get(field, (field,))
+        new_v = next((cleaned[n] for n in names if n in cleaned), None)
+        old_v = next((before[n] for n in names if n in before), None)
+        if new_v is not None and before.get("build") and new_v != old_v:
+            edited.add(field)
+    if edited or before.get("build"):
+        cleaned["edited"] = sorted(edited)
+    if before.get("build"):
+        cleaned["legal"] = bi.legal_lines({**cleaned, "company": cleaned.get("company") or cleaned.get("brokerage")})
+        cleaned["missing"] = bi.missing_post_facts({**cleaned, "company": cleaned.get("company") or cleaned.get("brokerage")})
     current_user.brand = cleaned
     db.commit()
     db.refresh(current_user)
     return {"brand": current_user.brand or {}}
+
+
+@router.get("/me/brand/build")
+def my_brand_build(current_user: User = Depends(get_current_user)):
+    """Where the brand engine is: not started, running, done or failed, with the kit and what's missing."""
+    from app.services import brand_investigator as bi
+    return bi.build_status(current_user)
+
+
+@router.post("/me/brand/research")
+async def research_my_brand(background: BackgroundTasks, current_user: User = Depends(get_current_user),
+                            db: Session = Depends(get_db)):
+    """Research again: reruns the investigation in the background. Their own changes survive."""
+    from app.services import brand_investigator as bi
+    brand = dict(current_user.brand or {})
+    brand["build"] = {"status": "running", "reason": "research_again"}
+    current_user.brand = brand
+    db.commit()
+    background.add_task(bi.build_for_user, current_user.id, reason="research_again")
+    return {"build": brand["build"]}
 
 
 @router.post("/me/brand/from-meta")
