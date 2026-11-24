@@ -875,7 +875,9 @@ async def daily_sweep(db) -> Dict[str, Any]:
         conn = connection_for(db, u.id)
         if conn is not None and send_breakage_emails(db, u, conn):
             result["emails"] += 1
-    if result["checked"] and result["dead"] / result["checked"] > 0.05:
+    recent_alert = (db.query(Event).filter(Event.event_type == "meta_alert",
+                                           Event.created_at >= datetime.utcnow() - timedelta(hours=24)).first())
+    if result["checked"] and result["dead"] / result["checked"] > 0.05 and recent_alert is None:
         result["alert"] = _alert_owner(db, f"{result['dead']} of {result['checked']} live agents lost their Meta connection",
                                        "More than 5% of agents with live campaigns can't post. That's usually the Meta app, not the agents.")
     stale = (db.query(MetaConnection)
