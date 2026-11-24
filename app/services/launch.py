@@ -342,6 +342,19 @@ async def launch_boost(boost: Boost, current_user: User, db: Session, *, budget_
     # Approved by the agent, active in Meta, and simply not delivering before start_time (§4.4).
     ad_row.status = "scheduled"
 
+    db.commit()
+    # Engine 6, section 3: the hook versions run as their own ads in the same ad set.
+    hook_note = None
+    try:
+        from app.services import ad_audit
+        page_id = ((configs.get("adcreative") or {}).get("object_story_spec") or {}).get("page_id") or ""
+        ig_id = ((configs.get("adcreative") or {}).get("object_story_spec") or {}).get("instagram_user_id") or ""
+        made = await ad_audit.add_hook_versions(db, boost, ad_row, client, page_id=page_id, ig_id=ig_id)
+        hook_note = f"{len(made)} hook version(s) added to the ad set"
+        configs.setdefault("notes", []).append(hook_note)
+    except Exception as exc:  # noqa: BLE001 - the main ad is live either way
+        configs.setdefault("notes", []).append(f"hook versions not added: {type(exc).__name__}")
+
     db.add(Event(user_id=current_user.id, boost_id=boost.id, event_type="campaign_launched",
                  payload={"action": action, "campaign_id": campaign_id, "adset_id": adset_id,
                           "creative_id": creative_id, "ad_id": ad_id,

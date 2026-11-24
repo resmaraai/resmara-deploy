@@ -98,6 +98,8 @@ ADDITIONS = {
         ("features", "JSON"),
     ],
     "ads": [
+        ("versions", "JSON"),      # Engine 6: every ad in the ad set (hook versions)
+        ("audit", "JSON"),         # Engine 6: the live ad audit's state
         ("meta_adset_id", "VARCHAR"),
         ("meta_creative_id", "VARCHAR"),
         ("reach", "INTEGER"),

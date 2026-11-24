@@ -448,6 +448,34 @@ class MetaAdsClient(_BaseAdsClient):
             waited += interval
         return False
 
+    async def add_ad(self, adset_id: str, creative_data: dict, ad_data: dict) -> dict:
+        """One more ad (with its own creative) in an existing ad set: the hook versions (Engine 6)."""
+        if self.simulated:
+            n = abs(hash(str(creative_data.get("name")))) % 100000
+            return {"creative": {"id": f"sim_creative_{n}"}, "ad": {"id": f"sim_ad_{n}"}, "simulated": True}
+        base = f"act_{self._act_id}"
+        creative = await self._post(f"{base}/adcreatives", creative_data)
+        if not creative.get("id"):
+            raise PlatformError("Meta did not return an adcreative id", platform="meta",
+                                path=f"{base}/adcreatives", body=creative)
+        data = dict(ad_data)
+        data["adset_id"] = adset_id
+        data["creative"] = {"creative_id": creative["id"]}
+        try:
+            ad = await self._post(f"{base}/ads", data)
+        except Exception:
+            try:
+                await self._delete(creative["id"])
+            except Exception:  # noqa: BLE001 - must not mask the real error
+                pass
+            raise
+        return {"creative": creative, "ad": ad, "simulated": False}
+
+    async def get_object(self, object_id: str, fields: str) -> dict:
+        if self.simulated:
+            return {"id": object_id, "effective_status": "ACTIVE"}
+        return await self._get(object_id, {"fields": fields})
+
     async def update_object(self, object_id: str, data: dict) -> dict:
         """POST an edit to a campaign/adset/ad (pause, resume, move the end date)."""
         if self.simulated:

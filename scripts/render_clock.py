@@ -114,6 +114,9 @@ def main() -> int:
         say(f"system-check found a failure: {body}")
 
     now = datetime.now(timezone.utc)
+    # Engine 6, section 5: the live ad audit, every 4 hours.
+    if now.hour % 4 == 1 and now.minute < 15:
+        run_step("ad audit", "/api/admin/ads/audit", 300, quiet_when='"changed":0')
     # Engine 6, section 7: every hour, so a pending home stops within the hour.
     if now.minute < 15:
         run_step("listings sweep", "/api/admin/listings/sweep", 240, quiet_when='"pending":0,"sold":0,"back":0')

@@ -473,6 +473,10 @@ class Ad(Base):
     meta_video_id = Column(String, nullable=True)
     video_url = Column(Text, nullable=True)
     destination_url = Column(Text, nullable=True)
+    # Engine 6: every ad in the ad set (the main video or carousel, and each hook version), and what
+    # the live ad audit has done: [{kind, hook, meta_ad_id, meta_creative_id, status, started_at, ...}]
+    versions = Column(JSON, default=list)
+    audit = Column(JSON, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # --- Photo / design asset (the PHOTO INDEX behind the content engine) ---

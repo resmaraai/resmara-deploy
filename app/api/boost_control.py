@@ -531,3 +531,17 @@ async def run_again(boost_id: int, db: Session = Depends(get_db), current_user: 
     asyncio.create_task(work(boost.id, current_user.id))
     return {"status": "building", "message": "Resmara is building a fresh 14 days. It's charged only when the build is "
                                              "done, and goes live the next morning. We'll email you."}
+
+
+@router.post("/admin/ads/audit")
+async def ads_audit(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db)):
+    """The live ad audit, several times a day (Engine 6, section 5). Called by the scheduler."""
+    from app.core.config import settings as _settings
+    from app.services import ad_audit
+
+    if not _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=503, detail="RESMARA_PUBLISH_TOKEN is not configured")
+    if x_resmara_token != _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=403, detail="Bad publish token")
+    result = await ad_audit.sweep(db)
+    return {"checked": result["checked"], "changed": result["changed"]}
