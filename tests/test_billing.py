@@ -96,6 +96,26 @@ def main():
     check("and says which round it is", "round 2" in repeat["line_items[0][price_data][product_data][name]"],
           repeat["line_items[0][price_data][product_data][name]"])
 
+    print("\n[promotion codes are redeemable at Checkout]")
+    # A coach's referral code and the Founding Agent code are Stripe promotion codes; a code can
+    # only be typed in when the session asked for one, and a session that did not answers
+    # "This promotion code is invalid" for a code that is perfectly good.
+    check("checkout asks Stripe for a promotion code", body.get("allow_promotion_codes") == "true",
+          body.get("allow_promotion_codes"))
+    check("and does not also pre-apply a discount (Stripe refuses both)",
+          not any(k.startswith("discounts") for k in body), [k for k in body if k.startswith("discounts")])
+    check("a repeat round can be discounted too",
+          repeat.get("allow_promotion_codes") == "true", repeat.get("allow_promotion_codes"))
+    check("a saved customer still gets the field",
+          dict(billing.checkout_payload(7, 3, "1 Main St", "https://resmara.com",
+                                       customer_id="cus_123")).get("allow_promotion_codes") == "true")
+    os.environ["STRIPE_ALLOW_PROMOS"] = "0"
+    check("STRIPE_ALLOW_PROMOS=0 takes the field off",
+          "allow_promotion_codes" not in dict(billing.checkout_payload(7, 3, "1 Main St", "https://resmara.com")))
+    check("promos_allowed reads it", billing.promos_allowed() is False)
+    os.environ.pop("STRIPE_ALLOW_PROMOS", None)
+    check("and is on again by default", billing.promos_allowed() is True)
+
     class FakeBoost:
         def __init__(self, r): self.repeat_round = r
     check("round_of reads the campaign", billing.round_of(FakeBoost(3)) == 3)
