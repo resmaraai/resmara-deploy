@@ -65,7 +65,7 @@ goes out by hand until there's a price screen).
 - Card-expiring email; Close my account by typing the email, stopping everything at once.
 - **Close vs reopen:** Engine 1 (§5) says closing can be undone by logging in; Engine 10 (§10) says it
   can't and data goes within 30 days. Built as both: everything stops at once, logging in within 30 days
-  reopens it, and on day 31 the details are deleted (purchases kept). Adam to confirm.
+  reopens it, and on day 31 the details are deleted (purchases kept). Confirmed by Adam (23 Nov).
 
 **Engine 11:** the AI line in the chat; Which listing?, the 1 business day promise and "We'll reply by
 Tuesday at 5 PM" (page and email); the four statuses; the agent replies on the request; replies signed
