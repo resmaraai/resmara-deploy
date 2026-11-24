@@ -109,8 +109,24 @@ def main() -> int:
         print("\n[the script]")
         import subprocess
         script = ROOT / "scripts" / "until_sold_due.py"
+        # The child is given a minimal environment on purpose. It re-reads the checkout's .env
+        # (app/core/config.py) and python-dotenv writes those values into os.environ, so copying
+        # this process's environment hands the child the live Stripe key, Render's private
+        # Postgres URL and the Render/GitHub tokens: `--apply` then reaches for production and
+        # hangs on a database the internet cannot reach. Name what the script needs instead.
+        child = {k: v for k, v in os.environ.items()
+                 if k in ("PATH", "HOME", "LANG", "TMPDIR", "VIRTUAL_ENV", "PYTHONPATH")}
+        child.update({"DATABASE_URL": os.environ["DATABASE_URL"],
+                      "RESMARA_UPLOAD_DIR": os.environ["RESMARA_UPLOAD_DIR"],
+                      "RESMARA_ADMIN_EMAILS": os.environ["RESMARA_ADMIN_EMAILS"],
+                      "SECRET_KEY": os.environ["SECRET_KEY"],
+                      "RESMARA_ENV": "test", "RESMARA_SIMULATE": "1",
+                      "STRIPE_SECRET_KEY": "", "STRIPE_WEBHOOK_SECRET": "",
+                      "META_SYSTEM_TOKEN": "", "META_CLIENT_SECRET": "", "META_CLIENT_ID": "",
+                      "OPENAI_API_KEY": "", "RESEND_API_KEY": "", "RESMARA_PUBLISH_TOKEN": "",
+                      "RESMARA_GITHUB_TOKEN": "", "RESMARA_RENDER_API_KEY": ""})
         run = subprocess.run([sys.executable, str(script)], capture_output=True, text=True,
-                             env={**os.environ})
+                             env=child, timeout=120)
         line = (run.stdout or "").strip().splitlines()[-1] if run.stdout.strip() else ""
         check("the script exits 0", run.returncode == 0, (run.stderr or "")[-200:])
         check("it prints one JSON line", line.startswith("{") and line.endswith("}"), line[:120])
@@ -122,7 +138,7 @@ def main() -> int:
         # --apply now does the work. With no Stripe key in this environment it must charge
         # nothing and say so, which is the behaviour a misconfigured cron has to have.
         applied = subprocess.run([sys.executable, str(script), "--apply"], capture_output=True,
-                                 text=True, env={**os.environ})
+                                 text=True, env=child, timeout=120)
         check("--apply runs and exits 0", applied.returncode == 0, (applied.stderr or "")[-200:])
         line2 = (applied.stdout or "").strip().splitlines()[-1] if applied.stdout.strip() else ""
         payload2 = json.loads(line2) if line2.startswith("{") else {}
