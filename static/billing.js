@@ -217,7 +217,7 @@ function billingUpcoming() {
     box.innerHTML = '<ul class="campaign-report-list">' + rows.map(function (u) {
       var street = String(u.address || 'Your listing').split(',')[0];
       var when = u.paused ? 'paused' : (u.about ? 'about ' + u.about : 'next round');
-      return '<li class="billing-upcoming-row"><span><strong>' + esc(street) + '</strong><span class="fine">' +
+      return '<li class="billing-upcoming-row"><span class="billing-upcoming-what"><strong>' + esc(street) + '</strong><span class="fine">' +
         esc(u.amount_label) + ' · ' + esc(when) + ' · Round ' + esc(u.round) + '</span></span>' +
         '<button type="button" class="billing-remove-card" onclick="turnOffUntilSold(' + Number(u.boost_id) + ')">Turn off</button></li>';
     }).join('') + '</ul>';

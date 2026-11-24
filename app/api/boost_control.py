@@ -485,7 +485,8 @@ async def renewals_run(x_resmara_token: str = Header(default=""), db: Session = 
 @router.post("/admin/campaigns/daily")
 async def campaigns_daily(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db)):
     """The once-a-day steps: day 7 and 14 reports, Run it again on day 12 and at the end, card-expiring
-    emails, and deleting the details of accounts closed over 30 days ago."""
+    emails, deleting the details of accounts closed over 30 days ago, and closing support requests
+    answered 7 days ago with no reply."""
     from app.core.config import settings as _settings
     from app.services import campaign_daily
 
@@ -497,6 +498,8 @@ async def campaigns_daily(x_resmara_token: str = Header(default=""), db: Session
     out = campaign_daily.run(db)
     out["cards_expiring"] = await campaign_daily.cards_expiring(db)
     out["accounts_wiped"] = len(account_close.wipe_due(db)["wiped"])
+    from app.services import support
+    out["requests_closed"] = support.auto_close(db)
     return out
 
 

@@ -50,3 +50,30 @@ and a Mailchimp key and audience. Nothing to build in this slice; it's Dan's eng
    the dispute webhook, closing an account that stops everything, the money emails.
 2. Engine 11: the AI line, Which listing? and the promise, reply-by times, the four statuses and auto-close,
    reply emails, confirmation emails, Save as a chat answer.
+
+## Built (23 Nov 2026)
+
+**Engine 10:** every ❌ and 🟡 above is built, except the emails Dan owns in the Build room (#65 renewal
+consent, #67 yearly reminder) and the price-change notice (prices are set on Render, so the 30-day notice
+goes out by hand until there's a price screen).
+
+- Prices from `/api/billing/config`; card form inside the pop-up; Change card replaces the old one; Remove
+  card (refused while Run it until it sells is on); Coming up with Turn off; Purchases with what it was,
+  tax, status and Receipt.
+- Stripe Tax behind `RESMARA_STRIPE_TAX=1` (off until Adam turns Stripe Tax on and registers).
+- Chargebacks pause the account and alert the team; Finance → Purchases → Refund (full or partial).
+- Card-expiring email; Close my account by typing the email, stopping everything at once.
+- **Close vs reopen:** Engine 1 (§5) says closing can be undone by logging in; Engine 10 (§10) says it
+  can't and data goes within 30 days. Built as both: everything stops at once, logging in within 30 days
+  reopens it, and on day 31 the details are deleted (purchases kept). Adam to confirm.
+
+**Engine 11:** the AI line in the chat; Which listing?, the 1 business day promise and "We'll reply by
+Tuesday at 5 PM" (page and email); the four statuses; the agent replies on the request; replies signed
+"Adam from Resmara" with See the reply; auto-close after 7 days; Team room reply-by (orange past due,
+Due soon), the listing and account snapshot on each request. Save as a chat answer already existed.
+
+**Still blocked (🔒):** support@resmara.com (set `RESMARA_SUPPORT_EMAIL` once the inbox exists; until then
+requests go to the operator addresses), email replies added to a request (needs the inbox), the Resmara
+setup session Calendly event and its bookings in the Team room.
+
+Tests: `tests/test_engine10_billing.py` (43), `tests/test_engine11_support.py` (31).

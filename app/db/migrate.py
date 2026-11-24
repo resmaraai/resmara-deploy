@@ -176,6 +176,13 @@ ADDITIONS = {
         ("visitor", "VARCHAR"),
         ("wants", "VARCHAR"),
     ],
+    "support_tickets": [
+        # Engine 11: which listing, the page they were on, the account snapshot, the reply-by time.
+        ("boost_id", "INTEGER"),
+        ("page", "VARCHAR"),
+        ("snapshot", "JSON"),
+        ("reply_by", "TIMESTAMP"),
+    ],
     "orders": [
         # Engine 10: tax, the Stripe receipt, refunds and what the purchase was.
         ("tax_cents", "INTEGER"),

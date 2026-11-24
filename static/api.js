@@ -636,12 +636,21 @@
   // The client's own support desk: raising a request and reading the replies are the
   // same two calls the Support page and the "Ask Resmara" assistant both use, so a
   // question asked in the chat lands in the operator console as a real ticket.
-  async function createTicket(subject, message) {
+  async function createTicket(subject, message, extra) {
+    // extra: { boost_id, page } - which listing it's about and where they were.
+    var body = { subject: String(subject || '').slice(0, 200), message: String(message || '') };
+    if (extra && extra.boost_id) body.boost_id = extra.boost_id;
+    var page = (extra && extra.page) || '';
+    if (page) body.page = String(page);
     return request('/api/support', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: String(subject || '').slice(0, 200), message: String(message || '') }),
+      body: JSON.stringify(body),
     });
+  }
+
+  async function replyTicket(id, text) {
+    return json('/api/support/' + segment(id) + '/reply', 'POST', { text: String(text || '') });
   }
 
   async function tickets() {
@@ -774,6 +783,7 @@
     withdrawPost: withdrawPost,
     tagAssets: tagAssets,
     createTicket: createTicket,
+    replyTicket: replyTicket,
     tickets: tickets,
     markSupportRead: markSupportRead,
     metaConnect: metaConnect,

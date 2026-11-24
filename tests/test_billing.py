@@ -149,8 +149,14 @@ def main():
                      name="Owner", is_active=True, is_admin=True)
         db.add_all([buyer, admin])
         db.commit()
+        # SQLite hands a deleted user's id to the next one: drop campaigns another test left on it.
+        db.query(Boost).filter(Boost.user_id == buyer.id).delete()
+        db.commit()
         boost = Boost(user_id=buyer.id, address="9 Unpaid Way")
         db.add(boost)
+        db.commit()
+        from app.db.session import Post
+        db.query(Post).filter(Post.boost_id == boost.id).delete()   # ids are reused here too
         db.commit()
         boost_id, buyer_id = boost.id, buyer.id
     finally:
@@ -165,13 +171,15 @@ def main():
           state.text[:160])
     check("and quotes the price", state.json()["price_label"] == "$49")
 
+    # Engine 4 (slice 1): build first, pay to unlock. The first build needs no card.
     build = client.post("/api/boosts/%d/build" % boost_id, json={"force": True}, headers=auth)
-    check("an unpaid campaign cannot build", build.status_code == 402, "%s %s" % (build.status_code, build.text[:160]))
-    check("the refusal is machine-readable",
-          build.json().get("detail", {}).get("error") == "payment_required", build.text[:200])
+    check("an unpaid campaign builds first (pay to unlock)", build.status_code in (200, 202),
+          "%s %s" % (build.status_code, build.text[:160]))
 
     launch = client.post("/api/boosts/%d/launch" % boost_id, json={}, headers=auth)
     check("an unpaid campaign cannot launch", launch.status_code == 402, launch.status_code)
+    check("the refusal is machine-readable",
+          (launch.json().get("detail") or {}).get("error") in ("locked", "payment_required"), launch.text[:200])
 
     checkout = client.post("/api/billing/checkout", json={"boost_id": boost_id}, headers=auth)
     check("checkout says billing is unconfigured rather than pretending",

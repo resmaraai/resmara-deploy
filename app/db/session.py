@@ -512,8 +512,12 @@ class SupportTicket(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     subject = Column(String, nullable=False)
-    status = Column(String, default="open")  # open, in_progress, resolved, closed
+    status = Column(String, default="received")  # received, answered, waiting, closed (app/services/support.py)
     messages = Column(JSON, default=[])
+    boost_id = Column(Integer, nullable=True)     # Which listing? (optional)
+    page = Column(String, nullable=True)          # the page they were on
+    snapshot = Column(JSON, default=dict)         # the account at the time, so the team doesn't have to ask
+    reply_by = Column(DateTime(timezone=True), nullable=True)  # the 1 business day promise
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 

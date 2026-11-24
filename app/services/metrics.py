@@ -28,7 +28,8 @@ from app.services.ad_platforms import is_simulated_account
 
 # A ticket is still the operator's problem until it is resolved or closed; the old metric
 # only counted the literal string "open", so a queue of ten in-progress tickets read as 0.
-OPEN_TICKET_STATUSES = ("open", "in_progress")
+# Engine 11's four statuses, plus the older names still on early rows.
+OPEN_TICKET_STATUSES = ("received", "answered", "waiting", "open", "in_progress")
 RESOLVED_TICKET_STATUSES = ("resolved", "closed")
 ERROR_EVENT = "error"
 
@@ -306,7 +307,7 @@ def _content(db, ids) -> Dict[str, Any]:
 def _support(db, ids) -> Dict[str, Any]:
     tickets = db.query(SupportTicket).all()
     test_tickets = [t for t in tickets if t.user_id in ids]
-    open_tickets = [t for t in tickets if (t.status or "open") in OPEN_TICKET_STATUSES]
+    open_tickets = [t for t in tickets if (t.status or "received") in OPEN_TICKET_STATUSES]
     waiting = []
     for t in open_tickets:
         msgs = t.messages or []

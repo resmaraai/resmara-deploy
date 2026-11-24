@@ -1622,3 +1622,9 @@ html.dark .shell .lp-stats small,html.dark .shell .lp-bar{color:#fff}
 .billing-upcoming-row{display:flex!important;justify-content:space-between;align-items:center;gap:12px}
 .billing-receipt{color:#12354d;font-weight:600;margin-left:6px}
 .billing-meta-line{margin:4px 0 0}
+/* Engine 11: Support page */
+.ticket-reply{display:flex;gap:8px;align-items:flex-end;margin-top:10px}.ticket-reply textarea{flex:1;min-height:44px}
+.ticket-reply .campaign-primary{white-space:nowrap}
+.ticket-st.st-received{background:#e2f0f8;color:#12354d}.ticket-st.st-answered{background:#12354d;color:#fff}
+.ticket-st.st-waiting{background:#d94c0d;color:#fff}.ticket-st.st-closed{background:#d8effd;color:#12354d}
+.billing-upcoming-what{display:flex;flex-direction:column;gap:2px}
