@@ -50,6 +50,7 @@ else
   run test_new_campaign_flow node tests/test_new_campaign_flow.js
   run test_review_scope node tests/test_review_scope.js
   run test_signup_flow node tests/test_signup_flow.js
+  run test_meta_return_notice node tests/test_meta_return_notice.js
   run test_campaign_build node tests/test_campaign_build.js
   if [ -n "${CI_SKIP_DEPLOYED_UI:-}" ]; then
     echo "skip test_deployed_ui (CI_SKIP_DEPLOYED_UI set: it reads a deployment's public URL)"

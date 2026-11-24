@@ -743,14 +743,30 @@ function connectMeta(){
  });
 }
 // Landing back from Meta: say what actually happened, then open the connections page.
+// 'several_pages' is Meta saying the login manages more than one Page, which the Page chooser
+// answers - it is not a failure, and painting it as a red "Meta connection failed" bar made a
+// normal choice look like a broken login. The chooser opens by itself instead.
 function metaReturnNotice(){
  const p=new URLSearchParams(location.search),m=p.get('meta');if(!m)return;
+ const several=m==='several_pages',nPages=Number(p.get('pages')||0);
  const n=document.createElement('div');n.className='notice connection-notice';
- if(m==='connected')n.textContent='Meta connected — '+p.get('accounts')+' ad account(s) and '+p.get('pages')+' Page(s) authorised.';
+ if(several)n.textContent='Meta connected — this login manages '+(nPages>1?nPages+' Pages':'more than one Page')
+   +'. Choose the one Resmara posts to for this listing.';
+ else if(m==='connected')n.textContent='Meta connected — '+p.get('accounts')+' ad account(s) and '+p.get('pages')+' Page(s) authorised.';
  else if(m==='no_accounts')n.textContent='Meta authorised, but this login can see no ad accounts. Add the ad account to the Meta app, or connect a login that owns it.';
  else n.textContent='Meta connection failed: '+(p.get('reason')||m);
  document.body.prepend(n);
  history.replaceState(null,'',location.pathname+location.hash);
- if(RM.isLoggedIn()){state.clientSignedIn=true;state.name=state.name||'there';persist();dashboard('accounts');}
+ if(RM.isLoggedIn()){state.clientSignedIn=true;state.name=state.name||'there';persist();dashboard('accounts');
+  if(several)openPageChooser();}
+}
+// The chooser lists the Pages the audit endpoint returned, so a tab that landed here straight
+// from Facebook (which has no Page list yet) refreshes that first and opens the chooser after.
+function openPageChooser(){
+ const pick=()=>{if(typeof window.pagePicker==='function')window.pagePicker();};
+ const S=window.RMSignup;
+ if(!S||typeof S.metaStatus!=='function')return pick();
+ if(((S.status||{}).pages||[]).length)return pick();
+ S.metaStatus(false).then(pick).catch(()=>{});
 }
 window.addEventListener('load',()=>{try{if(typeof fbReturn==='function')fbReturn();}catch(e){}try{metaReturnNotice();}catch(e){}});
