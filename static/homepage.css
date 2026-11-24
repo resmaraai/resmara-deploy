@@ -1612,3 +1612,7 @@ html.dark .sg-video{border-color:#1f4d68}
 .lp-share-card .campaign-primary{margin:0;text-align:center;text-decoration:none}
 html.dark .shell .lp-check{background:#0f2231;color:#fff}
 html.dark .shell .lp-stats small,html.dark .shell .lp-bar{color:#fff}
+/* Engine 6: the Pause pop-up's four choices */
+.pause-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.pause-choices .campaign-primary{width:100%;margin:0}
+@media (max-width:520px){.pause-choices{grid-template-columns:1fr}}

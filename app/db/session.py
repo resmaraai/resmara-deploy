@@ -331,6 +331,11 @@ class Boost(Base):
     leads_checked_at = Column(DateTime(timezone=True), nullable=True)
     leads_scan_note = Column(Text, nullable=True)
     reboost_offer_sent_at = Column(DateTime(timezone=True), nullable=True)
+    # Engine 6: pending and sold
+    paused_reason = Column(String, nullable=True)       # agent | pending | sold
+    listing_sources = Column(JSON, default=list)        # the agent's link + the same home elsewhere
+    listing_reads = Column(JSON, default=dict)          # last read per source: status, price, agent, layer, quote
+    listing_notes = Column(JSON, default=dict)          # one-time emails and alerts already sent
     # --- Engine 9 (Marketing) ---------------------------------------------------
     # Which channel gets credit for this purchase: "ad", "email" or "website". Decided once, when
     # the payment lands, by the last thing that got them to buy (Engine 9, section 1a) - so a

@@ -330,6 +330,8 @@ def _due_posts(db, now: str, limit: int, boost_id: Optional[int] = None) -> List
         .outerjoin(MetaConnection, MetaConnection.user_id == Boost.user_id)
         .filter(Post.client_status == "approved")
         .filter(Post.publish_status == "scheduled")
+        # Engine 6: a paused campaign (by the agent, or pending/sold) posts nothing until resumed.
+        .filter(Boost.paused_at.is_(None))
         .filter(Post.publish_at.isnot(None))
         .filter(Post.publish_at <= now)
         .filter(or_(Post.next_attempt_at.is_(None), Post.next_attempt_at <= now))

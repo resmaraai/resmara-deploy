@@ -1556,6 +1556,15 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
         tools=[{"type": "web_search"}],
     )
     research = _trunc(research, 7000)
+    # Engine 6, section 7: the same home on the listing sites is kept, so the hourly status check has
+    # more than one source to read.
+    try:
+        from app.services.listing_status import sources_from_research
+        found = sources_from_research(research)
+        if found:
+            boost.listing_sources = list(dict.fromkeys(list(boost.listing_sources or []) + found))[:6]
+    except Exception:  # noqa: BLE001
+        pass
 
     # --- R2: the agent's brand (Chat Completions -> JSON) -------------------
     website_provided = f"yes - {website}" if website else "no"

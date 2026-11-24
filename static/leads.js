@@ -289,19 +289,72 @@ function openReportFromCalendar(day) {
 
 // ---- Pause / resume a running campaign ------------------------------------------------------
 // Pausing stops the scheduled posts and pauses the Meta ad. Nothing is deleted.
-function campaignPaused(c) { return (state.pausedCampaigns || []).includes(c && c.address); }
+function campaignPaused(c) {
+  if (campaignBoostId(c) != null) return !!(c && c.paused_at);
+  return (state.pausedCampaigns || []).includes(c && c.address);
+}
+function campaignSold(c) { return String((c && c.listing_status) || '').toLowerCase() === 'sold'; }
 function pauseButton(c) {
-  if (!campaignIsLive(c) || campaignPhase(c) === 'completed') return '';
+  if (!campaignIsLive(c) || campaignPhase(c) === 'completed' || campaignSold(c)) return '';
   const i = [...state.campaigns, ...examples].indexOf(c);
   return campaignPaused(c)
-    ? `<button type="button" class="card-pause resume" onclick="resumeCampaign(${i})">▶ Resume</button>`
-    : `<button type="button" class="card-pause" onclick="pauseCampaign(${i})">❚❚ Pause</button>`;
+    ? `<button type="button" class="card-pause resume" onclick="resumeCampaign(${i})">Turn it back on</button>`
+    : `<button type="button" class="card-pause" onclick="pauseCampaign(${i})">Pause</button>`;
 }
+// Engine 6, section 7: the Pause pop-up keeps It's pending and It sold as the agent's fail-safe,
+// because the listing sites can lag the MLS by a day or more.
 function pauseCampaign(i) {
   const c = [...state.campaigns, ...examples][i];
-  show(`<span class="eyebrow">PAUSE CAMPAIGN</span><h2>Pause ${esc(c.address)}?</h2><p>Your scheduled posts stop and your listing ad pauses, so Meta stops spending your ad budget. Nothing is deleted.</p><p>Resume any time and it picks up where it left off.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Keep running</button><button class="campaign-primary" onclick="setCampaignPaused(${i},true)">Pause campaign</button></div>`);
+  show(`<span class="eyebrow">PAUSE CAMPAIGN</span><h2>Pause ${esc(c.address)}?</h2>
+  <p>Your scheduled posts stop and your listing ad pauses, so Meta stops spending your ad budget. Nothing is deleted.</p>
+  <p>If the home is under contract or sold, tell us and your website stops taking showing requests too.</p>
+  <div class="pause-choices">
+   <button type="button" class="campaign-primary" onclick="setCampaignPaused(${i},true,'pause')">Just pause it</button>
+   <button type="button" class="campaign-primary navy" onclick="setCampaignPaused(${i},true,'pending')">It’s pending</button>
+   <button type="button" class="campaign-primary navy" onclick="setCampaignPaused(${i},true,'sold')">It sold</button>
+   <button type="button" class="campaign-primary navy" onclick="modal.close()">Keep running</button>
+  </div>`);
 }
 function resumeCampaign(i) { setCampaignPaused(i, false); }
+
+function setCampaignPaused(i, on, why, confirm) {
+  const c = [...state.campaigns, ...examples][i];
+  const id = campaignBoostId(c);
+  if (id != null && window.RM && RM.request) {
+    const path = '/api/boosts/' + id + (on ? '/pause' : '/resume');
+    const body = on ? { why: why || 'pause' } : { confirm: !!confirm };
+    RM.request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (res) {
+        if (modal.open) modal.close();
+        if (on) c.paused_at = c.paused_at || new Date().toISOString(); else c.paused_at = null;
+        if (on && why === 'sold') c.listing_status = 'sold';
+        if (on && why === 'pending') c.listing_status = 'pending';
+        if (!on && c.listing_status === 'pending') c.listing_status = 'active';
+        if (res && res.card_state) c.card_state = res.card_state;
+        persist(); dashboard('campaigns');
+        toast(!on ? 'Turned back on. Your posts and ad are running again, and you get the paused days back.'
+          : why === 'sold' ? 'Marked sold. Your ad and posts have stopped.'
+          : why === 'pending' ? 'Paused as pending. Your website now says it’s under contract.'
+          : 'Campaign paused. Posts and your ad are on hold.');
+      })
+      .catch(function (err) {
+        const d = err && err.detail;
+        if (d && d.error === 'still_pending') {
+          show(`<span class="eyebrow">TURN IT BACK ON</span><h2>${esc(d.message)}</h2><p>Resmara still reads the listing as Pending. If the deal fell through and the listing sites haven’t caught up yet, you can turn it back on now.</p>
+          <div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Not yet</button><button class="campaign-primary" onclick="setCampaignPaused(${i},false,null,true)">Turn it back on</button></div>`);
+          return;
+        }
+        toast((d && d.message) || (err && err.message) || 'That didn’t go through. Please try again.');
+      });
+    return;
+  }
+  const list = (state.pausedCampaigns || []).filter(a => a !== c.address);
+  if (on) list.push(c.address);
+  state.pausedCampaigns = list; persist();
+  if (modal.open) modal.close();
+  dashboard('campaigns');
+  toast(on ? 'Campaign paused. Posts and your ad are on hold.' : 'Campaign resumed. Posts and your ad are running again.');
+}
 
 // ---- Run it until it sells (autopilot) -------------------------------------------------------
 // When on, Resmara builds a brand-new 14-day round (new posts + a new ad, never a repeat) every
@@ -394,16 +447,6 @@ function setUntilSold(i, on, from, consented) {
   if (from === 'scope') details(i); else dashboard('campaigns');
   toast(on ? 'On. Resmara will run a fresh campaign every 2 weeks until this home sells.' : 'Turned off. This campaign ends after its 14 days.');
 }
-function setCampaignPaused(i, on) {
-  const c = [...state.campaigns, ...examples][i];
-  const list = (state.pausedCampaigns || []).filter(a => a !== c.address);
-  if (on) list.push(c.address);
-  state.pausedCampaigns = list; persist();
-  if (modal.open) modal.close();
-  dashboard('campaigns');
-  toast(on ? 'Campaign paused. Posts and your ad are on hold.' : 'Campaign resumed. Posts and your ad are running again.');
-}
-
 // ---- Open and close the sections of a live campaign ---------------------------------------
 // Each section (leads, calendar, listing page, reports) folds up to its heading, so an agent can
 // work through one at a time. A chevron on the right of the heading shows which way it goes, and
