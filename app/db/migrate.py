@@ -162,6 +162,10 @@ ADDITIONS = {
     # The agent's note on a lead (added 21 Nov 2026).
     "leads": [
         ("note", "TEXT"),
+        ("email", "VARCHAR"),
+        ("phone", "VARCHAR"),
+        ("visitor", "VARCHAR"),
+        ("wants", "VARCHAR"),
     ],
     "orders": [
         ("user_id", "INTEGER"),

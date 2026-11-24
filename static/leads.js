@@ -130,13 +130,13 @@ function leadsPanel(c, index) {
     body = `<p class="leads-empty">Could not check for comments just now: ${esc(cache.error)}</p>`;
   } else if (leads.length) {
     const row = (l, i) => `<li class="${l.done ? 'done' : ''}">
-    <span class="lead-av${l.source === 'web' || l.source === 'call' ? ' web' : ''}">${esc(initials(l.name))}</span>
-    <div class="lead-body"><b>${esc(l.name)}</b><span class="lead-where">${esc(l.where)} · ${esc(l.ago)}</span><p>${l.source === 'call' ? esc(l.text) : '“' + esc(l.text) + '”'}</p>${(l.email || l.phone) && l.source !== 'call' ? `<small class="lead-contact">${[l.email, l.phone].filter(Boolean).map(esc).join(' · ')}</small>` : ''}${l.post ? `<small>On: ${esc(l.post)}</small>` : ''}${leadNoteBlock(l, index, i)}</div>
+    <span class="lead-av${l.source === 'web' || l.source === 'call' || l.source === 'text' ? ' web' : ''}">${esc(initials(l.name))}</span>
+    <div class="lead-body"><b>${esc(l.name)}</b><span class="lead-where">${esc(l.where)} · ${esc(l.ago)}</span><p>${l.source === 'call' || l.source === 'text' ? esc(l.text) : '“' + esc(l.text) + '”'}</p>${(l.email || l.phone) && l.source !== 'call' && l.source !== 'text' ? `<small class="lead-contact">${[l.email, l.phone].filter(Boolean).map(esc).join(' · ')}</small>` : ''}${l.post ? `<small>On: ${esc(l.post)}</small>` : ''}${leadNoteBlock(l, index, i)}</div>
     <div class="lead-actions"><button type="button" class="lead-tick" title="${l.done ? 'Mark as not contacted yet' : 'Mark that you’ve contacted them'}" aria-pressed="${l.done}" onclick="toggleLead(${index},${i})">${l.done ? '✓ Contacted' : 'Mark as contacted'}</button><button type="button" class="lead-note-btn" onclick="openLeadNote(${index},${i})">${l.note ? 'Edit note' : 'Add note'}</button><button type="button" class="lead-remove" title="Not a lead" aria-label="Remove lead" onclick="removeLead(${index},${i})">✕</button></div>
   </li>`;
-    const fromPage = leads.map((l, i) => [l, i]).filter(([l]) => l.source === 'web' || l.source === 'call');
-    const fromSocial = leads.map((l, i) => [l, i]).filter(([l]) => !(l.source === 'web' || l.source === 'call'));
-    body = `<h3 class="leads-group">From your listing page</h3>${fromPage.length ? `<ul class="leads-list">${fromPage.map(([l, i]) => row(l, i)).join('')}</ul>` : '<p class="leads-empty">No form or call leads yet.</p>'}
+    const fromPage = leads.map((l, i) => [l, i]).filter(([l]) => l.source === 'web' || l.source === 'call' || l.source === 'text');
+    const fromSocial = leads.map((l, i) => [l, i]).filter(([l]) => !(l.source === 'web' || l.source === 'call' || l.source === 'text'));
+    body = `<h3 class="leads-group">From your listing page</h3>${fromPage.length ? `<ul class="leads-list">${fromPage.map(([l, i]) => row(l, i)).join('')}</ul>` : '<p class="leads-empty">No form, call or text leads yet.</p>'}
     <h3 class="leads-group">From your posts and ad</h3>${fromSocial.length ? `<ul class="leads-list">${fromSocial.map(([l, i]) => row(l, i)).join('')}</ul>` : '<p class="leads-empty">No comment leads yet.</p>'}`;
   } else {
     body = '<p class="leads-empty">No leads yet. When someone fills in the form or taps Call on your listing page, or comments with interest in the home, they show up here.</p>';
@@ -156,7 +156,7 @@ function leadsPanel(c, index) {
 // Where a lead came from, the same three buckets the server counts (app/services/lead_counts.py).
 function leadBucket(l) {
   const src = String(l.source || '').toLowerCase(), where = String(l.where || '').toLowerCase();
-  if (src === 'web' || src === 'call' || src === 'form' || where.includes('listing page') || where.includes('website')) return 'website';
+  if (src === 'web' || src === 'call' || src === 'text' || src === 'form' || where.includes('listing page') || where.includes('website')) return 'website';
   if (src === 'ad_comment' || /\bad$/.test(where) || where.includes(' ad ')) return 'ad';
   return 'posts';
 }

@@ -113,6 +113,18 @@ def _classify(post: Post) -> str:
     return "photo" if post.image_url else "text"
 
 
+def site_link(db, boost: Boost, post: Post) -> Optional[str]:
+    """The listing website, tagged with this post so the report knows which post brought a visitor."""
+    try:
+        from app.services import listing_site
+        site = listing_site.site_for(db, boost, adopt=False) if db is not None else None
+        if site is None or not listing_site.is_public(boost):
+            return None
+        return listing_site.tracked_url(site, f"post-{post.id}")
+    except Exception:  # noqa: BLE001 - a post without its link still posts
+        return None
+
+
 def _message(post: Post) -> str:
     """The Facebook text: the caption body and its own tags, never the tag block twice."""
     from app.services.post_rules import messages as _messages
@@ -242,7 +254,7 @@ async def publish_post(post: Post, boost: Boost, ad_account: Any, db) -> Dict[st
     kind = _classify(post)
     # Engine 4: Facebook and Instagram each get their own text; Instagram's never carries a link.
     from app.services.post_rules import messages as _messages
-    message, ig_message = _messages(post)
+    message, ig_message = _messages(post, site_link(db, boost, post))
 
     if ad_account is None:
         return {"status": "failed", "state": "failed",

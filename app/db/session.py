@@ -150,6 +150,48 @@ class AdAccount(Base):
         self._refresh_token = encrypt(value)
 
 
+# --- Listing website (Engine 5) ---
+class ListingSite(Base):
+    """One website per home: homes.resmara.com/<slug>. Written by the campaign build, drawn by
+    one template in code (app/services/listing_site.py). The slug never changes."""
+    __tablename__ = "listing_sites"
+    id = Column(Integer, primary_key=True, index=True)
+    boost_id = Column(Integer, ForeignKey("boosts.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    slug = Column(String, nullable=False, unique=True, index=True)
+    status = Column(String, default="built")          # built | live | pending | sold | ended
+    version = Column(Integer, default=1)
+    content = Column(JSON, default={})                 # facts, headline, chapters, note, neighborhood, photos
+    brand = Column(JSON, default={})                   # brand kit snapshot (section 9)
+    checks = Column(JSON, default=[])                  # what the build checked, and any safe defaults used
+    # Section 3a: the price. Shown only when the sources agree; hidden the moment a change is suspected.
+    price_cents = Column(Integer, nullable=True)       # the price on the page, or None
+    price_mode = Column(String, default="auto")        # auto | agent | none
+    price_hold = Column(String, nullable=True)         # why the price is off while auto (a change suspected)
+    price_seen = Column(JSON, default={})              # last readings by source
+    price_email_at = Column(DateTime(timezone=True), nullable=True)
+    price_token = Column(String, nullable=True, index=True)
+    price_token_at = Column(DateTime(timezone=True), nullable=True)
+    share_asset_id = Column(Integer, nullable=True)    # the 1200x630 share image
+    checked_at = Column(DateTime(timezone=True), nullable=True)   # the daily load check
+    check_note = Column(Text, nullable=True)
+    ended_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ListingVisit(Base):
+    """A visitor on a listing website, at most one row per visitor per day."""
+    __tablename__ = "listing_visits"
+    __table_args__ = (UniqueConstraint("site_id", "visitor", "day", name="uq_listing_visit_day"),)
+    id = Column(Integer, primary_key=True, index=True)
+    site_id = Column(Integer, ForeignKey("listing_sites.id", ondelete="CASCADE"), nullable=False, index=True)
+    visitor = Column(String, nullable=False)
+    day = Column(String, nullable=False)               # YYYY-MM-DD (UTC)
+    source = Column(String, nullable=True)             # utm_content: which post or the ad
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 # --- Meta connection (Engine 1 Part B) ---
 class MetaConnection(Base):
     """One Meta connection per agent: their login, the Page they chose, its Instagram and the
@@ -393,6 +435,11 @@ class Lead(Base):
     note = Column(Text, nullable=True)
     notified_at = Column(DateTime(timezone=True), nullable=True)   # the alert email actually went
     email_error = Column(Text, nullable=True)                      # why it did not
+    # Engine 5: a lead from the listing website (form, call tap, text tap)
+    email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    visitor = Column(String, nullable=True)                        # one call/text lead per visitor per day
+    wants = Column(String, nullable=True)                          # showing | question | similar
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     __table_args__ = (UniqueConstraint("platform", "platform_comment_id", name="uq_leads_comment"),)
 

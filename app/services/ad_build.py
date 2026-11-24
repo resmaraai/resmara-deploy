@@ -91,6 +91,8 @@ def with_utm(url: str, listing: str, medium: str = "paid") -> str:
     query = dict(parse_qsl(parts.query))
     query.update({"utm_source": "resmara", "utm_medium": medium,
                   "utm_campaign": street_key(listing) or "listing"})
+    if medium == "paid":
+        query.setdefault("utm_content", "ad")   # the listing website's report: this visitor came from the ad
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
