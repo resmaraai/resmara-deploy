@@ -18,8 +18,8 @@ was at **1. Planned**: the PRs below were plans with no app code. Slice 1 is now
 | Live campaign: posting, ads, leads & reports (Engine 6) | #31 | `engine-6-brain.md` (#28) | 2. Ready for Dan (#40) |
 | Run it until it sells (Engine 8) | #33 | `engine-8-brain.md` (#29) | 2. Ready for Dan (#40) |
 | Marketing pages in the Team room (Engine 9) | #84 | `engine-9-brain.md` (#31) | Built by Dan (waiting on credentials) |
-| Billing (Engine 10) | #85 | `engine-10-brain.md` (#35) | 1. Planned |
-| Support & Ask Resmara (Engine 11) | #86 | `engine-11-brain.md` (#36) | 1. Planned |
+| Billing (Engine 10) | #85 | `engine-10-brain.md` (#35) | 2. Ready for Dan (#41) |
+| Support & Ask Resmara (Engine 11) | #86 | `engine-11-brain.md` (#36) | 2. Ready for Dan (#41) |
 
 (Engine 7 was folded into Engine 9.)
 
