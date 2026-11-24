@@ -3480,6 +3480,9 @@ function renderBuildroom(){
                 ? '<span class="tiny" title="' + esc(t.claimed_by) + ' has this claimed. Editing it is refused until they release it or the claim goes stale.">held</span>'
                 : '<button class="ghost tiny" data-brtake="' + t.id + '">take over</button>')) +
         ' <button class="ghost tiny" data-brtest="' + t.id + '">tested</button>' +
+        // Only a row that came from a pull request can have a preview environment; the server
+        // carries the number so this button never offers a link that cannot exist.
+        (t.pr ? ' <button class="ghost tiny" data-brpreview="' + t.id + '" title="Open the Render preview environment for PR #' + esc(t.pr) + '">preview</button>' : '') +
         ' <button class="ghost tiny" data-brdel="' + t.id + '">delete</button>';
       // The title is the door to the whole task: the preview underneath is one line, and clicking
       // it opens the full description, the history and an editable box. A description you cannot
@@ -3503,6 +3506,7 @@ function renderBuildroom(){
         '</tr>';
       if (!open) return main;
       const meta = [
+        (t.pr ? 'PR #' + esc(t.pr) : 'no pull request'),
         'Added ' + esc(String(t.created_at || '').slice(0, 10)) + ' by ' + esc(brPerson(t.created_by) || '—'),
         t.assigned_to ? 'assigned to ' + esc(brPerson(t.assigned_to)) : 'not assigned',
         t.tested_at ? 'tested by ' + esc(brPerson(t.tested_by)) + ' on ' + esc(String(t.tested_at).slice(0, 10)) +
@@ -3575,6 +3579,26 @@ function brToggle(id){
   renderBuildroom();
 }
 
+// A preview link is only knowable by asking GitHub (Render reports it as a deployment on the
+// pull request's head commit), so the click is one request. The window is opened BEFORE that
+// request: a window.open after an await is no longer attached to the click and every browser
+// blocks it, which reads as a button that does nothing.
+function brPreview(id){
+  const w = window.open('', '_blank');
+  api('/api/admin/buildroom/' + id + '/preview')
+    .then(d => {
+      if (d && d.ok && d.url) {
+        if (w) { try { w.location = d.url; } catch (e) { w.close(); window.open(d.url, '_blank'); } }
+        else window.open(d.url, '_blank');
+        brNote('Opened the preview for PR #' + d.pr + (d.state && d.state !== 'success' ? ' (still ' + d.state + ')' : '') + '.', true);
+      } else {
+        if (w) w.close();
+        brNote((d && d.why) || 'No preview for that task yet.', false);
+      }
+    })
+    .catch(err => { if (w) w.close(); brNote(brExplain(err), false); });
+}
+
 async function brAssign(id, who){
   try {
     await api('/api/admin/buildroom/' + id, { method: 'PATCH',
@@ -3611,6 +3635,7 @@ $('brTable').addEventListener('click', (e) => {
   else if (b.dataset.brtake) brAct(b.dataset.brtake, '/claim', { by: brMe(), force: true });
   else if (b.dataset.brrelease) brAct(b.dataset.brrelease, '/release', { by: brMe(), force: true });
   else if (b.dataset.brtest) brAct(b.dataset.brtest, '/tested');
+  else if (b.dataset.brpreview) brPreview(b.dataset.brpreview);
   else if (b.dataset.brdel) {
     if (!confirm('Delete this task from the board? The claim lock goes with it.')) return;
     api('/api/admin/buildroom/' + b.dataset.brdel, { method: 'DELETE' })
