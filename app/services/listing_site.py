@@ -173,7 +173,11 @@ def brand_snapshot(kit: Dict[str, Any]) -> Dict[str, Any]:
     fonts = [f for f in (kit.get("fonts") or []) if f][:2] or ["Playfair Display", "Jost"]
     if len(fonts) == 1:
         fonts.append(fonts[0])
-    legal = [l for l in (kit.get("legal") or []) if l and not re.search(r"equal housing", l, re.I)]
+    lines = kit.get("legal")
+    if not lines:
+        from app.services.brand_investigator import legal_lines
+        lines = legal_lines(kit)
+    legal = [l for l in (lines or []) if l and not re.search(r"equal housing", l, re.I)]
     return {
         "agent": kit.get("agent") or "", "brokerage": kit.get("company") or kit.get("brokerage") or "",
         "license": kit.get("license") or "", "phone": kit.get("phone") or "", "email": kit.get("email") or "",
@@ -910,7 +914,7 @@ def render(site: ListingSite, boost: Boost, *, status: str = "live", preview: bo
     facts = visible_facts(c)
     street, city_from_address = street_and_city(boost.address)
     city = facts.get("city") or city_from_address
-    price = price_text(site.price_cents) if status in ("live", "built", "pending") or preview else ""
+    price = price_text(site.price_cents) if status in ("live", "built") else ""   # off market: no price
     photos = list(c.get("photos") or [])
     agent = b.get("agent") or "Your agent"
     first = agent.split(" ")[0]
@@ -943,6 +947,8 @@ def render(site: ListingSite, boost: Boost, *, status: str = "live", preview: bo
                 f'{esc(photo_url(name, 1200))} 1200w, {esc(photo_url(name, 1800))} 1800w" sizes="(max-width:700px) 100vw, 60vw" '
                 f'alt="{esc((c.get("rooms") or {}).get(name) or street)}"{"" if eager else " loading=lazy"} decoding="async">')
 
+    mini = " · ".join(x for x in [facts.get("beds") and f"{facts['beds']} beds", facts.get("baths") and f"{facts['baths']} baths",
+                                  facts.get("sqft") and f"{int(facts['sqft']):,} sq ft", facts.get("lot")] if x)
     contact_btns = (f'<a class="btn accent" href="tel:{esc(tel)}" onclick="rmTap(&#39;call&#39;)">Call</a>'
                     f'<a class="btn light" href="sms:{esc(tel)}" onclick="rmTap(&#39;text&#39;)">Text</a>') if tel else ""
     chapters_html = ""
@@ -969,7 +975,7 @@ def render(site: ListingSite, boost: Boost, *, status: str = "live", preview: bo
 <section class="hero">{hero_media}<div class="hero-shade"></div><div class="hero-text">
 <span class="chip">{esc(chip)}</span><h1>{esc(street)}</h1><p class="city">{esc(city)}</p>
 {f'<p class="price">Listed at {esc(price)}</p>' if price else (f'<p class="price ask">Ask {esc(first)} about pricing</p>' if not off_market else '')}
-<p class="mini">{esc(" · ".join(v for k, v in rows if k in ("Bedrooms", "Bathrooms", "Living area", "Lot") and v) )}</p>
+<p class="mini">{esc(mini)}</p>
 <div class="hero-btns"><a class="btn accent" href="#contact" onclick="rmWant(&#39;{"similar" if off_market else "showing"}&#39;)">{cta}</a>
 {f'<button type="button" class="btn ghost" onclick="rmView(0)">See all {len(photos)} photos</button>' if photos else ''}</div></div></section>
 {f'<section class="facts" id="details">' + "".join(f'<div><small>{esc(k)}</small><b>{esc(v)}</b></div>' for k, v in rows) + '</section>' if rows else ''}
@@ -1052,7 +1058,7 @@ a{{color:inherit}}.pv{{background:#12354d;color:#fff;text-align:center;font-size
 .logo{{height:38px;width:auto}}.brand{{font-family:var(--h);font-size:20px}}.links{{display:flex;gap:22px;margin-left:auto;font-size:14px}}
 .links a{{text-decoration:none}}.btn{{display:inline-block;border:0;border-radius:6px;padding:13px 22px;font:600 15px var(--b);text-decoration:none;cursor:pointer;text-align:center}}
 .btn.small{{padding:9px 16px;font-size:14px}}.accent{{background:var(--a);color:#fff}}.dark{{background:var(--p);color:#fff}}
-.ghost{{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.7)}}.light{{background:#fff;color:var(--p)}}
+.ghost{{background:#fff;color:var(--p)}}.light{{background:#fff;color:var(--p)}}
 .banner{{background:var(--p);color:#fff;text-align:center;padding:12px;font-weight:600;letter-spacing:.02em}}
 .hero{{position:relative;min-height:86vh;display:flex;align-items:flex-end;overflow:hidden;color:#fff}}
 .hero-media{{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background-size:cover;background-position:center}}
@@ -1092,7 +1098,7 @@ a{{color:inherit}}.pv{{background:#12354d;color:#fff;text-align:center;font-size
 .lb-track img{{flex:0 0 100%;width:100%;height:100%;object-fit:contain;scroll-snap-align:center}}
 .lb button{{position:absolute;z-index:2;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:6px;padding:10px 14px;cursor:pointer}}
 .lb-x{{top:16px;right:16px}}.lb-p{{left:16px}}.lb-n{{right:16px}}.lb-c{{position:absolute;bottom:18px;color:#fff;font-size:14px}}
-@media (max-width:760px){{.links{{display:none}}.top{{padding:10px 16px}}.top .btn{{margin-left:auto}}
+@media (max-width:760px){{.links{{display:none}}.top{{padding:12px 16px}}.top .btn{{display:none}}.brand{{font-size:18px}}.logo{{height:32px}}
 .ch{{grid-template-columns:1fr;gap:22px;margin-bottom:60px}}.ch.flip .ch-pics{{order:0}}.ch-small{{right:-6px}}.ch.flip .ch-small{{left:-6px}}
 .grid{{grid-template-columns:repeat(2,1fr)}}.facts div{{padding:16px 18px;min-width:33%}}.hero{{min-height:78vh}}
 .bar{{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--bg);box-shadow:0 -2px 10px rgba(0,0,0,.12);padding:8px 8px calc(8px + env(safe-area-inset-bottom))}}
