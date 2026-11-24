@@ -171,10 +171,31 @@ def main():
           state.text[:160])
     check("and quotes the price", state.json()["price_label"] == "$49")
 
-    # Engine 4 (slice 1): build first, pay to unlock. The first build needs no card.
-    build = client.post("/api/boosts/%d/build" % boost_id, json={"force": True}, headers=auth)
-    check("an unpaid campaign builds first (pay to unlock)", build.status_code in (200, 202),
-          "%s %s" % (build.status_code, build.text[:160]))
+    # Engine 4 (slice 1): build first, pay to unlock. The first build needs no card, so what
+    # must still refuse is the money gate. Ask the gates themselves - a POST here would start a
+    # real engine run, which is the one thing a test must never do.
+    from fastapi import HTTPException
+    from app.api.billing import allow_build, require_paid
+    db = SessionLocal()
+    try:
+        unpaid_boost = db.query(Boost).filter(Boost.id == boost_id).first()
+        unpaid_user = db.query(User).filter(User.email == "pay-test@example.com").first()
+        try:
+            allow_build(unpaid_boost, unpaid_user, db)
+            check("an unpaid campaign builds first (pay to unlock)", True)
+        except HTTPException as e:  # noqa: BLE001 - the build gate must be open here
+            check("an unpaid campaign builds first (pay to unlock)", False,
+                  "%s %s" % (e.status_code, e.detail))
+        try:
+            require_paid(unpaid_boost, unpaid_user, db)
+            check("launching it without paying is refused", False, "the gate opened")
+        except HTTPException as e:
+            check("launching it without paying is refused", e.status_code == 402, e.detail)
+            check("the refusal is machine-readable",
+                  isinstance(e.detail, dict) and e.detail.get("error") == "payment_required",
+                  e.detail)
+    finally:
+        db.close()
 
     launch = client.post("/api/boosts/%d/launch" % boost_id, json={}, headers=auth)
     check("an unpaid campaign cannot launch", launch.status_code == 402, launch.status_code)
