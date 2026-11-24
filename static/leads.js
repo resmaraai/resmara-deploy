@@ -130,13 +130,13 @@ function leadsPanel(c, index) {
     body = `<p class="leads-empty">Could not check for comments just now: ${esc(cache.error)}</p>`;
   } else if (leads.length) {
     const row = (l, i) => `<li class="${l.done ? 'done' : ''}">
-    <span class="lead-av${l.source === 'web' || l.source === 'call' ? ' web' : ''}">${esc(initials(l.name))}</span>
-    <div class="lead-body"><b>${esc(l.name)}</b><span class="lead-where">${esc(l.where)} · ${esc(l.ago)}</span><p>${l.source === 'call' ? esc(l.text) : '“' + esc(l.text) + '”'}</p>${(l.email || l.phone) && l.source !== 'call' ? `<small class="lead-contact">${[l.email, l.phone].filter(Boolean).map(esc).join(' · ')}</small>` : ''}${l.post ? `<small>On: ${esc(l.post)}</small>` : ''}${leadNoteBlock(l, index, i)}</div>
+    <span class="lead-av${l.source === 'web' || l.source === 'call' || l.source === 'text' ? ' web' : ''}">${esc(initials(l.name))}</span>
+    <div class="lead-body"><b>${esc(l.name)}</b><span class="lead-where">${esc(l.where)} · ${esc(l.ago)}</span><p>${l.source === 'call' || l.source === 'text' ? esc(l.text) : '“' + esc(l.text) + '”'}</p>${(l.email || l.phone) && l.source !== 'call' && l.source !== 'text' ? `<small class="lead-contact">${[l.email, l.phone].filter(Boolean).map(esc).join(' · ')}</small>` : ''}${l.post ? `<small>On: ${esc(l.post)}</small>` : ''}${leadNoteBlock(l, index, i)}</div>
     <div class="lead-actions"><button type="button" class="lead-tick" title="${l.done ? 'Mark as not contacted yet' : 'Mark that you’ve contacted them'}" aria-pressed="${l.done}" onclick="toggleLead(${index},${i})">${l.done ? '✓ Contacted' : 'Mark as contacted'}</button><button type="button" class="lead-note-btn" onclick="openLeadNote(${index},${i})">${l.note ? 'Edit note' : 'Add note'}</button><button type="button" class="lead-remove" title="Not a lead" aria-label="Remove lead" onclick="removeLead(${index},${i})">✕</button></div>
   </li>`;
-    const fromPage = leads.map((l, i) => [l, i]).filter(([l]) => l.source === 'web' || l.source === 'call');
-    const fromSocial = leads.map((l, i) => [l, i]).filter(([l]) => !(l.source === 'web' || l.source === 'call'));
-    body = `<h3 class="leads-group">From your listing page</h3>${fromPage.length ? `<ul class="leads-list">${fromPage.map(([l, i]) => row(l, i)).join('')}</ul>` : '<p class="leads-empty">No form or call leads yet.</p>'}
+    const fromPage = leads.map((l, i) => [l, i]).filter(([l]) => l.source === 'web' || l.source === 'call' || l.source === 'text');
+    const fromSocial = leads.map((l, i) => [l, i]).filter(([l]) => !(l.source === 'web' || l.source === 'call' || l.source === 'text'));
+    body = `<h3 class="leads-group">From your listing page</h3>${fromPage.length ? `<ul class="leads-list">${fromPage.map(([l, i]) => row(l, i)).join('')}</ul>` : '<p class="leads-empty">No form, call or text leads yet.</p>'}
     <h3 class="leads-group">From your posts and ad</h3>${fromSocial.length ? `<ul class="leads-list">${fromSocial.map(([l, i]) => row(l, i)).join('')}</ul>` : '<p class="leads-empty">No comment leads yet.</p>'}`;
   } else {
     body = '<p class="leads-empty">No leads yet. When someone fills in the form or taps Call on your listing page, or comments with interest in the home, they show up here.</p>';
@@ -156,7 +156,7 @@ function leadsPanel(c, index) {
 // Where a lead came from, the same three buckets the server counts (app/services/lead_counts.py).
 function leadBucket(l) {
   const src = String(l.source || '').toLowerCase(), where = String(l.where || '').toLowerCase();
-  if (src === 'web' || src === 'call' || src === 'form' || where.includes('listing page') || where.includes('website')) return 'website';
+  if (src === 'web' || src === 'call' || src === 'text' || src === 'form' || where.includes('listing page') || where.includes('website')) return 'website';
   if (src === 'ad_comment' || /\bad$/.test(where) || where.includes(' ad ')) return 'ad';
   return 'posts';
 }
@@ -289,19 +289,72 @@ function openReportFromCalendar(day) {
 
 // ---- Pause / resume a running campaign ------------------------------------------------------
 // Pausing stops the scheduled posts and pauses the Meta ad. Nothing is deleted.
-function campaignPaused(c) { return (state.pausedCampaigns || []).includes(c && c.address); }
+function campaignPaused(c) {
+  if (campaignBoostId(c) != null) return !!(c && c.paused_at);
+  return (state.pausedCampaigns || []).includes(c && c.address);
+}
+function campaignSold(c) { return String((c && c.listing_status) || '').toLowerCase() === 'sold'; }
 function pauseButton(c) {
-  if (!campaignIsLive(c) || campaignPhase(c) === 'completed') return '';
+  if (!campaignIsLive(c) || campaignPhase(c) === 'completed' || campaignSold(c)) return '';
   const i = [...state.campaigns, ...examples].indexOf(c);
   return campaignPaused(c)
-    ? `<button type="button" class="card-pause resume" onclick="resumeCampaign(${i})">▶ Resume</button>`
-    : `<button type="button" class="card-pause" onclick="pauseCampaign(${i})">❚❚ Pause</button>`;
+    ? `<button type="button" class="card-pause resume" onclick="resumeCampaign(${i})">Turn it back on</button>`
+    : `<button type="button" class="card-pause" onclick="pauseCampaign(${i})">Pause</button>`;
 }
+// Engine 6, section 7: the Pause pop-up keeps It's pending and It sold as the agent's fail-safe,
+// because the listing sites can lag the MLS by a day or more.
 function pauseCampaign(i) {
   const c = [...state.campaigns, ...examples][i];
-  show(`<span class="eyebrow">PAUSE CAMPAIGN</span><h2>Pause ${esc(c.address)}?</h2><p>Your scheduled posts stop and your listing ad pauses, so Meta stops spending your ad budget. Nothing is deleted.</p><p>Resume any time and it picks up where it left off.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Keep running</button><button class="campaign-primary" onclick="setCampaignPaused(${i},true)">Pause campaign</button></div>`);
+  show(`<span class="eyebrow">PAUSE CAMPAIGN</span><h2>Pause ${esc(c.address)}?</h2>
+  <p>Your scheduled posts stop and your listing ad pauses, so Meta stops spending your ad budget. Nothing is deleted.</p>
+  <p>If the home is under contract or sold, tell us and your website stops taking showing requests too.</p>
+  <div class="pause-choices">
+   <button type="button" class="campaign-primary" onclick="setCampaignPaused(${i},true,'pause')">Just pause it</button>
+   <button type="button" class="campaign-primary navy" onclick="setCampaignPaused(${i},true,'pending')">It’s pending</button>
+   <button type="button" class="campaign-primary navy" onclick="setCampaignPaused(${i},true,'sold')">It sold</button>
+   <button type="button" class="campaign-primary navy" onclick="modal.close()">Keep running</button>
+  </div>`);
 }
 function resumeCampaign(i) { setCampaignPaused(i, false); }
+
+function setCampaignPaused(i, on, why, confirm) {
+  const c = [...state.campaigns, ...examples][i];
+  const id = campaignBoostId(c);
+  if (id != null && window.RM && RM.request) {
+    const path = '/api/boosts/' + id + (on ? '/pause' : '/resume');
+    const body = on ? { why: why || 'pause' } : { confirm: !!confirm };
+    RM.request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (res) {
+        if (modal.open) modal.close();
+        if (on) c.paused_at = c.paused_at || new Date().toISOString(); else c.paused_at = null;
+        if (on && why === 'sold') c.listing_status = 'sold';
+        if (on && why === 'pending') c.listing_status = 'pending';
+        if (!on && c.listing_status === 'pending') c.listing_status = 'active';
+        if (res && res.card_state) c.card_state = res.card_state;
+        persist(); dashboard('campaigns');
+        toast(!on ? 'Turned back on. Your posts and ad are running again, and you get the paused days back.'
+          : why === 'sold' ? 'Marked sold. Your ad and posts have stopped.'
+          : why === 'pending' ? 'Paused as pending. Your website now says it’s under contract.'
+          : 'Campaign paused. Posts and your ad are on hold.');
+      })
+      .catch(function (err) {
+        const d = err && err.detail;
+        if (d && d.error === 'still_pending') {
+          show(`<span class="eyebrow">TURN IT BACK ON</span><h2>${esc(d.message)}</h2><p>Resmara still reads the listing as Pending. If the deal fell through and the listing sites haven’t caught up yet, you can turn it back on now.</p>
+          <div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Not yet</button><button class="campaign-primary" onclick="setCampaignPaused(${i},false,null,true)">Turn it back on</button></div>`);
+          return;
+        }
+        toast((d && d.message) || (err && err.message) || 'That didn’t go through. Please try again.');
+      });
+    return;
+  }
+  const list = (state.pausedCampaigns || []).filter(a => a !== c.address);
+  if (on) list.push(c.address);
+  state.pausedCampaigns = list; persist();
+  if (modal.open) modal.close();
+  dashboard('campaigns');
+  toast(on ? 'Campaign paused. Posts and your ad are on hold.' : 'Campaign resumed. Posts and your ad are running again.');
+}
 
 // ---- Run it until it sells (autopilot) -------------------------------------------------------
 // When on, Resmara builds a brand-new 14-day round (new posts + a new ad, never a repeat) every
@@ -339,7 +392,7 @@ function untilSoldInfo(i, from) {
   const c = [...state.campaigns, ...examples][i], on = untilSoldOn(c);
   const r = state.reviews && state.reviews[typeof reviewKey === 'function' ? reviewKey(c, i) : 'review-' + (c.reviewId || i)];
   const budget = r && Number(r.scope && r.scope.budget) > 0 ? Number(r.scope.budget) : 50;
-  show(`<span class="eyebrow">RUN IT UNTIL IT SELLS</span><h2>Fresh marketing every 2 weeks, until it’s under contract.</h2><ul class="until-sold-list"><li><b>A brand-new campaign every 2 weeks.</b> 14 new posts and a new ad each round. Nothing is repeated.</li><li><b>Every round gets smarter.</b> Resmara looks at which posts and ad reached the most people and got the most clicks, and builds the next round around what worked.</li><li><b>You stay in control.</b> The next round is ready to look over 3 days before it starts. Change anything you like, or leave it and it goes live on its own.</li><li><b>$39 per renewal</b>, charged to your card on file when the new round is built. Your $${budget} ad budget runs again each round and is billed by Meta, as always.</li><li><b>Pending pauses it; sold ends it.</b> No round is built or charged while the listing is pending. You can turn it off any time.</li></ul><div class="until-sold-quote"><span class="eyebrow">TELL YOUR SELLERS</span><p>“${UNTIL_SOLD_LINE}”</p></div>${from === 'scope'
+  show(`<span class="eyebrow">RUN IT UNTIL IT SELLS</span><h2>Fresh marketing every 2 weeks, until it’s under contract.</h2><ul class="until-sold-list"><li><b>A brand-new campaign every 2 weeks.</b> 14 new posts and a new ad each round. Nothing is repeated.</li><li><b>Every round gets smarter.</b> Resmara looks at which posts and ad reached the most people and got the most clicks, and builds the next round around what worked.</li><li><b>Set it and forget it.</b> Each new round goes live on its own, right when the last one ends. We email you at every turn, so you don’t need to log in.</li><li><b>$39 per renewal</b>, charged to your card on file only once the new round is built. Your $${budget} ad budget runs again each round and is billed by Meta, as always.</li><li><b>Pending pauses it; sold ends it.</b> No round is built or charged while the listing is pending, and if it comes back on the market we pick up where we left off. You can turn it off any time.</li></ul><div class="until-sold-quote"><span class="eyebrow">TELL YOUR SELLERS</span><p>“${UNTIL_SOLD_LINE}”</p></div>${from === 'scope'
     ? `<div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Got it</button></div>`
     : `<div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">${on ? 'Keep it on' : 'Not now'}</button>${on
       ? `<button class="campaign-primary" onclick="setUntilSold(${i},false,'${from}')">Turn off</button>`
@@ -394,16 +447,6 @@ function setUntilSold(i, on, from, consented) {
   if (from === 'scope') details(i); else dashboard('campaigns');
   toast(on ? 'On. Resmara will run a fresh campaign every 2 weeks until this home sells.' : 'Turned off. This campaign ends after its 14 days.');
 }
-function setCampaignPaused(i, on) {
-  const c = [...state.campaigns, ...examples][i];
-  const list = (state.pausedCampaigns || []).filter(a => a !== c.address);
-  if (on) list.push(c.address);
-  state.pausedCampaigns = list; persist();
-  if (modal.open) modal.close();
-  dashboard('campaigns');
-  toast(on ? 'Campaign paused. Posts and your ad are on hold.' : 'Campaign resumed. Posts and your ad are running again.');
-}
-
 // ---- Open and close the sections of a live campaign ---------------------------------------
 // Each section (leads, calendar, listing page, reports) folds up to its heading, so an agent can
 // work through one at a time. A chevron on the right of the heading shows which way it goes, and

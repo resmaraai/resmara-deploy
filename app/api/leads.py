@@ -46,6 +46,9 @@ class LeadOut(BaseModel):
     notified_at: Optional[datetime] = None
     email_error: Optional[str] = None
     note: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    wants: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:

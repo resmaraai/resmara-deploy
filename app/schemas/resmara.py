@@ -149,6 +149,9 @@ class BoostOut(BaseModel):
     budget_confirmed_at: Optional[datetime] = None
     paused_at: Optional[datetime] = None
     paused_days: int = 0
+    paused_reason: Optional[str] = None
+    # Engine 6: what the card says (Active, Paused, Paused · Pending, Completed · Sold, ...).
+    card_state: Optional[str] = None
     photo_permission_at: Optional[datetime] = None
     class Config:
         from_attributes = True

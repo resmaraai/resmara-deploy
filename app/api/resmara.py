@@ -262,6 +262,11 @@ def list_boosts(current_user=Depends(get_current_user), db: Session = Depends(ge
         row.posts_total, row.posts_approved, row.posts_published = counted.get(b.id, (0, 0, 0))
         row.new_leads = new_leads.get(b.id, 0)
         row.image = covers.get(b.id)
+        try:
+            from app.services.campaign_state import card_state
+            row.card_state = card_state(b) or None
+        except Exception:  # noqa: BLE001 - the card still draws without it
+            pass
         if row.posts_total and not b.paid_at and not current_user.is_admin and not b.hidden:
             from app.api.billing import is_locked
             row.locked = is_locked(b, current_user, db)

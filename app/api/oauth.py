@@ -22,6 +22,11 @@ _DEFAULT_SCOPES = [
     # content on Instagram" use cases exist on the app (added 2026-11-05). Ask for nothing
     # the app is not entitled to - one unknown scope fails the entire dialog.
     "pages_manage_posts", "instagram_basic", "instagram_content_publish",
+    # Reports, the ad and leads (Engine 6), on the app's use cases and in App Review since 23 Nov:
+    # post and ad numbers, the ad as the agent's Page, comment leads, and the agent's own
+    # "Under contract!" posts.
+    "read_insights", "ads_read", "pages_manage_ads", "instagram_manage_insights",
+    "instagram_manage_comments", "pages_read_user_content",
 ]
 META_SCOPES = [s.strip() for s in os.getenv("META_SCOPES", ",".join(_DEFAULT_SCOPES)).split(",") if s.strip()]
 

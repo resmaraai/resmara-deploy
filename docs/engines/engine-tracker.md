@@ -14,9 +14,9 @@ was at **1. Planned**: the PRs below were plans with no app code. Slice 1 is now
 | Sign-up tour | #83 | `resmara-signup-tour-engine.md` (#23) | 2. Ready for Dan (#39) |
 | Listing link check (Engine 3) | #28 | `engine-3-brain.md` (#24) | 2. Ready for Dan (#39) |
 | Campaign build & pay to unlock (Engine 4) | #29 | `engine-4-brain.md` (#26) | 2. Ready for Dan (#39) |
-| Listing website (Engine 5) | #30 | `engine-5-brain.md` (#27, #28) | 1. Planned |
-| Live campaign: posting, ads, leads & reports (Engine 6) | #31 | `engine-6-brain.md` (#28) | 1. Planned |
-| Run it until it sells (Engine 8) | #33 | `engine-8-brain.md` (#29) | 1. Planned |
+| Listing website (Engine 5) | #30 | `engine-5-brain.md` (#27, #28) | 2. Ready for Dan (#40) |
+| Live campaign: posting, ads, leads & reports (Engine 6) | #31 | `engine-6-brain.md` (#28) | 2. Ready for Dan (#40) |
+| Run it until it sells (Engine 8) | #33 | `engine-8-brain.md` (#29) | 2. Ready for Dan (#40) |
 | Marketing pages in the Team room (Engine 9) | #84 | `engine-9-brain.md` (#31) | Built by Dan (waiting on credentials) |
 | Billing (Engine 10) | #85 | `engine-10-brain.md` (#35) | 1. Planned |
 | Support & Ask Resmara (Engine 11) | #86 | `engine-11-brain.md` (#36) | 1. Planned |
@@ -44,7 +44,8 @@ the sign-up tour PR, under `docs/journey/`.
 
 ## Up next
 
-1. **Slice 2** (Engines 5, 6, 8): audit, then build, the same way as slice 1. Then slice 3.
+1. **Slice 2** (Engines 5, 6, 8): built, Ready for Dan in #40 (stacked on #39; audit in `slice-2-audit.md`).
+2. **Slice 3** (Engines 10, 11, 9): audit, then build, the same way.
 2. Not engines: the Resmara setup session in Calendly, the support@resmara.com inbox, and turning on Stripe Tax (Adam). The AI tutorial videos are done (PRs #25 and #30).
 3. Later: the growth plan engine (Founding Agents, coach codes).
 

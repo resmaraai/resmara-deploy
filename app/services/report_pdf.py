@@ -122,8 +122,12 @@ def _render(pages: list[_Page]) -> bytes:
     return bytes(out)
 
 
-def _rows_from_payload(report: dict) -> list[tuple[str, str, str]]:
-    """The numbers the page shows, in the order the page shows them."""
+def _rows_from_payload(report: dict, version: str = "agent") -> list[tuple[str, str, str]]:
+    """The numbers the page shows, in the order the page shows them.
+
+    version="seller" is the client-ready report (Engine 6, section 9): reach, views, engagement and
+    clicks to the listing, and NO cost, spend or cost per click anywhere."""
+    seller = version == "seller"
     organic = report.get("organic") or {}
     paid = report.get("paid") or {}
     summary = organic.get("summary") or {}
@@ -131,31 +135,49 @@ def _rows_from_payload(report: dict) -> list[tuple[str, str, str]]:
     rows: list[tuple[str, str, str]] = []
 
     posts = report.get("posts") or {}
-    rows.append(("Posts", f"{posts.get('published', 0)} published of {posts.get('total', 0)}",
-                 f"{posts.get('approved', 0)} approved by the agent"))
+    rows.append(("Posts", f"{posts.get('published', 0)} published", "" if seller else
+                 f"of {posts.get('total', 0)}; {posts.get('approved', 0)} approved"))
     if measured:
-        rows.append(("Reach", str(summary.get("reach") or 0),
-                     f"Across {summary.get('posts') or 0} posts with measured results"))
-        rows.append(("Interactions", str(summary.get("interactions") or 0),
+        rows.append(("Reach", f"{int(summary.get('reach') or 0):,}",
+                     f"People who saw the posts, across {summary.get('posts') or 0} posts"))
+        rows.append(("Engagement", f"{int(summary.get('interactions') or 0):,}",
                      "Likes, comments, shares, saves and clicks on the posts"))
     else:
         reason = organic.get("reason") or "Meta has not shared numbers for this period yet"
-        rows.append(("Reach", "Not measured", reason))
+        rows.append(("Reach", "-", reason))
 
-    ads = report.get("ads") or {}
-    rows.append(("Ad", f"{ads.get('live', 0)} running of {ads.get('total', 0)}", ""))
     if paid.get("ok"):
-        rows.append(("Ad impressions", str(paid.get("impressions") or 0),
-                     f"{paid.get('clicks') or 0} clicks, {paid.get('link_clicks') or 0} to the listing"))
-        spend = paid.get("spend")
-        rows.append(("Ad spend", f"${spend}" if spend not in (None, "") else "Not reported",
-                     "Billed by Meta on the agent's own card, not by Resmara"))
-    elif paid.get("reason"):
-        rows.append(("Ad numbers", "Not measured", str(paid.get("reason"))))
+        rows.append(("Ad views", f"{int(paid.get('impressions') or 0):,}",
+                     f"Seen by {int(paid.get('reach') or 0):,} people" if paid.get("reach") else ""))
+        rows.append(("Clicks to the listing", f"{int(paid.get('link_clicks') or 0):,}", ""))
+        if not seller:
+            spend = paid.get("spend")
+            rows.append(("Ad spend", f"${spend}" if spend not in (None, "") else "-",
+                         "Billed by Meta on your own card, not by Resmara"))
+            rows.append(("Cost per click", f"${paid.get('cpc')}" if paid.get("cpc") not in (None, "") else "-",
+                         f"Click rate {paid.get('ctr')}%" if paid.get("ctr") not in (None, "") else ""))
+            if paid.get("frequency") not in (None, ""):
+                rows.append(("Frequency", str(paid.get("frequency")), "Times each person saw the ad, on average"))
+    elif paid.get("reason") and not seller:
+        rows.append(("Ad numbers", "-", str(paid.get("reason"))))
+
+    website = report.get("website") or {}
+    if website.get("visits") is not None and website:
+        srcs = website.get("sources") or {}
+        top = ", ".join(f"{k}: {v}" for k, v in sorted(srcs.items(), key=lambda kv: -kv[1])[:4])
+        rows.append(("Listing website visits", f"{int(website.get('visits') or 0):,}", "" if seller else top))
+    if not seller:
+        leads = report.get("leads") or {}
+        if leads:
+            total = sum(int(v or 0) for v in leads.values())
+            rows.append(("Leads", str(total),
+                         f"Ad comments {leads.get('ad_comments', 0)} · post comments {leads.get('post_comments', 0)} · "
+                         f"website form {leads.get('website_form', 0)} · calls {leads.get('calls', 0)} · "
+                         f"texts {leads.get('texts', 0)}"))
     return rows
 
 
-def campaign_report_pdf(report: dict, *, brand: str = "Resmara") -> bytes:
+def campaign_report_pdf(report: dict, *, brand: str = "Resmara", version: str = "agent") -> bytes:
     """Render the Day 7 / Day 14 report payload as a real PDF.
 
     Takes the same dict ``GET /api/boosts/{id}/reports/{day}`` returns, so the download can never
@@ -169,16 +191,20 @@ def campaign_report_pdf(report: dict, *, brand: str = "Resmara") -> bytes:
         pages.append(_Page())
         return pages[-1]
 
+    seller = version == "seller"
     day = report.get("report_day") or report.get("day") or 7
-    page.text(f"Day {day} report", size=20, bold=True, gap=6)
+    page.text(f"Day {day} marketing report" if seller else f"Day {day} report", size=20, bold=True, gap=6)
     page.text(str(report.get("address") or ""), size=12, gap=5)
+    who = report.get("prepared_by") or {}
+    if seller and (who.get("agent") or who.get("brokerage")):
+        page.text("Prepared by " + ", ".join(x for x in (who.get("agent"), who.get("brokerage")) if x), size=10.5, gap=4)
     period = report.get("period") or {}
     label = period.get("label") if isinstance(period, dict) else str(period or "")
     if label:
         page.text(label, size=9.5, gap=4)
     page.rule()
 
-    rows = report.get("stats") or _rows_from_payload(report)
+    rows = _rows_from_payload(report, version) if seller else (report.get("stats") or _rows_from_payload(report))
     for row in rows:
         if isinstance(row, dict):
             lab, val, note = row.get("label"), row.get("value"), row.get("note") or ""
@@ -190,8 +216,11 @@ def campaign_report_pdf(report: dict, *, brand: str = "Resmara") -> bytes:
         for line in _wrap(str(note), 9.5, PAGE_W - 2 * MARGIN - 8) if note else []:
             page.text(line, size=9.5, indent=8, gap=1)
 
-    for heading, key in (("What worked", "worked"), ("What to change", "change"),
-                         ("Notes", "notes")):
+    sections = (("What worked", "worked"), ("Notes", "notes")) if seller else (
+        ("What worked", "worked"), ("What to change", "change"), ("Notes", "notes"), ("Ad audit log", "audit_lines"))
+    report = dict(report)
+    report["audit_lines"] = [a.get("line") for a in report.get("audit") or [] if a.get("line")]
+    for heading, key in sections:
         body = report.get(key)
         if not body:
             continue
@@ -209,8 +238,9 @@ def campaign_report_pdf(report: dict, *, brand: str = "Resmara") -> bytes:
 
     page.rule()
     stamp = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
-    for line in _wrap(f"{brand} - generated {stamp}. Reach, clicks and leads are what this report "
-                      f"ranks on; ad spend is billed by Meta on the agent's card.", 8.5,
-                      PAGE_W - 2 * MARGIN):
+    footer = (f"Generated {stamp}. Numbers come from Meta; anything Meta hasn't shared shows as a dash." if seller
+              else f"{brand} - generated {stamp}. Reach, clicks and leads are what this report ranks on; "
+                   f"ad spend is billed by Meta on the agent's card.")
+    for line in _wrap(footer, 8.5, PAGE_W - 2 * MARGIN):
         page.text(line, size=8.5, gap=1)
     return _render(pages)

@@ -1592,3 +1592,27 @@ html.dark .sg-video{border-color:#1f4d68}
 .rmh .rh-robot .home-world{width:96%;max-width:none;aspect-ratio:1.42;margin:0 auto}
 .rmh .rh-frame>*{text-align:left}
 .rmh .rh-panel[data-tab="posts"] .rh-frame{height:auto;max-height:580px}
+
+/* Engine 5: section 3, Your listing page */
+.lp-stats{grid-template-columns:repeat(4,1fr)}
+@media (max-width:640px){.lp-stats{grid-template-columns:repeat(2,1fr)}}
+.lp-stats small{color:#12354d}
+.lp-bar{color:#12354d}
+.lp-live{display:block;width:100%;height:560px;border:0;background:#fff}
+.lp-locked .lp-live{filter:blur(6px);pointer-events:none}
+.lp-actions{display:flex;flex-wrap:wrap;gap:10px}
+.lp-actions .campaign-primary{width:auto;margin:0}
+.lp-check{background:#e2f0f8;border-radius:14px;padding:14px 16px;margin-bottom:14px;color:#12354d}
+.lp-check ul{list-style:none;padding:0;margin:8px 0 0}
+.lp-check li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}
+.lp-check .campaign-primary{width:auto;margin:0;padding:8px 14px}
+#lp-share{position:fixed;inset:0;z-index:200;background:rgba(18,53,77,.45);display:grid;place-items:center;padding:20px}
+.lp-share-card{background:#fff;color:#12354d;border-radius:16px;padding:24px;max-width:380px;width:100%;display:grid;gap:10px}
+.lp-share-card h3{margin:0}.lp-share-card p{margin:0 0 6px;word-break:break-all}
+.lp-share-card .campaign-primary{margin:0;text-align:center;text-decoration:none}
+html.dark .shell .lp-check{background:#0f2231;color:#fff}
+html.dark .shell .lp-stats small,html.dark .shell .lp-bar{color:#fff}
+/* Engine 6: the Pause pop-up's four choices */
+.pause-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.pause-choices .campaign-primary{width:100%;margin:0}
+@media (max-width:520px){.pause-choices{grid-template-columns:1fr}}

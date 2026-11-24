@@ -120,6 +120,25 @@ def serve_upload(filename: str, w: int = 0):
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 app.include_router(api_router, prefix="/api")
+# Engine 5: the listing websites and what visitors do on them (paths are absolute in the module).
+from app.api.listing_pages import router as listing_pages_router  # noqa: E402
+app.include_router(listing_pages_router)
+
+
+@app.middleware("http")
+async def listing_host(request, call_next):
+    """homes.resmara.com/<slug> is the listing website; /photos/<file> its photos. One DNS record
+    points the whole host at this app, so every house is just a path (Engine 5, section 9)."""
+    host = (request.headers.get("host") or "").split(":")[0].lower()
+    if host.startswith("homes."):
+        path = request.scope.get("path") or "/"
+        if path in ("/", ""):
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse("https://www.resmara.com", status_code=302)
+        first = path.strip("/").split("/")[0]
+        if first not in ("photos", "api", "l") and "." not in first:
+            request.scope["path"] = "/l/" + path.strip("/")
+    return await call_next(request)
 
 
 def _migrate_failures():

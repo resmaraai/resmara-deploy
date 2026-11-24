@@ -98,6 +98,8 @@ ADDITIONS = {
         ("features", "JSON"),
     ],
     "ads": [
+        ("versions", "JSON"),      # Engine 6: every ad in the ad set (hook versions)
+        ("audit", "JSON"),         # Engine 6: the live ad audit's state
         ("meta_adset_id", "VARCHAR"),
         ("meta_creative_id", "VARCHAR"),
         ("reach", "INTEGER"),
@@ -123,6 +125,12 @@ ADDITIONS = {
     # A campaign is bought, not credited: these columns on an existing install are what let
     # the build gate ask "was this campaign paid for?" without a second query.
     "boosts": [
+        # Engine 6: why it's paused (agent | pending | sold), where the listing is read, what each
+        # source said last, and which one-time emails and alerts have gone out.
+        ("paused_reason", "VARCHAR"),
+        ("listing_sources", "JSON"),
+        ("listing_reads", "JSON"),
+        ("listing_notes", "JSON"),
         ("paid_at", "TIMESTAMP"),
         ("paid_amount_cents", "INTEGER"),
         # Hiding a campaign from the list is reversible and keeps its history; only the flag
@@ -162,6 +170,10 @@ ADDITIONS = {
     # The agent's note on a lead (added 21 Nov 2026).
     "leads": [
         ("note", "TEXT"),
+        ("email", "VARCHAR"),
+        ("phone", "VARCHAR"),
+        ("visitor", "VARCHAR"),
+        ("wants", "VARCHAR"),
     ],
     "orders": [
         ("user_id", "INTEGER"),
