@@ -1556,6 +1556,15 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
         tools=[{"type": "web_search"}],
     )
     research = _trunc(research, 7000)
+    # Engine 6, section 7: the same home on the listing sites is kept, so the hourly status check has
+    # more than one source to read.
+    try:
+        from app.services.listing_status import sources_from_research
+        found = sources_from_research(research)
+        if found:
+            boost.listing_sources = list(dict.fromkeys(list(boost.listing_sources or []) + found))[:6]
+    except Exception:  # noqa: BLE001
+        pass
 
     # --- R2: the agent's brand (Chat Completions -> JSON) -------------------
     website_provided = f"yes - {website}" if website else "no"
@@ -2014,7 +2023,20 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
             ad_hooks_note = {"error": f"{type(exc).__name__}: {exc}"[:200]}
             engine_notes.append(f"the ad hooks step failed: {type(exc).__name__}")
 
+    # Engine 5, section 5: the listing website is built in the same build, and lands with the rest.
+    site_note: dict = {}
+    try:
+        from app.services import listing_site
+        site = await listing_site.build(db, boost)
+        site_note = {"slug": site.slug, "url": listing_site.public_url(site), "checks": site.checks or []}
+        engine_notes.append(f"the listing website is ready at {listing_site.public_url(site)}"
+                            + (f" ({len(site.checks)} note(s))" if site.checks else ""))
+    except Exception as exc:  # noqa: BLE001 - the posts and the ad are usable without the website
+        site_note = {"error": f"{type(exc).__name__}: {exc}"[:200]}
+        engine_notes.append(f"the listing website step failed: {type(exc).__name__}")
+
     return {
+        "listing_site": site_note,
         "ad_hooks": ad_hooks_note,
         "source": source,
         "engine": engine,

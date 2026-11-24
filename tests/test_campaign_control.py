@@ -50,6 +50,14 @@ PENDING_HTML = """<html><body><h1>1234 Elm Street, Austin, TX 78704</h1>
 PAGE = {"body": LISTING_HTML, "status": 200}
 
 
+def status_page(status):
+    """A listing page with its status field, the way the listing sites publish it."""
+    import json as _json
+    data = {"props": {"pageProps": {"property": {"streetAddress": "1234 Elm Street", "homeStatus": status}}}}
+    return f'<html><script id="__NEXT_DATA__" type="application/json">{_json.dumps(data)}</script></html>'
+
+
+
 class Listing(http.server.BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802 - http.server's API
         if self.path.startswith("/gone"):
@@ -182,7 +190,8 @@ body = resp.json()
 check("resume restarts delivery", resp.status_code == 200 and body["status"] == "resumed",
       resp.text[:300])
 check("  ...and moves the ad set's end date by the paused days",
-      (body.get("end_time") or "").startswith("2026-12-15"), str(body)[:300])
+      any(str(st.get("adset_end_time") or "").startswith("2026-12-15") for st in body.get("steps") or []),
+      str(body)[:300])
 
 resp = client.post(f"/api/boosts/99999/pause", headers=agent)
 check("someone else's campaign cannot be paused", resp.status_code == 404)
@@ -220,16 +229,22 @@ try:
 finally:
     db.close()
 
+# Engine 6, section 7: the words on a page are never a status; the status field behind it is.
+PAGE["body"] = LISTING_HTML
 resp = client.post("/api/admin/listings/sweep", headers={"x-resmara-token": "sweep-token"})
 body = resp.json()
 check("the sweep runs with the system token", resp.status_code == 200, resp.text[:200])
-check("  ...and records the listing as still active", body.get("active") == 1, str(body)[:300])
+check("  ...and words alone ('Sold', 'pending') never decide", body.get("sold") == 0 and body.get("pending") == 0,
+      str(body)[:300])
+PAGE["body"] = status_page("FOR_SALE")
+body = client.post("/api/admin/listings/sweep", headers={"x-resmara-token": "sweep-token"}).json()
+check("  ...and records the listing as still active",
+      (body.get("details") or [{}])[0].get("status") == "active", str(body)[:300])
 
-PAGE["body"] = SOLD_HTML
+PAGE["body"] = status_page("SOLD")
 resp = client.post("/api/admin/listings/sweep", headers={"x-resmara-token": "sweep-token"})
 body = resp.json()
 check("a sold listing is caught on the next sweep", body.get("sold") == 1, str(body)[:300])
-check("  ...and the campaign is paused because of it", body.get("paused") == 1, str(body)[:300])
 db = SessionLocal()
 row = db.query(Boost).filter(Boost.id == boost["id"]).first()
 check("  ...with the state saved on the campaign",

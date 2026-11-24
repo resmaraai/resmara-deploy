@@ -8,7 +8,7 @@ removing a row from the list must not make that number go down.
 Buckets:
   ad       comments on the ad (source ad_comment, or a manual lead marked as from the ad)
   posts    comments on the 14 posts
-  website  the listing page: form fills and Call taps (source form / call)
+  website  the listing page: form fills, Call taps and Text taps (source web / call / text)
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ BUCKETS = ("ad", "posts", "website")
 def bucket_of(source: str | None, channel: str | None) -> str:
     src = (source or "").lower()
     ch = (channel or "").lower()
-    if src in ("form", "call", "web") or "listing page" in ch or "website" in ch:
+    if src in ("form", "call", "web", "text") or "listing page" in ch or "website" in ch:
         return "website"
     if src == "ad_comment" or ch.endswith(" ad") or " ad " in ch:
         return "ad"

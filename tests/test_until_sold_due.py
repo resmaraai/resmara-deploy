@@ -71,7 +71,7 @@ def main() -> int:
         off = add("3 Off Street", launched_at=now - timedelta(days=13), until_sold=False)
         # Paused: held, and nothing is charged while it is paused.
         paused = add("4 Paused Street", launched_at=now - timedelta(days=13), paused_at=now - timedelta(days=1))
-        # The listing went pending: this is what stops it by itself.
+        # The listing went pending: Engine 8 pauses it and it stays on (held, never charged).
         pending = add("5 Pending Street", launched_at=now - timedelta(days=13), listing_status="pending")
         sold = add("6 Sold Street", launched_at=now - timedelta(days=13), listing_status="sold")
         # A repeat campaign: round 1 means the next one is round 2.
@@ -89,7 +89,7 @@ def main() -> int:
         check("autopilot off is not due", off.id in ids("too_early") or off.id not in ids("due"))
         check("a paused campaign is held, not due", paused.id in ids("held") and paused.id not in ids("due"))
         check("held says why", "paused" in (next(r for r in result["held"] if r["boost_id"] == paused.id)["why"] or ""))
-        check("pending stops itself", pending.id in ids("ending"))
+        check("pending doesn't end the series (it waits, paused)", pending.id not in ids("ending"))
         check("sold stops itself", sold.id in ids("ending"))
         check("a pending listing is never due", pending.id not in ids("due"))
         check("round one's next is round two", next(r for r in result["due"] if r["boost_id"] == second.id)["next_round"] == 2)

@@ -192,72 +192,66 @@ async def _set_objects(ad: Ad, state: str) -> list:
     return steps
 
 
+class PauseBody(BaseModel):
+    # Engine 6, section 7: the Pause pop-up's choices. "pause" = Just pause it.
+    why: str = "pause"
+
+
 @router.post("/boosts/{boost_id}/pause")
-async def pause_campaign(boost_id: int, db: Session = Depends(get_db),
+async def pause_campaign(boost_id: int, body: Optional[PauseBody] = None, db: Session = Depends(get_db),
                          current_user: User = Depends(get_current_user)):
-    """Stop delivery now; the end date moves out by however long it stays paused (§4.5)."""
+    """Stop the ad and the remaining posts now (§4.5). It's pending / It sold are the agent's
+    fail-safe: the listing sites can lag the MLS by a day, so this stops marketing immediately."""
+    from app.services import campaign_state
     boost = _owned(boost_id, current_user, db)
-    ad = db.query(Ad).filter(Ad.boost_id == boost.id).first()
-    if not ad or not ad.meta_ad_id:
+    if not boost.launched_at and not db.query(Ad).filter(Ad.boost_id == boost.id, Ad.meta_ad_id.isnot(None)).first():
         raise HTTPException(status_code=404, detail={
             "error": "no_live_ad", "message": "This campaign has not been launched yet."})
+    why = (body.why if body else "pause").lower()
+    if why == "sold":
+        from app.services import listing_status as lst
+        await campaign_state.on_status(db, boost, lst.SOLD, [], "the agent said it sold", send=False)
+        return {"status": "paused", "reason": "sold", "card_state": campaign_state.card_state(boost)}
+    if why == "pending":
+        if boost.until_sold:
+            pass   # Run it until it sells stays on, paused (Engine 8, section 5)
+        result = await campaign_state.pause(db, boost, "pending", by="agent")
+        result["card_state"] = campaign_state.card_state(boost)
+        return result
     if boost.paused_at:
-        return {"status": "already_paused", "paused_at": boost.paused_at.isoformat()}
-    steps = await _set_objects(ad, "PAUSED")
-    boost.paused_at = datetime.now(timezone.utc)
-    ad.status = "paused"
-    db.add(Event(user_id=current_user.id, boost_id=boost.id, event_type="campaign_paused",
-                 payload={"steps": steps}))
-    db.commit()
-    return {"status": "paused", "steps": steps,
-            "paused_at": boost.paused_at.isoformat(),
-            "note": "The end date moves out by the days it stays paused."}
+        return {"status": "already_paused", "paused_at": boost.paused_at.isoformat(),
+                "card_state": campaign_state.card_state(boost)}
+    result = await campaign_state.pause(db, boost, "agent", by="agent")
+    result["note"] = "The end date moves out by the days it stays paused."
+    result["card_state"] = campaign_state.card_state(boost)
+    return result
+
+
+class ResumeBody(BaseModel):
+    confirm: bool = False
 
 
 @router.post("/boosts/{boost_id}/resume")
-async def resume_campaign(boost_id: int, db: Session = Depends(get_db),
+async def resume_campaign(boost_id: int, body: Optional[ResumeBody] = None, db: Session = Depends(get_db),
                           current_user: User = Depends(get_current_user)):
-    """Restart delivery and give the seller back the days they lost (§4.5)."""
+    """Turn it back on: the ad and the remaining posts run again and the paused days come back (§4.5).
+    If Resmara still reads the listing as pending, the agent confirms first (Engine 6, section 7)."""
+    from app.services import campaign_state
     boost = _owned(boost_id, current_user, db)
-    ad = db.query(Ad).filter(Ad.boost_id == boost.id).first()
-    if not ad or not ad.meta_ad_id:
-        raise HTTPException(status_code=404, detail={"error": "no_live_ad",
-                                                     "message": "Nothing to resume."})
     if not boost.paused_at:
         return {"status": "not_paused"}
-    steps = await _set_objects(ad, "ACTIVE")
-    paused = boost.paused_at
-    if paused.tzinfo is None:
-        paused = paused.replace(tzinfo=timezone.utc)
-    days = max(0, (datetime.now(timezone.utc) - paused).days)
-    boost.paused_days = int(boost.paused_days or 0) + days
-    boost.paused_at = None
-    # The run's clock is the ad set's end date, so the days it was paused are added there —
-    # on Meta, not only in Resmara's database (§4.5).
-    end_time = None
-    if ad.meta_adset_id:
-        from app.services.ad_build import schedule
-        start = getattr(boost, "go_live_date", None)
-        window = schedule(start) if start else {}
-        if window:
-            base = datetime.fromisoformat(window["end_time"])
-            end_time = (base + timedelta(days=int(boost.paused_days))).isoformat()
-            try:
-                from app.services.launch import resolve_ad_account
-                from app.services.ad_platforms import get_platform_client
-                account = resolve_ad_account(boost, current_user, db)
-                if account:
-                    client = get_platform_client(account)
-                    if hasattr(client, "update_object"):
-                        await client.update_object(ad.meta_adset_id, {"end_time": end_time})
-                        steps.append({"adset_end_time": end_time, "ok": True})
-            except Exception as exc:  # noqa: BLE001 - report the failure instead of hiding it
-                steps.append({"adset_end_time": end_time, "ok": False, "error": str(exc)[:200]})
-    ad.status = "live"
-    db.add(Event(user_id=current_user.id, boost_id=boost.id, event_type="campaign_resumed",
-                 payload={"steps": steps, "days_added": days, "end_time": end_time}))
-    db.commit()
-    return {"status": "resumed", "steps": steps, "days_added": days, "end_time": end_time}
+    if (boost.listing_status or "") == "sold":
+        raise HTTPException(status_code=409, detail={
+            "error": "sold", "message": "This home sold, so the campaign can't be turned back on. A new listing is a new campaign."})
+    still = [r for r in (boost.listing_reads or {}).values()
+             if isinstance(r, dict) and r.get("status") == "pending" and r.get("layer") in ("known", "standard", "ai")]
+    pending_now = boost.paused_reason == "pending" or (boost.listing_status or "") == "pending"
+    if still and pending_now and not (body and body.confirm):
+        raise HTTPException(status_code=409, detail={
+            "error": "still_pending", "message": "Your listing still shows Pending. Turn it back on anyway?"})
+    result = await campaign_state.resume(db, boost, by="agent", override_pending=bool(still and pending_now))
+    result["card_state"] = campaign_state.card_state(boost)
+    return result
 
 
 # --------------------------------------------------------------------------- the numbers
@@ -324,7 +318,7 @@ def _days_running(boost) -> int:
 @router.post("/admin/listings/sweep")
 async def listings_sweep(x_resmara_token: str = Header(default=""),
                          db: Session = Depends(get_db)):
-    """Daily listing check across every running campaign. Called by the scheduler.
+    """Hourly listing check across every running campaign (Engine 6, section 7). Called by the scheduler.
 
     Machine-called, so it uses the same shared token as the publisher; an unconfigured token
     refuses the call rather than letting anything on the internet trigger a pause.
@@ -455,3 +449,99 @@ def posts_purge(body: Optional[dict] = None, db: Session = Depends(get_db),
                           "via": "token" if current_user is None else "dashboard"}))
     db.commit()
     return {"deleted": int(deleted), "kept_boost_ids": sorted(keep), "remaining": db.query(Post).count()}
+
+
+@router.post("/admin/listings/own-posts")
+async def own_posts_sweep(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db)):
+    """Once a day: the agent's own business Page and Instagram, read for pending, sold and price
+    posts about each running campaign's home (Engine 6, section 7.6). Called by the scheduler."""
+    from app.core.config import settings as _settings
+    from app.services.campaign_state import own_posts_sweep as run
+
+    if not _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=503, detail="RESMARA_PUBLISH_TOKEN is not configured")
+    if x_resmara_token != _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=403, detail="Bad publish token")
+    return await run(db)
+
+
+@router.post("/admin/renewals/run")
+async def renewals_run(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db)):
+    """Run it until it sells, once a day (Engine 8). Reports only, unless RESMARA_RENEWALS_APPLY is on."""
+    from app.core.config import settings as _settings
+    from app.services import renewals
+
+    if not _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=503, detail="RESMARA_PUBLISH_TOKEN is not configured")
+    if x_resmara_token != _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=403, detail="Bad publish token")
+    if not renewals.apply_enabled():
+        plan = renewals.review(db)
+        return {"applied": False, "why": "RESMARA_RENEWALS_APPLY is off: report only", "counts": plan["counts"]}
+    result = await renewals.apply(db)
+    return {"applied": True, "counts": result["counts"]}
+
+
+@router.post("/admin/campaigns/daily")
+async def campaigns_daily(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db)):
+    """The once-a-day emails: day 7 and 14 reports, and Run it again on day 12 and at the end."""
+    from app.core.config import settings as _settings
+    from app.services import campaign_daily
+
+    if not _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=503, detail="RESMARA_PUBLISH_TOKEN is not configured")
+    if x_resmara_token != _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=403, detail="Bad publish token")
+    return campaign_daily.run(db)
+
+
+@router.post("/boosts/{boost_id}/run-again")
+async def run_again(boost_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Run it again · $39 (Engine 8, section 8): one click builds a fresh round, charges the saved card
+    when the build succeeded, and it goes live the next morning. The build takes minutes, so it runs
+    in the background and the agent gets the "goes live" email when it's done."""
+    from app.services import billing, renewals
+
+    boost = _owned(boost_id, current_user, db)
+    status = (boost.listing_status or "").lower()
+    if status in ("pending", "sold"):
+        raise HTTPException(status_code=409, detail={"error": status, "message": f"This listing is {status}."})
+    if renewals.waiting_round(db, boost) is not None and not renewals.declines(db, renewals.waiting_round(db, boost)):
+        return {"status": "building"}
+    try:
+        cards = await billing.list_cards(getattr(current_user, "stripe_customer_id", "") or "")
+    except Exception:  # noqa: BLE001
+        cards = []
+    if not cards:
+        raise HTTPException(status_code=402, detail={"error": "no_card",
+                                                     "message": "Add a card first, then Run it again."})
+
+    async def work(bid: int, uid: int):
+        s2 = SessionLocal()
+        try:
+            b2 = s2.query(Boost).filter(Boost.id == bid).first()
+            u2 = s2.query(User).filter(User.id == uid).first()
+            result = await renewals.run_again(s2, b2, u2)
+            s2.add(Event(user_id=uid, boost_id=bid, event_type="run_again", payload={k: result.get(k) for k in
+                                                                                      ("status", "why", "new_boost_id")}))
+            s2.commit()
+        finally:
+            s2.close()
+
+    asyncio.create_task(work(boost.id, current_user.id))
+    return {"status": "building", "message": "Resmara is building a fresh 14 days. It's charged only when the build is "
+                                             "done, and goes live the next morning. We'll email you."}
+
+
+@router.post("/admin/ads/audit")
+async def ads_audit(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db)):
+    """The live ad audit, several times a day (Engine 6, section 5). Called by the scheduler."""
+    from app.core.config import settings as _settings
+    from app.services import ad_audit
+
+    if not _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=503, detail="RESMARA_PUBLISH_TOKEN is not configured")
+    if x_resmara_token != _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=403, detail="Bad publish token")
+    result = await ad_audit.sweep(db)
+    return {"checked": result["checked"], "changed": result["changed"]}

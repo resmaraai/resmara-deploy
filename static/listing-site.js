@@ -98,28 +98,115 @@ function listingPageStats(c) {
     ? (((typeof leadCache === 'function' && leadCache(c)) || {}).rows || [])
     : (typeof campaignLeads === 'function' ? campaignLeads(c) : []);
   const demo = LISTING_DEMO[c.address];
+  const site = listingSiteCache[campaignBoostId(c)];
+  if (site && site.stats) return { visits: site.stats.visits, forms: site.stats.forms, calls: site.stats.calls, texts: site.stats.texts };
   return {
     visits: Number(c.page_visits != null ? c.page_visits : (demo ? demo.visits : 0)),
     forms: leads.filter(l => l.source === 'web').length,
-    calls: leads.filter(l => l.source === 'call').length
+    calls: leads.filter(l => l.source === 'call').length,
+    texts: leads.filter(l => l.source === 'text').length
   };
 }
+function listingStatsHTML(s) {
+  return [['Visits', s.visits], ['Form leads', s.forms], ['Call leads', s.calls], ['Text leads', s.texts]]
+    .map(([label, n]) => `<div><b>${Number(n || 0).toLocaleString()}</b><small>${label}</small></div>`).join('');
+}
 
-// Section 3 of a live campaign.
-// draft = before launch: no numbers yet, and the page isn't public until the campaign launches.
+// Section 3 of the campaign: "Your listing page". Everything about the website lives here, never at
+// the top of the page (Engine 5, section 6). draft = in review: no numbers yet.
+const listingSiteCache = {};
+function listingButtons(index) {
+  return `<div class="lp-actions"><button type="button" class="campaign-primary" onclick="openListingPage(${index})">Preview your website</button>
+  <button type="button" class="campaign-primary navy" onclick="copyListingLink(${index})">Copy link</button>
+  <button type="button" class="campaign-primary navy" onclick="shareListingLink(${index})">Share</button></div>`;
+}
 function listingPagePanel(c, index, draft) {
-  const s = listingPageStats(c);
-  return `<section class="panel listing-page-panel${draft ? ' lp-draft' : ''}" id="listing-page">
-  <h2 class="campaign-step-title"><span>3</span> Your listing page</h2>
-  <p class="fine">${draft ? 'Resmara built this website for the home in your brand. It goes live when you launch: every post and your ad link here, and anyone who fills in the form or taps Call comes straight to you.' : 'Resmara built this page for the home in your brand. Every post and your ad send people here, and anyone who fills in the form or taps Call comes straight to you.'}</p>
-  ${draft ? '' : `<div class="lp-stats"><div><b>${s.visits.toLocaleString()}</b><small>Visits</small></div><div><b>${s.forms}</b><small>Form leads</small></div><div><b>${s.calls}</b><small>Calls</small></div></div>`}
+  const id = campaignBoostId(c);
+  const head = `<h2 class="campaign-step-title"><span>3</span> Your listing page</h2>`;
+  if (id == null) {
+    const s = listingPageStats(c);
+    return `<section class="panel listing-page-panel${draft ? ' lp-draft' : ''}" id="listing-page">${head}
+  <p class="fine">Resmara built this website for the home in your brand. Every post and your ad send people here, and anyone who fills in the form, taps Call or taps Text comes straight to you.</p>
+  ${draft ? '' : `<div class="lp-stats">${listingStatsHTML(s)}</div>`}
   <div class="lp-frame"><div class="lp-bar">${esc(listingPageAddress(c))}</div><div class="lp-view">${listingSiteHTML(c, index)}</div></div>
-  <button type="button" class="campaign-primary" onclick="openListingPage(${index})">View full page</button>
-</section>`;
+  ${listingButtons(index)}</section>`;
+  }
+  setTimeout(() => loadListingSite(index, draft), 0);
+  return `<section class="panel listing-page-panel${draft ? ' lp-draft' : ''}" id="listing-page">${head}<div class="lp-body"><p class="fine">Loading your website…</p></div></section>`;
+}
+async function loadListingSite(index, draft) {
+  const c = [...state.campaigns, ...examples][index], id = campaignBoostId(c);
+  const box = document.querySelector('#listing-page .lp-body');
+  if (!box || id == null) return;
+  let site;
+  try { site = await RM.request('/api/boosts/' + id + '/site'); } catch (e) {
+    box.innerHTML = '<p class="fine">Your website couldn’t load. Reload the page to try again.</p>'; return;
+  }
+  listingSiteCache[id] = site;
+  if (!site.built) {
+    box.innerHTML = `<p class="fine">Resmara builds a website for this home with your campaign.</p>` +
+      (Number(c.posts_total || 0) ? `<button type="button" class="campaign-primary" onclick="buildListingSite(${index})">Build my website</button>` : '');
+    return;
+  }
+  const check = (site.please_check || []).map(k => {
+    const label = { beds: 'Bedrooms', baths: 'Bathrooms', sqft: 'Square feet', lot: 'Lot', year_built: 'Year built', garage: 'Garage', city: 'City' }[k] || k;
+    return `<li><span>${esc(label)}: <b>${esc(String((site.facts || {})[k] ?? ''))}</b></span><button type="button" class="campaign-primary navy" onclick="confirmListingFact(${index},'${esc(k)}')">Looks right</button></li>`;
+  }).join('');
+  box.innerHTML = `<p class="fine">${site.public
+      ? 'Resmara built this website for the home in your brand. Every post and your ad send people here, and anyone who fills in the form, taps Call or taps Text comes straight to you.'
+      : 'Resmara built this website for the home in your brand. Its link works once you unlock the campaign.'}</p>
+  ${draft ? '' : `<div class="lp-stats">${listingStatsHTML(site.stats || {})}</div>`}
+  ${check ? `<div class="lp-check"><b>Please check before these show on your website</b><ul>${check}</ul></div>` : ''}
+  <div class="lp-frame${site.public ? '' : ' lp-locked'}"><div class="lp-bar">${esc(site.url.replace(/^https?:\/\//, ''))}</div>
+  <iframe class="lp-live" src="${esc(site.preview_url)}" title="Your listing page" loading="lazy"></iframe></div>
+  ${site.public ? listingButtons(index) : ''}`;
+}
+async function buildListingSite(index) {
+  const c = [...state.campaigns, ...examples][index];
+  const box = document.querySelector('#listing-page .lp-body');
+  if (box) box.innerHTML = '<p class="fine">Building your website…</p>';
+  try { await RM.request('/api/boosts/' + campaignBoostId(c) + '/site/build', { method: 'POST' }); } catch (e) {}
+  loadListingSite(index, !(typeof campaignIsLive === 'function' && campaignIsLive(c)));
+}
+async function confirmListingFact(index, key) {
+  const c = [...state.campaigns, ...examples][index];
+  try {
+    await RM.request('/api/boosts/' + campaignBoostId(c) + '/site/confirm',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: [key] }) });
+  } catch (e) { toast('That didn’t save. Please try again.'); return; }
+  loadListingSite(index, !(typeof campaignIsLive === 'function' && campaignIsLive(c)));
+}
+function listingLink(c) {
+  const site = listingSiteCache[campaignBoostId(c)];
+  return site && site.url ? site.url : 'https://' + listingPageAddress(c);
+}
+function copyListingLink(index) {
+  const url = listingLink([...state.campaigns, ...examples][index]);
+  const done = () => toast('Link copied.');
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, () => window.prompt('Copy this link:', url));
+  else window.prompt('Copy this link:', url);
+}
+function shareListingLink(index) {
+  const c = [...state.campaigns, ...examples][index], url = listingLink(c);
+  const phone = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  if (phone && navigator.share) { navigator.share({ title: c.address, url }).catch(() => {}); return; }
+  document.getElementById('lp-share')?.remove();
+  const box = document.createElement('div');
+  box.id = 'lp-share';
+  const body = encodeURIComponent('Take a look at ' + c.address + ': ' + url);
+  box.innerHTML = `<div class="lp-share-card" role="dialog" aria-label="Share your website"><h3>Share your website</h3><p>${esc(url.replace(/^https?:\/\//, ''))}</p>
+  <button type="button" class="campaign-primary" onclick="copyListingLink(${index})">Copy link</button>
+  <a class="campaign-primary navy" href="mailto:?subject=${encodeURIComponent(c.address)}&body=${body}">Email it</a>
+  <a class="campaign-primary navy" href="sms:?&body=${body}">Text it</a>
+  <button type="button" class="campaign-primary navy" onclick="document.getElementById('lp-share').remove()">Close</button></div>`;
+  box.addEventListener('click', e => { if (e.target === box) box.remove(); });
+  document.body.appendChild(box);
 }
 
 function openListingPage(index) {
   const c = [...state.campaigns, ...examples][index];
+  const site = listingSiteCache[campaignBoostId(c)];
+  if (site && site.built) { window.open(site.public ? site.url : site.preview_url, '_blank', 'noopener'); return; }
   closeListingPage();
   const wrap = document.createElement('div');
   wrap.id = 'listing-page-full';
@@ -182,7 +269,5 @@ function listingCallTap(event, index) {
 // Only the numbers change; redrawing the whole section would wipe a form mid-thank-you.
 function refreshListingStats(index) {
   const c = [...state.campaigns, ...examples][index], s = listingPageStats(c);
-  document.querySelectorAll('.lp-stats').forEach(el => {
-    el.innerHTML = `<div><b>${s.visits.toLocaleString()}</b><small>Visits</small></div><div><b>${s.forms}</b><small>Form leads</small></div><div><b>${s.calls}</b><small>Calls</small></div>`;
-  });
+  document.querySelectorAll('.lp-stats').forEach(el => { el.innerHTML = listingStatsHTML(s); });
 }

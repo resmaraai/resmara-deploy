@@ -1,4 +1,4 @@
-"""The daily listing watcher (Ad Engine §5).
+"""The listing watcher (Ad Engine §5), now hourly and status-field based (Engine 6, section 7).
 
 A campaign runs for fourteen days on a house that can sell on day three. When it does, the
 agent is paying Meta to advertise a listing that is gone. This sweeper reads the listing link
@@ -95,39 +95,9 @@ async def _pause(boost: Boost, db: Session, reason: str) -> list:
     return steps
 
 
-async def sweep(db: Session, *, limit: int = 100) -> dict:
-    """Check every running campaign that has a listing link, and act on the answer."""
-    now = datetime.now(timezone.utc)
-    boosts = (db.query(Boost)
-              .filter(Boost.listing_url.isnot(None), Boost.launched_at.isnot(None))
-              .order_by(Boost.listing_checked_at.is_(None).desc(), Boost.listing_checked_at)
-              .limit(limit).all())
-    counts = {ACTIVE: 0, SOLD: 0, PENDING: 0, CONTINGENT: 0, OFFLINE: 0, UNKNOWN: 0}
-    results = {"checked": 0, "sold": 0, "pending": 0, "offline": 0, "unknown": 0,
-               "paused": 0, "details": []}
-    for boost in boosts:
-        if boost.paused_at:
-            continue
-        status_code, html = await read_listing(boost.listing_url)
-        verdict = classify(status_code, html)
-        boost.listing_status = verdict
-        boost.listing_checked_at = now
-        results["checked"] += 1
-        counts[verdict] = counts.get(verdict, 0) + 1
-        detail = {"boost_id": boost.id, "listing_status": verdict, "http": status_code}
-        sold = verdict in (SOLD, OFFLINE)
-        if sold:
-            steps = await _pause(boost, db, "listing " + verdict)
-            detail["paused"] = steps
-            results["paused"] += 1
-            db.add(Event(user_id=boost.user_id, boost_id=boost.id, event_type="listing_sold",
-                         payload={"listing_status": verdict, "steps": steps,
-                                  "url": boost.listing_url}))
-        results["details"].append(detail)
-    db.commit()
-    results["sold"] = counts[SOLD]
-    results["pending"] = counts[PENDING] + counts[CONTINGENT]
-    results["offline"] = counts[OFFLINE]
-    results["unknown"] = counts[UNKNOWN]
-    results["active"] = counts[ACTIVE]
-    return results
+async def sweep(db: Session, *, limit: int = 200) -> dict:
+    """Every hour (Engine 6, section 7): read each campaign's listing status across its sources and
+    act on a clear Pending or Sold. The work lives in campaign_state / listing_status now; the
+    word-matching above is kept only for callers that still ask for a quick classification."""
+    from app.services import campaign_state
+    return await campaign_state.sweep(db, limit=limit)

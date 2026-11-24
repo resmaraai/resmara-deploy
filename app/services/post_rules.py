@@ -140,16 +140,22 @@ def has_link(text: str) -> bool:
     return bool(URL_RE.search(text or ""))
 
 
-def messages(post) -> Tuple[str, str]:
-    """(facebook, instagram) text for one post, each with its own tags, never doubled."""
+def messages(post, link: Optional[str] = None) -> Tuple[str, str]:
+    """(facebook, instagram) text for one post, each with its own tags, never doubled.
+
+    `link` is the listing website (Engine 5), tagged with this post: Facebook carries it, Instagram
+    never does (Engine 4, 9c)."""
     body = strip_tags(getattr(post, "caption", "") or "")
+    fb_body = body
+    if link and not has_link(body):
+        fb_body = body + "\n\nSee the home: " + link
     ig_tags = (getattr(post, "hashtags", "") or "").strip()
     fb_tags = getattr(post, "hashtags_fb", None)
     if fb_tags is None:
         # A post built before Engine 4 has one tag list: Facebook takes at most two of it.
         fb_tags = " ".join(ig_tags.split()[:FACEBOOK_MAX])
     fb_tags = fb_tags.strip()
-    fb = (body + ("\n\n" + fb_tags if fb_tags else "")).strip()
+    fb = (fb_body + ("\n\n" + fb_tags if fb_tags else "")).strip()
     ig_body = getattr(post, "caption_ig", None)
     # Never a link on Instagram; the invitation is written at build time (older posts just lose links).
     ig_body = ig_body.strip() if ig_body else without_links(body)

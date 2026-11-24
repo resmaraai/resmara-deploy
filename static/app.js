@@ -26,7 +26,7 @@ async function syncLiveCampaigns(){
   // a visible change and must repaint, even though the campaign list itself is unchanged.
   // until_sold is in the signature too: turning autopilot on or off (here or on a phone) is a
   // visible change and the card must repaint, not wait for a reload.
-  const signature=list=>list.map(c=>[campaignBoostId(c),c.image||'',c.status,c.until_sold?'on':'off',Number(c.new_leads||0),c.launched_at||'',c.locked?'L':''].join(':')).join(',').slice(0,4000);
+  const signature=list=>list.map(c=>[campaignBoostId(c),c.image||'',c.status,c.until_sold?'on':'off',Number(c.new_leads||0),c.launched_at||'',c.locked?'L':'',c.card_state||'',c.paused_at||''].join(':')).join(',').slice(0,4000);
   const before=signature(state.campaigns);
   list.forEach(b=>{
    if(!b||b.id==null)return;
@@ -119,13 +119,15 @@ function mediaPath(u){return typeof mediaUrl==='function'?mediaUrl(u):u}
 // "Run until sold is on" tag. Run until sold itself is set on the campaign page.
 function cardFlags(c){
  const i=[...state.campaigns,...examples].indexOf(c),n=typeof newLeadCount==='function'?newLeadCount(c):0;
+ // Engine 8, section 6: a renewal waiting on a declined card says so, with one button.
+ if(/^Renewal on hold/.test(c.card_state||''))return `<div class="card-flags"><button type="button" class="card-leads" onclick="RM.addCard().then(r=>{if(r&&r.url)location.href=r.url}).catch(e=>toast(e.message))">Renewal on hold: card declined · Check billing</button></div>`;
  const leads=n?`<button type="button" class="card-leads" onclick="openLeads(${i})">${n} new lead${n>1?'s':''}</button>`:'';
  const sold=typeof untilSoldOn==='function'&&campaignPhase(c)!=='completed'&&untilSoldOn(c)?'<span class="card-until-sold">✓ Run until sold is on</span>':'';
  return leads||sold?`<div class="card-flags">${leads}${sold}</div>`:'';
 }
 function campaignCard(c,top){
  const ph=campaignPhase(c),key=encodeURIComponent(campaignKey(c));
- return `<article class="card">${typeof clientView==='function'&&clientView()&&examples.includes(c)?'<span class="card-sample">Sample</span>':''}${cardFlags(c)}${c.image?`<img src="${esc(mediaPath(c.image))}" alt="${esc(c.address)}">`:(c.live?`<div class="card-noimg">No photos yet — import the listing link</div>`:`<img src="${img}" alt="Illustrative property photo">`)}<div class="card-body"><div class="card-status-row"><span class="pill phase-${ph}${campaignPaused(c)?' is-paused':''}">${campaignPaused(c)?'Paused':PHASE_LABEL[ph]}</span><span class="card-actions">${pauseButton(c)}</span></div><h3>${esc(c.address)}</h3><p>${esc(c.area||'Your saved campaign draft')}</p><div class="progress"><i style="width:${c.live?Math.min(100,(c.posts_published||0)/Math.max(c.posts_total||14,1)*100):(c.day||0)/14*100}%"></i></div><div class="flex small"><span>${ph==='ready'?'Goes live '+esc(goLiveLabel(campaignGoLive(c))):c.live?(c.posts_total||0)+' posts · '+(c.posts_published||0)+' published':c.day?'Day '+c.day+' of 14':'Awaiting campaign generation'}</span><span>${ph==='ready'?'Facebook + Instagram':c.live?esc(c.status==='Draft'?'Not built yet':'Meta ad'):c.day?'Facebook + Instagram':'Draft'}</span></div><button class="alt" onclick="details(${[...state.campaigns,...examples].indexOf(c)})">${ph==='staged'?'Review staged campaign':ph==='completed'?'View campaign':'View active campaign'} &nbsp;</button></div></article>`;
+ return `<article class="card">${typeof clientView==='function'&&clientView()&&examples.includes(c)?'<span class="card-sample">Sample</span>':''}${cardFlags(c)}${c.image?`<img src="${esc(mediaPath(c.image))}" alt="${esc(c.address)}">`:(c.live?`<div class="card-noimg">No photos yet — import the listing link</div>`:`<img src="${img}" alt="Illustrative property photo">`)}<div class="card-body"><div class="card-status-row"><span class="pill phase-${ph}${campaignPaused(c)||/Sold|Pending/.test(c.card_state||'')?' is-paused':''}">${c.card_state&&/Paused|Sold|Pending/.test(c.card_state)?esc(c.card_state):campaignPaused(c)?'Paused':PHASE_LABEL[ph]}</span><span class="card-actions">${pauseButton(c)}</span></div><h3>${esc(c.address)}</h3><p>${esc(c.area||'Your saved campaign draft')}</p><div class="progress"><i style="width:${c.live?Math.min(100,(c.posts_published||0)/Math.max(c.posts_total||14,1)*100):(c.day||0)/14*100}%"></i></div><div class="flex small"><span>${ph==='ready'?'Goes live '+esc(goLiveLabel(campaignGoLive(c))):c.live?(c.posts_total||0)+' posts · '+(c.posts_published||0)+' published':c.day?'Day '+c.day+' of 14':'Awaiting campaign generation'}</span><span>${ph==='ready'?'Facebook + Instagram':c.live?esc(c.status==='Draft'?'Not built yet':'Meta ad'):c.day?'Facebook + Instagram':'Draft'}</span></div><button class="alt" onclick="details(${[...state.campaigns,...examples].indexOf(c)})">${ph==='staged'?'Review staged campaign':ph==='completed'?'View campaign':'View active campaign'} &nbsp;</button></div></article>`;
 }
 function campaignList(){
  syncLiveCampaigns();

@@ -6,7 +6,7 @@ into the service so publishing no longer depends on a computer in Dan's office b
 
   * every run (Render fires at :00/:15/:30/:45 UTC) publish every approved post whose time has come,
     read the comments on the live campaigns and email new Social leads, and sync the build room;
-  * every sixth hour, re-read each running campaign's listing (sold / pending / offline);
+  * every hour, read each running campaign's listing status across its sources (Engine 6);
   * once a day around 14:00 UTC, check every Meta connection's token health.
 
 Two deliberate choices:
@@ -114,10 +114,22 @@ def main() -> int:
         say(f"system-check found a failure: {body}")
 
     now = datetime.now(timezone.utc)
-    if now.hour % 6 == 0 and now.minute < 15:
-        run_step("listings sweep", "/api/admin/listings/sweep", 180)
+    # Engine 6, section 5: the live ad audit, every 4 hours.
+    if now.hour % 4 == 1 and now.minute < 15:
+        run_step("ad audit", "/api/admin/ads/audit", 300, quiet_when='"changed":0')
+    # Engine 6, section 7: every hour, so a pending home stops within the hour.
+    if now.minute < 15:
+        run_step("listings sweep", "/api/admin/listings/sweep", 240, quiet_when='"pending":0,"sold":0,"back":0')
     if now.hour == 14 and now.minute < 10:
         run_step("meta token health", "/api/oauth/meta/check-all", 180)
+        # Engine 8: Run it until it sells (report only until RESMARA_RENEWALS_APPLY is on), then the
+        # once-a-day emails: day 7 and 14 reports, Run it again on day 12 and at the end.
+        run_step("renewals", "/api/admin/renewals/run", 600)
+        run_step("campaign emails", "/api/admin/campaigns/daily", 180, quiet_when='"reports":0,"run_again":0')
+        # Engine 6: the agent's own Page and Instagram, for pending, sold and price posts.
+        run_step("own posts", "/api/admin/listings/own-posts", 240, quiet_when='"found":0')
+        # Engine 5: every live listing website renders and has its photos.
+        run_step("listing websites", "/api/admin/sites/check", 180, quiet_when='"flagged":[]')
         # Engine 1 §6: welcome / day 3 / day 7 / day 14, once each, stopping at the first
         # launched campaign. Idempotent server-side, so a doubled tick sends nothing twice.
         status, body = post_body("/api/admin/onboarding/emails/run", 180)

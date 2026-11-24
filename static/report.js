@@ -117,7 +117,7 @@ async function openPropertyReport(index, day, btn) {
     box.innerHTML = '<div class="notice">Your numbers appear here once Meta returns them for this campaign.</div>';
     return;
   }
-  box.innerHTML = `<div class="pr-bar"><b>Day ${day} report</b><div><button type="button" class="pr-close" onclick="openPropertyReport(${index},${day},document.querySelector('.pr-pick.on'))">Close</button><button type="button" class="campaign-primary" onclick="downloadReportPDF(this)">Download PDF</button></div></div>${propertyReportHTML(d)}`;
+  box.innerHTML = `<div class="pr-bar"><b>Day ${day} report</b><div><button type="button" class="pr-close" onclick="openPropertyReport(${index},${day},document.querySelector('.pr-pick.on'))">Close</button><button type="button" class="campaign-primary" onclick="downloadReportPDF(this)">Download PDF</button>${campaignBoostId(c) != null ? `<button type="button" class="campaign-primary navy" onclick="downloadSellerReport(${index},${day},this)">Seller version</button>` : ''}</div></div>${propertyReportHTML(d)}`;
   box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -126,6 +126,22 @@ function loadScript(src) {
 }
 
 // Branded PDF, letter size, built in the browser from the same document the agent sees.
+// Engine 6, section 9: the client-ready version for the agent to send their seller. In the agent's
+// brand, with reach, views, engagement and clicks, and no cost or spend anywhere.
+async function downloadSellerReport(index, day, btn) {
+  const c = [...state.campaigns, ...examples][index];
+  const label = btn.textContent; btn.disabled = true; btn.textContent = 'Preparing…';
+  try {
+    const res = await fetch('/api/content/reports/' + campaignBoostId(c) + '/download?day=' + day + '&version=seller',
+      { headers: { Authorization: 'Bearer ' + (localStorage.getItem('resmara_token') || '') } });
+    if (!res.ok) throw new Error('the report isn’t ready yet');
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a'); a.href = url;
+    a.download = String(c.address || 'Listing').split(',')[0] + ' - Day ' + day + ' marketing report.pdf';
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch (e) { toast('Could not make the seller version: ' + e.message); }
+  btn.disabled = false; btn.textContent = label;
+}
 async function downloadReportPDF(btn) {
   const doc = btn.closest('#pr-view').querySelector('.pr-doc');
   const label = btn.textContent; btn.disabled = true; btn.textContent = 'Preparing PDF…';
