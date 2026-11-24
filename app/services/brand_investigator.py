@@ -256,6 +256,10 @@ def merge(existing: Dict[str, Any], fresh: Dict[str, Any]) -> Dict[str, Any]:
             continue
         out[k] = v
     out["edited"] = sorted(edited)
+    # One brokerage, two names for it: whichever the agent set wins for both.
+    mine = existing.get("brokerage") if "brokerage" in edited else existing.get("company") if "company" in edited else None
+    if mine:
+        out["company"] = out["brokerage"] = mine
     out["legal"] = legal_lines(out)
     out["missing"] = missing_post_facts(out)
     return out
@@ -298,6 +302,10 @@ async def build_for_user(user_id: int, *, reason: str = "signup") -> Dict[str, A
         if user is None:
             return {}
         current = dict(user.brand or {})
+        if not (current.get("build") or {}).get("finished") and not current.get("edited"):
+            # A kit the agent typed before the brand engine existed is theirs: every filled field
+            # counts as their own edit, so the first investigation only fills what's empty.
+            current["edited"] = [k for k in KIT_FIELDS if current.get(k) not in (None, "", [], {})]
         current["build"] = {"status": "running", "started": _now().isoformat(), "reason": reason}
         user.brand = current
         db.commit()

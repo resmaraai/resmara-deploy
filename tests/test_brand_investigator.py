@@ -112,6 +112,23 @@ ok("what's missing is listed for the campaign flow", "license" in u.brand.get("m
 st = bi.build_status(u)
 ok("build status endpoint shape", st["build"]["status"] == "done" and "license" in st["missing"])
 
+print("An agent who typed their brand before the engine existed")
+old = User(email="typed@example.com", hashed_password="x", name="Pat Typed", facebook_id="fb2",
+           brand={"agent": "Pat Typed", "brokerage": "Pat's Own Realty", "license": "777"})
+db.add(old)
+db.commit()
+db.add(MetaConnection(user_id=old.id, page_name="Pat Page", page_info={"phone": "530-555-0177"},
+                      issues=[], issue_log=[], capabilities={}))
+db.commit()
+llm.llm_available = lambda: False
+asyncio.run(bi.build_for_user(old.id))
+llm.llm_available = real
+db.expire_all()
+old = db.query(User).filter(User.id == old.id).first()
+ok("what they typed is kept", old.brand.get("brokerage") == "Pat's Own Realty" and old.brand.get("license") == "777", old.brand)
+ok("  ...and the empty fields are filled", old.brand.get("phone") == "530-555-0177")
+ok("  ...and the legal line uses their brokerage", "Pat's Own Realty" in " ".join(old.brand.get("legal") or []), old.brand.get("legal"))
+
 print(f"\n{checks} checks, {failures} failed.")
 if failures:
     raise SystemExit(1)
