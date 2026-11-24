@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
@@ -44,6 +44,44 @@ def _now_iso() -> str:
 
 def _row(name: str, status: str, detail: str, checked_at: str) -> Dict[str, Any]:
     return {"name": name, "status": status, "detail": detail, "checked_at": checked_at}
+
+
+def _utc(value: Any) -> Optional[datetime]:
+    """A stored datetime as aware UTC.
+
+    Postgres hands back an aware value for a `timestamptz` column while `datetime.utcnow()`
+    is naive, and comparing the two raises TypeError. That is why this check once read
+    "can't compare offset-naive and offset-aware datetimes" instead of the state of the
+    logins: the row was reporting the crash in its own comparison, not a broken token.
+    """
+    if not isinstance(value, datetime):
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def _meta_login_row(accounts: List[Any], checked_at: str) -> Dict[str, Any]:
+    """One row for every agent's Meta login.
+
+    `token_status` is what token_health wrote on its last check; the expiry is the second
+    opinion, because a status nobody has refreshed for weeks is a claim, not a fact.
+    """
+    now = datetime.now(timezone.utc)
+    dead: List[Any] = []
+    expiring: List[Any] = []
+    for account in accounts:
+        expires = _utc(getattr(account, "token_expires_at", None))
+        status = (getattr(account, "token_status", "") or "").lower()
+        if status in ("needs_reconnect", "broken", "expired") or (expires and expires < now):
+            dead.append(account.user_id)
+        elif expires and (expires - now).days <= 7:
+            expiring.append(account.user_id)
+    if not accounts:
+        return _row("Meta logins", "warn", "No Meta account connected yet", checked_at)
+    if dead:
+        return _row("Meta logins", "fail", f"{len(dead)} of {len(accounts)} need reconnecting", checked_at)
+    if expiring:
+        return _row("Meta logins", "warn", f"{len(expiring)} token(s) expire within a week", checked_at)
+    return _row("Meta logins", "ok", f"All {len(accounts)} working", checked_at)
 
 
 def _http_get(url: str, timeout: float = 8.0) -> tuple[Optional[int], float, str]:
@@ -113,27 +151,7 @@ def _run_checks(db: Session) -> List[Dict[str, Any]]:
 
     # Every agent's Meta login, from the accounts table.
     try:
-        accounts = db.query(AdAccount).all()
-        now = datetime.utcnow()
-        dead, expiring = [], []
-        for a in accounts:
-            expires = a.token_expires_at
-            expires = expires if isinstance(expires, datetime) else None
-            status = (a.token_status or "").lower()
-            if status in ("needs_reconnect", "broken", "expired") or (expires and expires < now):
-                dead.append(a.user_id)
-            elif expires and (expires - now).days <= 7:
-                expiring.append(a.user_id)
-        if not accounts:
-            rows.append(_row("Meta logins", "warn", "No Meta account connected yet", checked_at))
-        elif dead:
-            rows.append(_row("Meta logins", "fail",
-                             f"{len(dead)} of {len(accounts)} need reconnecting", checked_at))
-        elif expiring:
-            rows.append(_row("Meta logins", "warn",
-                             f"{len(expiring)} token(s) expire within a week", checked_at))
-        else:
-            rows.append(_row("Meta logins", "ok", f"All {len(accounts)} working", checked_at))
+        rows.append(_meta_login_row(db.query(AdAccount).all(), checked_at))
     except Exception as exc:                                     # noqa: BLE001
         rows.append(_row("Meta logins", "fail", str(exc)[:200], checked_at))
 
