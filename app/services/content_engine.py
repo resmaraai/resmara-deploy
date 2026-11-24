@@ -139,6 +139,27 @@ def _agent_card(boost, openings):
     return card
 
 
+def _listing_link(boost) -> str:
+    """The link the agent pasted for this home (Engine 3: it says which house, not where to stop)."""
+    link = (getattr(boost, "listing_url", None) or "").strip()
+    if not link:
+        m = re.search(r"Listing:\s*(https?://\S+)", getattr(boost, "property_facts", None) or "")
+        link = m.group(1) if m else ""
+    return link
+
+
+def home_file_sources(boost) -> str:
+    """Engine 3, section 2: the pasted link identifies the house; the file comes from every source."""
+    link = _listing_link(boost)
+    return ((f"The agent gave this link for the home: {link}. Treat it as identifying WHICH house. " if link else "")
+            + "Build the home's file from every source you can reach: "
+            + ("that link, " if link else "")
+            + "the same home on Zillow, Realtor.com, Redfin, Homes.com and Trulia, the listing "
+              "brokerage's own site, the photographer's delivery page (Aryeo, Fotello and similar) if "
+              "one turns up, and public records for the address. When sources disagree, prefer the "
+              "listing brokerage and public records, and name each source in brackets as above.")
+
+
 POSITIVE_ONLY_RULE = ("EVERY post, caption and ad is positive and professional: never political, divisive, "
                       "negative or sarcastic, and never about anyone's family, health, faith or politics, "
                       "whatever the voice notes say.")
@@ -1405,7 +1426,7 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
             photo_index = build_photo_index(intact, offset=gallery_offset(round_, len(intact)))
 
     # --- R1: property research (Responses API, web search) ------------------
-    r1_input = prompts.R1_PROPERTY_RESEARCH.format(address=address)
+    r1_input = prompts.R1_PROPERTY_RESEARCH.format(address=address) + " " + home_file_sources(boost)
     research = await llm.responses_text(
         r1_input,
         model=settings.research_model,

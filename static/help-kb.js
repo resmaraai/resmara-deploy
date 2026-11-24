@@ -16,7 +16,7 @@ var HELP_KB = [
   // ---- Getting started ------------------------------------------------------------------------
   { id: 'start', topic: 'Getting started', q: 'How do I start my first campaign?',
     keys: ['start', 'first campaign', 'new campaign', 'begin', 'how do i use', 'get started', 'create campaign', 'launch'],
-    a: 'Click the orange ＋ Campaign button at the top of My campaigns. Paste your MLS public listing link, tick the photo permission box and click Build my campaign. Resmara builds 14 posts and your ad, then you set your go-live date, review and approve.' },
+    a: 'Click the orange ＋ Campaign button at the top of My campaigns. Paste any link to the home (your photographer’s link with all the photos and video works best), tick the photo permission box and click Build my campaign. Resmara builds 14 posts, your ad and your listing page, then you pay to unlock it, set your go-live date, review and approve.' },
   { id: 'what', topic: 'Getting started', q: 'What does Resmara do?',
     keys: ['what is resmara', 'what does resmara do', 'what do i get', 'included', 'what comes with'],
     a: 'For each listing, Resmara builds a 14-day campaign in your brand: 14 social posts for Facebook and Instagram plus one Meta ad. It posts them for you, flags people who comment with buying interest, and gives you Day 7 and Day 14 reports to share with your seller.' },
