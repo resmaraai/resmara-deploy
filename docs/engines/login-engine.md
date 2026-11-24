@@ -182,7 +182,7 @@ Plus the no-Facebook stop.
 | Confirmation link life | `CONFIRM_TTL_HOURS` in `auth.py` | 48 |
 | Reset link life | `RESET_TTL_MINUTES` in `auth.py` | 60 |
 | Minimum password length | `auth.py` | 8 |
-| Facebook permissions asked for | env `META_SCOPES` | ads_management, business_management, pages_read_engagement, pages_show_list, pages_manage_posts, instagram_basic, instagram_content_publish |
+| Facebook permissions asked for | env `META_SCOPES` (fallback: `_DEFAULT_SCOPES` in `app/api/oauth.py`, kept identical by `tests/test_meta_scopes.py`) | ads_management, ads_read, pages_manage_ads, read_insights, business_management, pages_read_engagement, pages_show_list, pages_manage_posts, instagram_basic, instagram_content_publish, instagram_manage_insights, instagram_manage_comments, pages_read_user_content, email |
 | Meta app and API version | env `META_CLIENT_ID`, `META_REDIRECT_URI`, `META_API_VERSION` | set on Render |
 | Email providers | env `RESEND_API_KEY`, `MAIL_FROM`, `SMTP_*` | Resend first, then SMTP |
 | Sweep frequency | the scheduler (`DEPLOY.md`) | every 6 hours |
