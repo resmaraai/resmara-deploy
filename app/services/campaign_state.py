@@ -176,6 +176,8 @@ def card_state(boost: Boost, now: Optional[datetime] = None) -> str:
     status = (boost.listing_status or "").lower()
     if status == "sold":
         return "Completed · Sold"
+    if (boost.listing_notes or {}).get("renewal_hold") == "declined":
+        return "Renewal on hold: card declined"
     if is_over(boost, now):
         return "Completed · Pending" if status == "pending" else "Completed"
     if boost.paused_at is not None:

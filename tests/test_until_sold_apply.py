@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
-"""The money half of "run it until it sells", with Stripe stubbed.
+"""Run it until it sells, the money half (Engine 8, docs/engines/engine-8-brain.md), Stripe stubbed.
 
-A renewal that charges a card is the highest-risk code in this app: nobody is watching it, the
-customer is asleep, and a bug is a real $39. So the whole path runs here against stubs, and what
-is pinned is the order of operations and every way it can refuse:
+A renewal that charges a card is the highest-risk code in this app: nobody is watching, the
+customer is asleep, and a bug is a real $39. What is pinned is the order and every refusal:
 
-  * nothing due, or no saved card, or a card already declined today: no charge, and say why
-  * charged: a paid Order, the new round stamped paid, the old round's flag off so it cannot be
-    charged twice, and the photos carried over
-  * declined: nothing left behind (no half-made round), an event recorded, and no retry for a day
-  * a listing that has gone pending or sold: the flag clears and nothing is charged
-  * run twice in a row: the second run has nothing to do
-
-Run:
-    cd /Users/dan/resmara && ./venv/bin/python3 tests/test_until_sold_apply.py
+  * build first, charge only when the build succeeded; a build that fails twice is never charged
+  * charged: a paid Order, posts approved automatically, launched for the day the round ends,
+    the flag moves to the new round, the website keeps its link, one "goes live" email
+  * declined: nothing charged, nothing live, the built round kept; tried once a day, 3 times,
+    then one Check billing email; a saved card charges it straight away
+  * pending holds it (still on); sold ends it
+  * Run it again · $39: the same path, live the next morning, the series stays off
 """
 from __future__ import annotations
 
@@ -26,170 +23,189 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-
 FAILS = 0
 
 
 def check(label: str, cond: bool, detail: str = "") -> None:
     global FAILS
-    if cond:
-        print("  ok   %s" % label)
-    else:
+    print(("  ok   " if cond else "  FAIL ") + label + ("" if cond else " " + str(detail)[:300]))
+    if not cond:
         FAILS += 1
-        print("  FAIL %s %s" % (label, detail))
 
 
 def main() -> int:
     tmp = tempfile.mkdtemp(prefix="resmara-apply-")
-    os.environ["RESMARA_UPLOAD_DIR"] = tmp
+    os.environ["UPLOAD_DIR"] = tmp
     os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(tmp, "apply.db")
     os.environ.setdefault("SECRET_KEY", "test-secret-key-for-until-sold-apply")
-    os.environ["RESMARA_ADMIN_EMAILS"] = "owner@example.com"
+    os.environ["RESMARA_ADMIN_EMAILS"] = "team@example.com"
     os.environ.pop("STRIPE_SECRET_KEY", None)
-    os.environ["UNTIL_SOLD_BUILD"] = "0"          # no engine in a unit test; the hook is exercised
+    os.environ.pop("RESMARA_SIMULATE", None)
 
-    from app.db.session import Base, engine, SessionLocal, Boost, Asset, Event, Order, User  # noqa: E402
-    from app.db.migrate import migrate                                                     # noqa: E402
-    from app.services import renewals                                                      # noqa: E402
+    from app.db.session import Base, engine, SessionLocal, Boost, Asset, ListingSite, Order, Post, User  # noqa
+    from app.db.migrate import migrate
+    from app.services import mail, renewals
 
+    sent = []
+    mail.send_email = lambda to, subject, body: sent.append((to, subject, body)) or True
     Base.metadata.create_all(bind=engine)
     migrate()
     db = SessionLocal()
-    now = datetime(2026, 11, 18, 12, 0, tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    owner = User(email="morgan@example.com", name="Morgan Ellis", is_active=True, hashed_password="x",
+                 stripe_customer_id="cus_test_1")
+    db.add(owner)
+    db.commit()
 
-    try:
-        owner = User(email="owner@example.com", name="Owner", is_active=True, is_admin=True,
-                     hashed_password="x", stripe_customer_id="cus_test_1")
-        db.add(owner); db.commit(); db.refresh(owner)
-
-        def add(address, **kw):
-            b = Boost(user_id=owner.id, address=address, main_status="Live", stage="LAUNCHED",
-                      hidden=False, repeat_round=0, until_sold=True,
-                      launched_at=now - timedelta(days=12))
-            for k, v in kw.items():
-                setattr(b, k, v)
-            db.add(b); db.commit(); db.refresh(b)
-            return b
-
-        calls = {"charge": [], "email": [], "build": []}
-
-        async def cards_none(customer_id):
-            return []
-
-        async def cards_one(customer_id):
-            return [{"id": "pm_card_1", "label": "Visa •4242"}]
-
-        async def charge_paid(**kw):
-            calls["charge"].append(kw)
-            return {"paid": True, "payment_intent": "pi_test_paid", "message": ""}
-
-        async def charge_declined(**kw):
-            calls["charge"].append(kw)
-            return {"paid": False, "payment_intent": "pi_test_declined",
-                    "message": "Your card was declined."}
-
-        async def build_stub(fresh, session):
-            calls["build"].append(fresh.id)
-            return {"built": True, "posts": 14}
-
-        def email_stub(to, boost, cents, build):
-            calls["email"].append({"to": to, "boost": boost.id, "cents": cents})
-            return True
-
-        # ---------------------------------------------------------------- nothing due at all
-        early = add("0 Too Early Road", launched_at=now - timedelta(days=2))
-        out = asyncio.run(renewals.apply(db, now=now, cards_fn=cards_one, charge_fn=charge_paid,
-                                         build_fn=build_stub, email_fn=email_stub))
-        check("a campaign two days in is not touched", out["counts"]["due"] == 0, out["counts"])
-        check("...and nothing was charged", calls["charge"] == [])
-
-        # ---------------------------------------------------------------- no card on file
-        due = add("1 Due Street")
-        db.add(Asset(user_id=owner.id, boost_id=due.id, filename="f1.jpg", url="/uploads/f1.jpg",
-                     kind="photo", room="kitchen", tags=["ROOM"]))
+    def add(address, **kw):
+        b = Boost(user_id=owner.id, address=address, main_status="Live", stage="LAUNCHED", repeat_round=0,
+                  until_sold=True, campaign_days=14, launched_at=now - timedelta(days=12),
+                  go_live_date=(now - timedelta(days=12)).strftime("%Y-%m-%d"), paid_at=now - timedelta(days=13))
+        for k, v in kw.items():
+            setattr(b, k, v)
+        db.add(b)
         db.commit()
-        out = asyncio.run(renewals.apply(db, now=now, cards_fn=cards_none, charge_fn=charge_paid,
-                                         build_fn=build_stub, email_fn=email_stub))
-        check("no saved card means no charge", out["applied"][0]["status"] == "no_card",
-              out["applied"][:1])
-        check("...and no round was created", db.query(Boost).filter(Boost.address == "1 Due Street").count() == 1)
-        check("...and the flag is still on, so it retries once a card exists", db.get(Boost, due.id).until_sold is True)
+        db.add(Asset(user_id=owner.id, boost_id=b.id, filename=f"{b.id}-front.jpg", url="/uploads/x.jpg", kind="photo"))
+        db.commit()
+        return b
 
-        # ---------------------------------------------------------------- charged, built, emailed
-        out = asyncio.run(renewals.apply(db, now=now, cards_fn=cards_one, charge_fn=charge_paid,
-                                         build_fn=build_stub, email_fn=email_stub))
-        row = out["applied"][0]
-        check("a due campaign renews", row["status"] == "renewed", row)
-        check("the charge is the $39 repeat price", calls["charge"][-1]["cents"] == 3900, calls["charge"][-1])
-        check("the charge names the new round", calls["charge"][-1]["round_no"] == 1, calls["charge"][-1])
-        check("it charged the newest saved card", calls["charge"][-1]["payment_method_id"] == "pm_card_1")
+    order = []
 
-        fresh = db.get(Boost, row["new_boost_id"])
-        check("the next round exists as round 2", fresh.repeat_round == 1, fresh.repeat_round)
-        check("...continuing the campaign it came from", fresh.parent_boost_id == due.id)
-        check("...marked paid", bool(fresh.paid_at), fresh.paid_at)
-        check("...at the repeat price", fresh.paid_amount_cents == 3900, fresh.paid_amount_cents)
-        check("...on autopilot itself", fresh.until_sold is True)
-        check("...with the photos carried over",
-              db.query(Asset).filter(Asset.boost_id == fresh.id).count() == 1)
-        check("the paid order is recorded",
-              db.query(Order).filter(Order.boost_id == fresh.id, Order.status == "paid").count() == 1)
-        check("the old round's flag is off, so it cannot charge twice",
-              db.get(Boost, due.id).until_sold is False)
-        check("the agent was told", calls["email"] and calls["email"][-1]["to"] == "owner@example.com")
-        check("the event records the charge",
-              db.query(Event).filter(Event.boost_id == fresh.id, Event.event_type == "renewal_charged").count() == 1)
+    async def build_ok(fresh, d):
+        order.append(("build", fresh.id))
+        for day in (1, 2):
+            d.add(Post(boost_id=fresh.id, day=day, caption=f"Round post {day}", client_status="pending",
+                       publish_status="scheduled",
+                       publish_at=(datetime.strptime(fresh.go_live_date, "%Y-%m-%d")
+                                   + timedelta(days=day - 1, hours=18)).isoformat()))
+        d.commit()
 
-        # ---------------------------------------------------------------- the second run is quiet
-        before_second = len(calls["charge"])
-        out = asyncio.run(renewals.apply(db, now=now, cards_fn=cards_one, charge_fn=charge_paid,
-                                         build_fn=build_stub, email_fn=email_stub))
-        check("running it again charges nothing", out["counts"]["due"] == 0, out["counts"])
-        check("...and the charge count did not move", len(calls["charge"]) == before_second,
-              len(calls["charge"]))
+    async def build_broken(fresh, d):
+        order.append(("build-fail", fresh.id))
+        raise RuntimeError("the plan model timed out")
 
-        # ---------------------------------------------------------------- the run cap
-        for n in range(5):
-            add("4 Many %d Way" % n)
-        out = asyncio.run(renewals.apply(db, now=now, cards_fn=cards_one, charge_fn=charge_paid,
-                                         build_fn=build_stub, email_fn=email_stub))
-        check("one run renews at most three campaigns", out["counts"]["renewed"] == 3,
-              out["counts"])
+    async def cards_one(customer_id):
+        return [{"id": "pm_card_1"}]
 
-        # ---------------------------------------------------------------- a declined card
-        declined = add("2 Declined Drive")
-        before = len(calls["charge"])
-        out = asyncio.run(renewals.apply(db, now=now, limit=10, cards_fn=cards_one,
-                                         charge_fn=charge_declined, build_fn=build_stub,
-                                         email_fn=email_stub))
-        check("a decline is reported, not raised", out["applied"][0]["status"] == "declined",
-              out["applied"][:1])
-        # Other campaigns are still due in this fixture (sqlite reuses ids, so the earlier cap
-        # test left work behind); what matters is that a charge was attempted for this one.
-        check("...a charge was attempted", len(calls["charge"]) > before, len(calls["charge"]))
-        check("...no half-made round is left behind",
-              db.query(Boost).filter(Boost.address == "2 Declined Drive").count() == 1)
-        check("...the decline is recorded",
-              db.query(Event).filter(Event.boost_id == declined.id, Event.event_type == "renewal_declined").count() == 1)
-        out = asyncio.run(renewals.apply(db, now=now, cards_fn=cards_one, charge_fn=charge_declined,
-                                         build_fn=build_stub, email_fn=email_stub))
-        check("...and it is not retried on the next tick", out["applied"][0]["status"] == "skipped",
-              out["applied"][:1])
+    async def cards_none(customer_id):
+        return []
 
-        # ---------------------------------------------------------------- a sold listing stops itself
-        sold = add("3 Sold Street", listing_status="sold")
-        before_sold = len(calls["charge"])
-        out = asyncio.run(renewals.apply(db, now=now, cards_fn=cards_one, charge_fn=charge_paid,
-                                         build_fn=build_stub, email_fn=email_stub))
-        check("a sold listing is stopped", any(s["boost_id"] == sold.id for s in out["stopped"]), out["stopped"])
-        check("...its flag is off", db.get(Boost, sold.id).until_sold is False)
-        check("...and it was never charged", len(calls["charge"]) == before_sold,
-              len(calls["charge"]))
+    async def charge_ok(**kw):
+        order.append(("charge", kw["boost_id"]))
+        return {"paid": True, "payment_intent": "pi_ok"}
 
-    finally:
-        db.close()
+    async def charge_declined(**kw):
+        order.append(("decline", kw["boost_id"]))
+        return {"paid": False, "message": "Your card was declined."}
 
-    print()
+    async def launch_ok(b, u, d):
+        order.append(("launch", b.id))
+        return {"status": "launched"}
+
+    kw = dict(cards_fn=cards_one, launch_fn=launch_ok)
+
+    print("Build first, then charge")
+    due = add("1248 Oakridge Drive, Austin, TX")
+    db.add(ListingSite(boost_id=due.id, user_id=owner.id, slug="1248-oakridge-drive", content={"photos": []}, brand={}))
+    db.commit()
+    res = asyncio.run(renewals.apply(db, now=now, build_fn=build_ok, charge_fn=charge_ok, **kw))
+    row = res["applied"][0]
+    fresh = db.get(Boost, row.get("new_boost_id"))
+    check("renewed", row["status"] == "renewed", row)
+    check("built before it was charged, launched after", [o[0] for o in order] == ["build", "charge", "launch"], order)
+    check("a paid $39 order", db.query(Order).filter(Order.boost_id == fresh.id, Order.status == "paid").count() == 1
+          and fresh.paid_amount_cents == 3900)
+    check("approved automatically", all(p.client_status == "approved" for p in db.query(Post).filter(Post.boost_id == fresh.id)))
+    check("goes live the day the current round ends", fresh.go_live_date == (now + timedelta(days=2)).strftime("%Y-%m-%d"),
+          fresh.go_live_date)
+    check("the series moves to the new round", fresh.until_sold is True and db.get(Boost, due.id).until_sold is False)
+    check("the website keeps its link on the new round",
+          db.query(ListingSite).filter(ListingSite.slug == "1248-oakridge-drive").first().boost_id == fresh.id)
+    check("one email: it goes live, nothing to do", len(sent) == 1 and "goes live" in sent[0][1]
+          and "Nothing to do" in sent[0][2], sent)
+    check("the photos came along", db.query(Asset).filter(Asset.boost_id == fresh.id).count() == 1)
+    res = asyncio.run(renewals.apply(db, now=now, build_fn=build_ok, charge_fn=charge_ok, **kw))
+    check("run again straight away: nothing to do", not res["applied"], res["applied"])
+
+    print("A build that fails is never charged")
+    order.clear()
+    sent.clear()
+    broken = add("2 Broken Way, Austin, TX")
+    res = asyncio.run(renewals.apply(db, now=now, build_fn=build_broken, charge_fn=charge_ok, **kw))
+    check("failed, retried once, no charge", res["applied"][0]["status"] == "failed"
+          and [o[0] for o in order] == ["build-fail", "build-fail"], order)
+    check("nothing left behind", db.query(Boost).filter(Boost.parent_boost_id == broken.id).count() == 0)
+    check("the team is told", any(s[0] == "team@example.com" for s in sent))
+    broken.until_sold = False
+    db.commit()
+
+    print("A declined card")
+    order.clear()
+    sent.clear()
+    dec = add("3 Decline Court, Austin, TX")
+    res = asyncio.run(renewals.apply(db, now=now, build_fn=build_ok, charge_fn=charge_declined, **kw))
+    waiting = renewals.waiting_round(db, dec)
+    check("nothing charged, nothing live, the built round kept", res["applied"][0]["status"] == "declined"
+          and waiting is not None and waiting.paid_at is None and ("launch", waiting.id) not in order)
+    check("no email after the first decline", not sent)
+    res = asyncio.run(renewals.apply(db, now=now + timedelta(hours=2), build_fn=build_ok, charge_fn=charge_declined, **kw))
+    check("tried once a day, not every tick", res["applied"][0]["status"] == "skipped")
+    for i in (1, 2):
+        res = asyncio.run(renewals.apply(db, now=now + timedelta(days=i, hours=1), build_fn=build_ok,
+                                         charge_fn=charge_declined, **kw))
+    check("not rebuilt on a retry", [o[0] for o in order].count("build") == 1, order)
+    check("after the 3rd decline: one Check billing email", len(sent) == 1 and "couldn't renew" in sent[0][1]
+          and "Check billing" in sent[0][2], sent)
+    check("the old round still runs to its end", db.get(Boost, dec.id).paused_at is None)
+    res = asyncio.run(renewals.apply(db, now=now + timedelta(days=4), build_fn=build_ok, charge_fn=charge_declined, **kw))
+    check("then it waits for a card", res["applied"][0]["status"] == "on_hold", res["applied"])
+    order.clear()
+    res = asyncio.run(renewals.card_saved(db, owner.id, now=now + timedelta(days=4, hours=1), build_fn=build_ok,
+                                          charge_fn=charge_ok, **kw))
+    row = (res.get("applied") or [{}])[0]
+    check("a saved card charges the waiting round straight away", row.get("status") == "renewed"
+          and [o[0] for o in order] == ["charge", "launch"], (row, order))
+    if row.get("new_boost_id"):
+        check("the old round had ended, so it goes live the next morning",
+              db.get(Boost, row["new_boost_id"]).go_live_date == (now + timedelta(days=5)).strftime("%Y-%m-%d"),
+              db.get(Boost, row["new_boost_id"]).go_live_date)
+
+    print("No card at all")
+    order.clear()
+    nocard = add("4 No Card Lane, Austin, TX")
+    res = asyncio.run(renewals.apply(db, now=now, build_fn=build_ok, charge_fn=charge_ok, cards_fn=cards_none,
+                                     launch_fn=launch_ok))
+    mine = [r for r in res["applied"] if r["boost_id"] == nocard.id]
+    check("no card is a decline: nothing charged", mine and mine[0]["status"] == "declined"
+          and "charge" not in [o[0] for o in order], res["applied"])
+    nocard.until_sold = False
+    db.commit()
+
+    print("Pending and sold")
+    order.clear()
+    pend = add("5 Pending Street, Austin, TX", listing_status="pending", paused_at=now, paused_reason="pending")
+    sold = add("6 Sold Street, Austin, TX", listing_status="sold")
+    asyncio.run(renewals.apply(db, now=now, build_fn=build_ok, charge_fn=charge_ok, **kw))
+    check("pending: nothing built or charged, and it stays on",
+          not [o for o in order if o[1] in (pend.id,)] and db.get(Boost, pend.id).until_sold is True
+          and renewals.waiting_round(db, pend) is None)
+    check("sold: ends it", db.get(Boost, sold.id).until_sold is False)
+
+    print("Run it again · $39")
+    order.clear()
+    sent.clear()
+    done = add("7 Again Avenue, Austin, TX", until_sold=False,
+               go_live_date=(now - timedelta(days=15)).strftime("%Y-%m-%d"))
+    res = asyncio.run(renewals.run_again(db, done, owner, build_fn=build_ok, charge_fn=charge_ok, **kw))
+    again = db.get(Boost, res.get("new_boost_id")) if res.get("new_boost_id") else None
+    check("one click: built, charged, launched", res["status"] == "renewed"
+          and [o[0] for o in order] == ["build", "charge", "launch"], (res, order))
+    check("live the next morning", again is not None and again.go_live_date == (now + timedelta(days=1)).strftime("%Y-%m-%d"))
+    check("and the series stays off", again is not None and again.until_sold is False)
+    check("never for a pending listing",
+          asyncio.run(renewals.run_again(db, pend, owner, build_fn=build_ok, charge_fn=charge_ok, **kw))["status"] == "skipped")
+
+    db.close()
     if FAILS:
         print("FAILURES: %d" % FAILS)
         return 1
@@ -198,4 +214,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

@@ -105,12 +105,28 @@ def tracked_url(site, content: str, medium: str = "social") -> str:
 
 
 # ------------------------------------------------------------------ finding the site
+def parent_site(db, boost: Boost) -> Optional[ListingSite]:
+    """The site an earlier round of this home owns, if any."""
+    seen = {boost.id}
+    parent_id = getattr(boost, "parent_boost_id", None)
+    while parent_id and parent_id not in seen:
+        seen.add(parent_id)
+        site = db.query(ListingSite).filter(ListingSite.boost_id == parent_id).first()
+        if site is not None:
+            return site
+        parent = db.query(Boost).filter(Boost.id == parent_id).first()
+        parent_id = getattr(parent, "parent_boost_id", None) if parent else None
+    return None
+
+
 def site_for(db, boost: Boost, adopt: bool = True) -> Optional[ListingSite]:
-    """This campaign's site. A new round of Run it until it sells takes over its parent's site,
-    so every link already shared keeps working (section 9, keeping it current)."""
+    """This campaign's site. A new round takes over its parent's site once it's paid for, so every
+    link already shared keeps working (section 9). Until then the running round keeps it."""
     site = db.query(ListingSite).filter(ListingSite.boost_id == boost.id).first()
     if site is not None or not adopt:
         return site
+    if getattr(boost, "parent_boost_id", None) and not getattr(boost, "paid_at", None):
+        return None
     seen = {boost.id}
     parent_id = getattr(boost, "parent_boost_id", None)
     while parent_id and parent_id not in seen:
@@ -392,6 +408,18 @@ async def build(db, boost: Boost, *, writer: Optional[Callable] = None,
     content["video"] = video if re.search(r"\.(mp4|webm|mov)(\?|$)", video, re.I) or video.startswith("/uploads/") else ""
 
     site = site_for(db, boost)
+    if site is None and getattr(boost, "parent_boost_id", None) and not getattr(boost, "paid_at", None):
+        earlier = parent_site(db, boost)
+        if earlier is not None:
+            # A renewal built ahead: the running round keeps the page until this one is paid for;
+            # promote() swaps the new story in then.
+            nxt = dict(earlier.content or {})
+            nxt["next_round"] = {"boost_id": boost.id, "content": content, "brand": brand_snapshot(kit), "checks": checks}
+            earlier.content = nxt
+            db.commit()
+            boost.destination_url = public_url(earlier)
+            db.commit()
+            return earlier
     if site is None:
         site = ListingSite(boost_id=boost.id, user_id=boost.user_id,
                            slug=make_slug(db, boost.address, boost.id), version=0)
@@ -399,6 +427,7 @@ async def build(db, boost: Boost, *, writer: Optional[Callable] = None,
     old = dict(site.content or {})
     if old.get("confirmed"):
         content["confirmed"] = old["confirmed"]
+    content.pop("next_round", None)
     site.content = content
     site.brand = brand_snapshot(kit)
     site.checks = checks
@@ -423,6 +452,27 @@ def team_email() -> str:
     return owners[0] if owners else ""
 
 
+def promote(db, boost: Boost) -> Optional[ListingSite]:
+    """The new round is paid for: it takes over the page (same slug) with its own story."""
+    site = site_for(db, boost)
+    if site is None:
+        return None
+    content = dict(site.content or {})
+    nxt = content.pop("next_round", None)
+    if nxt and nxt.get("boost_id") == boost.id:
+        confirmed = content.get("confirmed")
+        content = dict(nxt.get("content") or {})
+        if confirmed:
+            content["confirmed"] = confirmed
+        site.brand = nxt.get("brand") or site.brand
+        site.checks = nxt.get("checks") or []
+    site.content = content
+    site.boost_id = boost.id
+    site.status = state(boost, site)
+    touch(db, site)
+    return site
+
+
 def _alert_team(db, boost: Boost, message: str) -> None:
     try:
         from app.services import mail
@@ -435,16 +485,9 @@ def _alert_team(db, boost: Boost, message: str) -> None:
 
 # ------------------------------------------------------------------ state (section 5)
 def ends_on(boost: Boost) -> Optional[datetime]:
-    """The last day of this round: launch (or the go-live date) + its days + any paused days."""
-    start = _aware(getattr(boost, "launched_at", None))
-    if start is None and getattr(boost, "go_live_date", None):
-        try:
-            start = datetime.strptime(str(boost.go_live_date)[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        except ValueError:
-            start = None
-    if start is None:
-        return None
-    return start + timedelta(days=int(boost.campaign_days or 14) + int(getattr(boost, "paused_days", 0) or 0))
+    """The last day of this round: its go-live date (else launch) + its days + any paused days."""
+    from app.services.renewals import round_ends_on
+    return _aware(round_ends_on(boost))
 
 
 def state(boost: Boost, site: Optional[ListingSite] = None, now: Optional[datetime] = None) -> str:

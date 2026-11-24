@@ -434,7 +434,16 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     # Saving a card (Checkout in setup mode) has no campaign and no order: Stripe has already
     # attached the card to the customer, which is all Build needs.
     if outcome.get("kind") == "card_setup":
-        return {"received": True, "status": "card_saved"}
+        # Engine 8, section 6: a round waiting on a declined card is charged as soon as a card works.
+        retried = None
+        if outcome.get("user_id"):
+            try:
+                from app.services import renewals
+                if renewals.apply_enabled():
+                    retried = (await renewals.card_saved(db, int(outcome["user_id"]))).get("counts")
+            except Exception as exc:  # noqa: BLE001 - the card is saved either way
+                retried = {"error": str(exc)[:200]}
+        return {"received": True, "status": "card_saved", "renewals": retried}
 
     return settle_checkout(outcome, db)
 

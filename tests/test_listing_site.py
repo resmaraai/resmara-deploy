@@ -259,9 +259,26 @@ print("Run it until it sells keeps the link")
 nxt = Boost(user_id=agent.id, address=boost.address, parent_boost_id=boost.id, plan=plan, stage="PENDING")
 db.add(nxt)
 db.commit()
-again = ls.site_for(db, nxt)
-ok("the next round takes over the same site and slug", again is not None and again.slug == "1248-oakridge-drive"
+for i in range(1, 4):
+    db.add(Asset(user_id=agent.id, boost_id=nxt.id, filename=f"p{i}.jpg", url=f"/uploads/p{i}.jpg", kind="photo",
+                 room="Kitchen", data=jpeg(), content_type="image/jpeg"))
+db.commit()
+ok("an unpaid next round doesn't take the page", ls.site_for(db, nxt) is None)
+
+
+async def writer2(b, kit, photos):
+    w = await writer(b, kit, photos)
+    w["headline"] = "Round two: the view, again"
+    return w
+held = asyncio.run(ls.build(db, nxt, writer=writer2, share=False))
+ok("built ahead, the running round keeps the page", held.boost_id == boost.id
+   and "Round two" not in client.get("/l/1248-oakridge-drive").text)
+nxt.paid_at = datetime.now(timezone.utc)
+db.commit()
+again = ls.promote(db, nxt)
+ok("paid: the next round takes over the same site and slug", again is not None and again.slug == "1248-oakridge-drive"
    and again.boost_id == nxt.id)
+ok("with the new round's story", "Round two" in client.get("/l/1248-oakridge-drive").text)
 again.boost_id = boost.id
 db.commit()
 
@@ -278,7 +295,7 @@ ok("the ad is tagged as the ad", "utm_content=ad" in with_utm("https://homes.res
 
 # ---------------------------------------------------------------- daily check
 print("Daily check")
-db.query(Asset).filter(Asset.filename == "p6.jpg").delete()
+db.query(Asset).filter(Asset.filename == "p2.jpg").delete()
 db.commit()
 r = client.post("/api/admin/sites/check", headers={"X-Resmara-Token": "clock-token"}).json()
 ok("a missing photo is flagged", any(f["slug"] == "1248-oakridge-drive" for f in r["flagged"]), r)

@@ -119,6 +119,10 @@ def main() -> int:
         run_step("listings sweep", "/api/admin/listings/sweep", 240, quiet_when='"pending":0,"sold":0,"back":0')
     if now.hour == 14 and now.minute < 10:
         run_step("meta token health", "/api/oauth/meta/check-all", 180)
+        # Engine 8: Run it until it sells (report only until RESMARA_RENEWALS_APPLY is on), then the
+        # once-a-day emails: day 7 and 14 reports, Run it again on day 12 and at the end.
+        run_step("renewals", "/api/admin/renewals/run", 600)
+        run_step("campaign emails", "/api/admin/campaigns/daily", 180, quiet_when='"reports":0,"run_again":0')
         # Engine 6: the agent's own Page and Instagram, for pending, sold and price posts.
         run_step("own posts", "/api/admin/listings/own-posts", 240, quiet_when='"found":0')
         # Engine 5: every live listing website renders and has its photos.

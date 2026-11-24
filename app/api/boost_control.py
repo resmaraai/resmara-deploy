@@ -463,3 +463,71 @@ async def own_posts_sweep(x_resmara_token: str = Header(default=""), db: Session
     if x_resmara_token != _settings.PUBLISH_TOKEN:
         raise HTTPException(status_code=403, detail="Bad publish token")
     return await run(db)
+
+
+@router.post("/admin/renewals/run")
+async def renewals_run(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db)):
+    """Run it until it sells, once a day (Engine 8). Reports only, unless RESMARA_RENEWALS_APPLY is on."""
+    from app.core.config import settings as _settings
+    from app.services import renewals
+
+    if not _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=503, detail="RESMARA_PUBLISH_TOKEN is not configured")
+    if x_resmara_token != _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=403, detail="Bad publish token")
+    if not renewals.apply_enabled():
+        plan = renewals.review(db)
+        return {"applied": False, "why": "RESMARA_RENEWALS_APPLY is off: report only", "counts": plan["counts"]}
+    result = await renewals.apply(db)
+    return {"applied": True, "counts": result["counts"]}
+
+
+@router.post("/admin/campaigns/daily")
+async def campaigns_daily(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db)):
+    """The once-a-day emails: day 7 and 14 reports, and Run it again on day 12 and at the end."""
+    from app.core.config import settings as _settings
+    from app.services import campaign_daily
+
+    if not _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=503, detail="RESMARA_PUBLISH_TOKEN is not configured")
+    if x_resmara_token != _settings.PUBLISH_TOKEN:
+        raise HTTPException(status_code=403, detail="Bad publish token")
+    return campaign_daily.run(db)
+
+
+@router.post("/boosts/{boost_id}/run-again")
+async def run_again(boost_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Run it again · $39 (Engine 8, section 8): one click builds a fresh round, charges the saved card
+    when the build succeeded, and it goes live the next morning. The build takes minutes, so it runs
+    in the background and the agent gets the "goes live" email when it's done."""
+    from app.services import billing, renewals
+
+    boost = _owned(boost_id, current_user, db)
+    status = (boost.listing_status or "").lower()
+    if status in ("pending", "sold"):
+        raise HTTPException(status_code=409, detail={"error": status, "message": f"This listing is {status}."})
+    if renewals.waiting_round(db, boost) is not None and not renewals.declines(db, renewals.waiting_round(db, boost)):
+        return {"status": "building"}
+    try:
+        cards = await billing.list_cards(getattr(current_user, "stripe_customer_id", "") or "")
+    except Exception:  # noqa: BLE001
+        cards = []
+    if not cards:
+        raise HTTPException(status_code=402, detail={"error": "no_card",
+                                                     "message": "Add a card first, then Run it again."})
+
+    async def work(bid: int, uid: int):
+        s2 = SessionLocal()
+        try:
+            b2 = s2.query(Boost).filter(Boost.id == bid).first()
+            u2 = s2.query(User).filter(User.id == uid).first()
+            result = await renewals.run_again(s2, b2, u2)
+            s2.add(Event(user_id=uid, boost_id=bid, event_type="run_again", payload={k: result.get(k) for k in
+                                                                                      ("status", "why", "new_boost_id")}))
+            s2.commit()
+        finally:
+            s2.close()
+
+    asyncio.create_task(work(boost.id, current_user.id))
+    return {"status": "building", "message": "Resmara is building a fresh 14 days. It's charged only when the build is "
+                                             "done, and goes live the next morning. We'll email you."}

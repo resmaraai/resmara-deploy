@@ -119,6 +119,8 @@ function mediaPath(u){return typeof mediaUrl==='function'?mediaUrl(u):u}
 // "Run until sold is on" tag. Run until sold itself is set on the campaign page.
 function cardFlags(c){
  const i=[...state.campaigns,...examples].indexOf(c),n=typeof newLeadCount==='function'?newLeadCount(c):0;
+ // Engine 8, section 6: a renewal waiting on a declined card says so, with one button.
+ if(/^Renewal on hold/.test(c.card_state||''))return `<div class="card-flags"><button type="button" class="card-leads" onclick="RM.addCard().then(r=>{if(r&&r.url)location.href=r.url}).catch(e=>toast(e.message))">Renewal on hold: card declined · Check billing</button></div>`;
  const leads=n?`<button type="button" class="card-leads" onclick="openLeads(${i})">${n} new lead${n>1?'s':''}</button>`:'';
  const sold=typeof untilSoldOn==='function'&&campaignPhase(c)!=='completed'&&untilSoldOn(c)?'<span class="card-until-sold">✓ Run until sold is on</span>':'';
  return leads||sold?`<div class="card-flags">${leads}${sold}</div>`:'';

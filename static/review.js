@@ -574,6 +574,10 @@ function showRerunOffer(index){
 }
 function startRerun(index){
  const c=[...state.campaigns,...examples][index];if(!c)return;
+ if(campaignBoostId(c)!=null&&window.RM&&RM.request){
+  show(`<span class="eyebrow">RUN IT AGAIN</span><h2>Run ${esc(c.address)} again for ${RERUN_PRICE}?</h2><p>Resmara builds a fresh 14 days of posts and a new ad from what worked last time. Your card on file is charged only when the build is done, and it goes live the next morning. Nothing else to do.</p><div class="modal-actions"><button type="button" class="nc-cancel" onclick="modal.close()">Not now</button><button class="campaign-primary" onclick="confirmRerun(${index})">Run it again · ${RERUN_PRICE}</button></div>`);
+  return;
+ }
  show(`<span class="eyebrow">RUNNING IT AGAIN</span><h2>Resmara is building a fresh 14 days.</h2><div class="audit-track campaign-build-track"><span class="robot-avatar" aria-hidden="true"></span></div><p role="status">Charging ${RERUN_PRICE} to your saved card…</p><p class="fine">Demo · no real payment runs here.</p>`);
  const status=modal.querySelector('[role="status"]');
  ['Looking back at what worked last time…','Planning new angles on the home…','Placing the new posts and ad on the calendar…'].forEach((t,i)=>setTimeout(()=>{if(status?.isConnected)status.textContent=t},1000+i*1400));
@@ -586,6 +590,18 @@ function startRerun(index){
   if(modal.open)modal.close();details(index);
   toast('Your new campaign is ready. Confirm the launch details and approve it to go live.');
  },5400);
+}
+
+function confirmRerun(index){
+ const c=[...state.campaigns,...examples][index];
+ RM.request('/api/boosts/'+campaignBoostId(c)+'/run-again',{method:'POST'}).then(()=>{
+  if(modal.open)modal.close();
+  toast('Building your fresh 14 days. You’ll get an email when it’s set to go live.');
+ }).catch(err=>{
+  const d=err&&err.detail;
+  if(d&&d.error==='no_card'){if(modal.open)modal.close();if(RM.addCard)RM.addCard().then(r=>{if(r&&r.url)location.href=r.url}).catch(e=>toast(e.message));else toast(d.message);return}
+  toast((d&&d.message)||'That didn’t go through. Please try again.');
+ });
 }
 
 // Replacement photos: scale to max 1440px on the long side and save as JPEG (Instagram-safe).
