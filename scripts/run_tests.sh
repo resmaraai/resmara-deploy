@@ -30,7 +30,10 @@ run() {
     printf 'ok   %-26s %s\n' "$label" "$(printf '%s' "$out" | tail -1)"
   else
     printf 'FAIL %-26s\n' "$label"
-    printf '%s\n' "$out" | tail -15
+    # A suite that prints one line per check buries the failing checks above the last 15 lines,
+    # which is exactly how a red CI run became unreadable. Name the failures first, then the tail.
+    printf '%s\n' "$out" | grep -E "FAIL|Traceback|Error:|assert" | head -20
+    printf '%s\n' "$out" | tail -6
     fail=1
   fi
 }

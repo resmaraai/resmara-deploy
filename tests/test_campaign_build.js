@@ -7,6 +7,12 @@
  *  - a caption edit is saved on the server first; a Fair Housing refusal stops the save.
  * Run: node tests/test_campaign_build.js
  */
+
+// Pin the agent's own time zone before anything reads a clock. The check below is "the time is
+// NOT the UTC value", which is only meaningful if the process is not itself in UTC — GitHub's
+// runners are, so without this line the suite is green on a laptop and red on CI.
+process.env.TZ = 'America/Los_Angeles';
+
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
