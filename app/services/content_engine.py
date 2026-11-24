@@ -38,7 +38,7 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from app.core.config import settings
-from app.db.session import Ad, Asset, Post
+from app.db.session import Ad, Asset, Boost, Post
 from app.services import llm, prompts
 from app.services import photos as photos_service
 from app.services.plan_rules import CLOSING_LINE_RE, caption_body_and_closing, validate_plan
@@ -174,6 +174,128 @@ def _owner_kit(db, boost) -> dict:
     except Exception:  # noqa: BLE001 - the build never fails for want of a brand
         return {}
     return kit
+
+
+async def _audience_hours(db, boost):
+    """The two best local posting hours from Meta's 'online followers', else the defaults (Engine 4, 9f)."""
+    from app.services import post_rules
+    try:
+        from app.services import meta_engine
+        conn = meta_engine.connection_for(db, boost.user_id) if db is not None else None
+        token = (conn.access_token if conn is not None else "") or ""
+        if not (conn is not None and conn.ig_user_id and token) or settings.SIMULATE:
+            return post_rules.DEFAULT_HOURS
+        import httpx
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(f"{settings.graph_base}/{conn.ig_user_id}/insights",
+                                 params={"metric": "online_followers", "period": "lifetime", "access_token": token})
+        data = (r.json() or {}).get("data") or []
+        values = ((data[0] or {}).get("values") or [{}])[0].get("value") if data else None
+        if isinstance(values, dict) and values:
+            return post_rules.best_hours({int(h): float(v or 0) for h, v in values.items()})
+    except Exception:  # noqa: BLE001 - the defaults are fine; the next campaign tries again
+        pass
+    return post_rules.DEFAULT_HOURS
+
+
+def style_profile(db, user_id, *, exclude_boost=None) -> dict:
+    """What the agent's thumbs, edits and approvals say about the styles they like (Engine 4, section 5).
+
+    A 👍 counts 2, approved untouched counts 1, a 👎 counts -2. Styles netting negative are avoided;
+    the detail treatments on 👍 posts are used more. ``last_sequence`` stops a repeat of their last campaign.
+    """
+    out = {"liked": {}, "avoid": [], "treatments": [], "last_sequence": [], "references": []}
+    if db is None or user_id is None:
+        return out
+    try:
+        rows = (db.query(Post).join(Boost, Post.boost_id == Boost.id)
+                .filter(Boost.user_id == user_id, Post.design_style.isnot(None)).all())
+    except Exception:  # noqa: BLE001
+        return out
+    score: dict = {}
+    treat: dict = {}
+    for p in rows:
+        if exclude_boost is not None and p.boost_id == exclude_boost:
+            continue
+        val = 2 if p.rating == 1 else -2 if p.rating == -1 else (1 if p.client_status == "approved" else 0)
+        score[p.design_style] = score.get(p.design_style, 0) + val
+        if p.details_treatment:
+            treat[p.details_treatment] = treat.get(p.details_treatment, 0) + val
+        if p.rating == 1 and p.image_url:
+            out["references"].append(p.image_url)
+    out["liked"] = {k: v for k, v in score.items() if v > 0}
+    out["avoid"] = [k for k, v in score.items() if v < 0]
+    out["treatments"] = [k for k, v in sorted(treat.items(), key=lambda kv: -kv[1]) if v > 0]
+    prior = [p for p in rows if p.boost_id != exclude_boost]
+    if prior:
+        last_boost = max(p.boost_id for p in prior)
+        out["last_sequence"] = [p.design_style for p in sorted(prior, key=lambda p: (p.day, p.slot or 1))
+                                if p.boost_id == last_boost]
+    return out
+
+
+def market_styles(db, address: str, user_id, days: int = 30) -> list:
+    """The post styles other Resmara agents in this listing's city used most lately, most first."""
+    from app.services import post_rules
+    city = post_rules.city_of(address).lower()
+    if db is None or not city:
+        return []
+    try:
+        since = datetime.utcnow() - timedelta(days=days)
+        rows = (db.query(Post.design_style, Boost.address).join(Boost, Post.boost_id == Boost.id)
+                .filter(Boost.user_id != user_id, Post.design_style.isnot(None), Boost.created_at >= since).all())
+    except Exception:  # noqa: BLE001
+        return []
+    counts: dict = {}
+    for style, addr in rows:
+        if post_rules.city_of(addr or "").lower() == city:
+            counts[style] = counts.get(style, 0) + 1
+    return [k for k, _ in sorted(counts.items(), key=lambda kv: -kv[1])][:2]
+
+
+def _reference_bytes(db, urls: list, limit: int = 6) -> list:
+    """Their 👍 posts as image bytes, newest first, for the designer to match."""
+    out = []
+    if db is None:
+        return out
+    for url in list(dict.fromkeys(urls))[-limit:][::-1]:
+        asset = db.query(Asset).filter(Asset.url == url).first()
+        raw = _asset_bytes(asset) if asset is not None else b""
+        if raw:
+            out.append(raw)
+    return out
+
+
+def _alert_build_trouble(db, boost, failed: int, total: int) -> None:
+    """More than 3 posts needed the fallback design: Adam hears about it (Engine 4, if part of a build fails)."""
+    try:
+        from app.services import mail
+        from app.db.session import Event
+        owners = [a.strip() for a in (settings.ADMIN_EMAILS or "").split(",") if a.strip()]
+        db.add(Event(user_id=boost.user_id, boost_id=boost.id, event_type="build_design_trouble",
+                     payload={"fallbacks": failed, "posts": total}))
+        db.commit()
+        if owners:
+            mail.send_email(owners[0], f"Resmara build needs a look: {boost.address}",
+                            f"{failed} of {total} posts for {boost.address} used the fallback design because the "
+                            "image model or the checks didn't clear them. They're flagged Needs a look for the agent.\n\n- Resmara")
+    except Exception:  # noqa: BLE001 - an alert must never break a build
+        pass
+
+
+def learned_summary(profile: dict) -> list:
+    """'What Resmara learned about you', in plain words, from the style profile."""
+    from app.services import post_rules
+    words = dict(post_rules.POST_STYLES)
+    lines = []
+    if profile.get("liked"):
+        top = sorted(profile["liked"], key=lambda k: -profile["liked"][k])[:2]
+        lines.append("You like " + " and ".join(words.get(k, k) for k in top) + ".")
+    if profile.get("avoid"):
+        lines.append("You don't like " + " or ".join(words.get(k, k) for k in profile["avoid"][:2]) + ", so Resmara uses them less.")
+    if profile.get("treatments"):
+        lines.append(f"Your details look best as {profile['treatments'][0]}.")
+    return lines
 
 
 def voice_of_client_rules(kit: dict) -> str:
@@ -1474,6 +1596,9 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
         tools=[{"type": "web_search"}],
     )
     style = _trunc(style, 5000)
+    # Engine 4, section 6: the story arc the plan follows, fitted to this home.
+    from app.services import post_rules
+    style = style + "\n" + post_rules.STORY_ARC
 
     # --- R4: the campaign plan (Chat Completions -> JSON) -------------------
     say("planning the calendar", days=days, per_day=per_day)
@@ -1660,6 +1785,20 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
 
     say("writing posts")
     posts_created = 0
+    from app.services import post_rules
+    kit = saved_kit or {}
+    hours = await _audience_hours(db, boost)
+    profile = style_profile(db, getattr(boost, "user_id", None), exclude_boost=boost.id)
+    # No two Resmara agents alike in the same market (Engine 4, 9): steer away from the styles other
+    # agents there used most in the last 30 days, while at least three styles stay in play.
+    crowded = market_styles(db, address, getattr(boost, "user_id", None))
+    avoid = list(profile["avoid"])
+    for k in crowded:
+        if len({kk for kk, _ in post_rules.POST_STYLES} - set(avoid) - {k}) >= 3 and k not in profile["liked"]:
+            avoid.append(k)
+    styles = post_rules.style_plan(len(plan_posts), liked=profile["liked"], avoid=avoid,
+                                   last=profile["last_sequence"], seed=int(getattr(boost, "id", 0) or 0))
+    treatments = profile["treatments"] or list(post_rules.DETAIL_TREATMENTS)
     for index, p in enumerate(plan_posts):
         if not isinstance(p, dict):
             continue
@@ -1678,8 +1817,19 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
             db.add(post)
 
         post.kind = kind
-        post.caption = caption + (("\n\n" + hashtags_str) if hashtags_str else "")
+        # Engine 4, 9c and 9f: Instagram gets 3-5 clean tags and no links; Facebook 0-2 tags.
+        body = post_rules.strip_tags(caption)
+        room_for_tags = (assignments[index] if index < len(assignments) else {}).get("room") or p.get("photoRoom") or ""
+        ig_tags, fb_tags = post_rules.hashtags_for(index=index, room=room_for_tags, address=address, kit=kit,
+                                                   suggested=hashtags, market=kit.get("market") or "")
+        hashtags_str = " ".join(ig_tags)
+        post.caption = body + (("\n\n" + hashtags_str) if hashtags_str else "")
         post.hashtags = hashtags_str
+        post.hashtags_fb = " ".join(fb_tags)
+        post.caption_ig = post_rules.instagram_caption(body, index)
+        post.design_style = styles[index] if index < len(styles) else None
+        post.details_treatment = treatments[index % len(treatments)]
+        post.needs_look = False
         post.cta = p.get("cta")
         # The photo and the words over it travel with the post; the calendar renders them and the
         # item editor edits them. A plan-only overlay was invisible in the product.
@@ -1695,8 +1845,12 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
             or _overlay_from(str(p.get("title") or ""), photo.get("room") or "", address)
             or None)
         target_date = base_date + timedelta(days=day - 1)
-        slot_time = time(9, 0) if slot == 1 else time(19, 0)
-        post.publish_at = datetime.combine(target_date, slot_time).isoformat()
+        # When the agent's audience is online most, only between 6 AM and 11 PM local, stored in UTC
+        # (what the publisher compares against). The old 9:00/19:00 was read as UTC: 1 AM Pacific.
+        post.publish_at = post_rules.publish_at(target_date, slot, address, hours)
+        post.features = {"style": post.design_style, "treatment": post.details_treatment,
+                         "room": post.photo_room or "", "post_type": str(p.get("postType") or "photo"),
+                         "words": len(str(p.get("overlayText") or "").split()), "slot": slot}
         post.publish_target = ("instagram" if kind == "short_video"
                                else "both")
         post.publish_status = "scheduled"
@@ -1762,7 +1916,9 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
     if db is not None:
         try:
             from app.services import design as design_step
-            if design_step.design_available():
+            # Never a plain photo (Engine 4): without an image model every post still gets the
+            # fallback design, flagged Needs a look, so this step always runs when there are photos.
+            if design_step.design_available() or intact:
                 rows = (db.query(Post).filter(Post.boost_id == boost.id)
                         .order_by(Post.day, Post.slot).all())
                 by_name = {getattr(a, "filename", ""): a for a in intact}
@@ -1775,19 +1931,30 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
                     raw = _asset_bytes(asset)
                     return (raw, getattr(asset, "content_type", "") or "image/png") if raw else None
 
+                details_line = " · ".join(x for x in [agent, phone, (f"Lic. {license_}" if license_ else ""), brokerage] if x)
                 briefs = [{"overlay": getattr(post, "overlay_text", "") or getattr(post, "title", "") or "",
                            "caption": getattr(post, "caption", "") or "",
-                           "room": getattr(post, "photo_room", "") or ""} for post in rows]
+                           "room": getattr(post, "photo_room", "") or "",
+                           "style": getattr(post, "design_style", "") or "",
+                           "treatment": getattr(post, "details_treatment", "") or "",
+                           "details": details_line} for post in rows]
+                design_brand = {**(brand if isinstance(brand, dict) else {}),
+                                **{k: v for k, v in (saved_kit or {}).items() if k in ("palette", "fonts")}}
                 say("designing the posts", posts=len(rows))
-                made = await design_step.design_posts(briefs, boost, brand, _photo_for)
+                refs = _reference_bytes(db, profile.get("references") or [])
+                made = await design_step.design_posts(briefs, boost, design_brand, _photo_for, references=refs)
                 for item in made.get("designed") or []:
                     post = rows[item["index"]]
                     post.image_url = _store_design(db, boost, post, item["bytes"])
+                    if item.get("needs_look"):
+                        post.needs_look = True
                 db.commit()
                 design_notes = {k: made.get(k) for k in
                                 ("calls", "checked", "regenerated", "fallbacks", "model")}
                 design_notes["designed"] = len(made.get("designed") or [])
                 engine_notes.extend([str(n) for n in (made.get("notes") or [])][:14])
+                if (made.get("fallbacks") or 0) > 3:
+                    _alert_build_trouble(db, boost, made.get("fallbacks"), len(rows))
                 engine_notes.append(
                     f"{design_notes['designed']} of {len(rows)} posts were designed with "
                     f"{made.get('model')}; each one cost an image call"
@@ -1802,7 +1969,53 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
             engine_notes.append(f"the design step failed and the posts kept their photos: "
                                 f"{type(exc).__name__}: {exc}"[:300])
 
+    # --- the ad: its hooks and its own graphic (Engine 4, 9b) --------------------
+    # Built here, launched by Engine 6. Up to 3 hook versions, each backed by the home's file and
+    # checked against the platform rulebook, each drawn in 4:5 (feeds) and 9:16 (Stories, Reels).
+    ad_hooks_note = {}
+    if db is not None and plan_posts and intact:
+        try:
+            from app.services import ad_hooks
+            diffs = []
+            if isinstance(plan, dict) and isinstance(plan.get("propertyStory"), dict):
+                diffs = [str(d) for d in plan["propertyStory"].get("differentiators") or []]
+            hooks = await ad_hooks.build_hooks(address=address, research=research, differentiators=diffs,
+                                               photo_index=photo_index)
+            named = {getattr(a, "filename", ""): a for a in intact}
+
+            def _hook_photo(name):
+                asset = named.get(name) or intact[0]
+                raw = _asset_bytes(asset)
+                return (raw, getattr(asset, "content_type", "") or "image/png") if raw else None
+
+            def _store_ad(raw, label):
+                class _P:  # _store_design names the file by day; the ad is day 0
+                    day = 0
+                return _store_design(db, boost, _P(), raw)
+
+            details_line = " · ".join(x for x in [agent, phone, (f"Lic. {license_}" if license_ else ""), brokerage] if x)
+            drawn = await ad_hooks.hook_graphics(hooks["hooks"], _hook_photo, _store_ad, details=details_line,
+                                                 brand=saved_kit)
+            new_plan = dict(boost.plan or {})
+            new_ad = dict(new_plan.get("ad") or {})
+            new_ad["hooks"] = hooks["hooks"]
+            new_ad["rulebook"] = hooks["rulebook"]
+            new_ad["placements"] = "Facebook and Instagram feeds, Marketplace, Stories and Reels"
+            new_ad["hours"] = "6 AM to 11 PM"
+            new_plan["ad"] = new_ad
+            boost.plan = new_plan
+            db.commit()
+            ad_hooks_note = {"hooks": len(hooks["hooks"]), "dropped": len(hooks["dropped"]), "images": drawn,
+                             "source": hooks["source"]}
+            engine_notes.append(f"the ad has {len(hooks['hooks'])} hook version(s) that pass the platform rulebook"
+                                + (f" ({len(hooks['dropped'])} dropped for breaking it)" if hooks["dropped"] else "")
+                                + f", with {drawn} ad graphic(s) in 4:5 and 9:16")
+        except Exception as exc:  # noqa: BLE001 - the posts are usable without the ad's hooks
+            ad_hooks_note = {"error": f"{type(exc).__name__}: {exc}"[:200]}
+            engine_notes.append(f"the ad hooks step failed: {type(exc).__name__}")
+
     return {
+        "ad_hooks": ad_hooks_note,
         "source": source,
         "engine": engine,
         "notes": engine_notes,

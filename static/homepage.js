@@ -465,7 +465,7 @@ function brandKitData(){
  const palette=b.palette||(b.colours?String(b.colours).split(/[,\s]+/).filter(x=>/^#?[0-9a-f]{6}$/i.test(x)).map((h,i)=>[['Primary','Accent','Text','Tint','Page'][i]||'Colour',h[0]==='#'?h:'#'+h]):null)||d.palette||[];
  return {demo,agent:b.agent||state.name||d.agent||'',brokerage:b.brokerage||b.company||state.company||d.brokerage||'',license:b.license||d.license||'',website:b.website||d.website||'',market:b.market||d.market||'',brandLink:b.brandLink||d.brandLink||'',
   palette,fonts:b.fonts||d.fonts||['Playfair Display','Jost'],voice:b.voice||d.voice||'',use:b.use||d.use||[],avoid:b.avoid||d.avoid||[],theme:b.theme||d.theme||'Match my brand',legal:b.legal||d.legal||[],sources:b.sources||d.sources||[],researched:b.researched||d.researched||'',
-  phone:b.phone||d.phone||'',brokerLicense:b.brokerLicense||d.brokerLicense||'',voiceOfClient:b.voiceOfClient||d.voiceOfClient||'',factSources:b.factSources||{},missing:demo?[]:(b.build?(b.missing||[]):[]),built:!!b.build,
+  ownTag:b.ownTag||'',phone:b.phone||d.phone||'',brokerLicense:b.brokerLicense||d.brokerLicense||'',voiceOfClient:b.voiceOfClient||d.voiceOfClient||'',factSources:b.factSources||{},missing:demo?[]:(b.build?(b.missing||[]):[]),built:!!b.build,
   logo:state.brandMedia?.[b.logoId]||'',headshot:state.brandMedia?.[b.headshotId]||''};
 }
 function brandKitSections(k){
@@ -480,7 +480,7 @@ function brandKitSections(k){
   <section class="mb-sec"><h4>COLOURS</h4><div class="mb-swatches">${k.palette.map(([role,hex],i)=>`<label class="mb-sw"><input type="color" value="${esc(hex)}" oninput="this.nextElementSibling.querySelector('code').textContent=this.value.toUpperCase();brandColoursSync(this.form)"><span><b>${esc(role)}</b><code>${esc(hex.toUpperCase())}</code></span></label>`).join('')}</div><small>Click a colour to change it.</small><input type="hidden" name="colours" value="${esc(k.palette.map(p=>p[1]).join(', '))}"></section>
   <div class="mb-two"><section class="mb-sec"><h4>TYPOGRAPHY</h4><p class="mb-type-h" style="font-family:'${esc(k.fonts[0])}',serif">The long view</p>${fontPicker('fontHead','Headlines',k.fonts[0],'.mb-type-h')}<p class="mb-type-b" style="font-family:'${esc(k.fonts[1])}',sans-serif">Morning light, wide oak floors and room to breathe.</p>${fontPicker('fontBody','Body',k.fonts[1],'.mb-type-b')}<small>Resmara picked these to match your brand. Change either one any time.</small></section>
   <section class="mb-sec"><h4>VOICE</h4><textarea name="voice" rows="2">${esc(k.voice)}</textarea><div class="mb-chips">${k.use.map(w=>`<span class="ok">“${esc(w)}”</span>`).join('')}${k.avoid.map(w=>`<span class="no">${esc(w)}</span>`).join('')}</div></section></div>
-  <div class="mb-two"><section class="mb-sec"><h4>YOUR LOOK</h4><input type="hidden" name="theme" value="${esc(k.theme)}"><div class="mb-looks">${['Modern','Classic','Rustic','Match my brand'].map(t=>`<button type="button" class="${t===k.theme?'on':''}" onclick="const f=this.form;f.elements.theme.value='${t}';this.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===this));brandMarkDirty()">${t}</button>`).join('')}</div><small>Change your look any time. New campaigns use it once you save.</small></section>
+  <div class="mb-two"><section class="mb-sec"><h4>WHAT RESMARA LEARNED ABOUT YOU</h4><ul class="mb-learned" data-learned><li>${k.demo?'You like overlaid text, no boxes and short headlines.':'Give posts a 👍 or 👎 in your campaigns and Resmara learns your style. Approving a campaign untouched counts too.'}</li></ul><label class="mb-field"><span>Your own hashtag<em>On every post</em></span><input name="ownTag" value="${esc(k.ownTag||'')}" placeholder="#SellingWith${esc(String(k.agent||'You').split(' ')[0])}"></label></section>
   <section class="mb-sec"><h4>ON EVERY POST</h4><ul class="mb-legal">${k.legal.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><small>Your brokerage’s rules, checked.</small></section></div>
   <section class="mb-sec"><h4>WHERE RESMARA LOOKED</h4><div class="mb-sources">${k.sources.map(([t,v])=>`<span>✓ <b>${esc(t)}</b> ${esc(v)}</span>`).join('')}</div></section>
   `}
@@ -494,6 +494,7 @@ function myBrand(){
  <form class="mb" onsubmit="saveBrandProfile(event,this,false)" oninput="brandMarkDirty()" onchange="brandMarkDirty()">${brandKitSections(k)}<p class="fine" data-brand-error role="alert"></p>
   <div class="mb-foot"><div class="mb-status"><button class="mb-research" type="button" onclick="brandResearchAgain(this)">Research again</button><span>✓ Researched ${esc(k.researched||'from your website')}</span><span class="mb-unsaved" hidden>Unsaved changes</span></div><button class="campaign-primary">Save my brand</button></div>
  </form>`;
+ if(!k.demo&&window.RM&&RM.isLoggedIn&&RM.isLoggedIn())RM.request('/api/me/style-profile').then(p=>{const ul=document.querySelector('[data-learned]');if(ul&&p&&p.lines&&p.lines.length)ul.innerHTML=p.lines.map(l=>'<li>'+esc(l)+'</li>').join('')}).catch(()=>{});
  k.missing.forEach(m=>{const f=document.querySelector('form.mb [name="'+({brokerage:'company'}[m]||m)+'"]');if(f)f.closest('.mb-field')?.classList.add('miss')});
  window.brandDirty=false;
  [k.fonts[0],k.fonts[1]].forEach(loadGoogleFont);
@@ -657,6 +658,7 @@ async function saveBrandProfile(event,form,onboarding){
   if(fields.phone)brand.phone=fields.phone.value.trim();
   if(fields.brokerLicense)brand.brokerLicense=fields.brokerLicense.value.trim();
   if(fields.voiceOfClient)brand.voiceOfClient=fields.voiceOfClient.value.trim();
+  if(fields.ownTag)brand.ownTag=fields.ownTag.value.trim()?'#'+fields.ownTag.value.trim().replace(/^#+/,'').replace(/[^A-Za-z0-9_]/g,''):'';
   brand.brokerage=company;
   if(fields.fontHead&&fields.fontBody)brand.fonts=[fields.fontHead.value.trim()||'Playfair Display',fields.fontBody.value.trim()||'Jost'];
   if(fields.theme)brand.theme=fields.theme.value;

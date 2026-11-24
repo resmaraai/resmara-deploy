@@ -341,7 +341,7 @@ function changeReviewMonth(offset){
 }
 function reviewCalendar(r,c){
  if(r.scopeFirst&&(!r.items.length||ReviewStudio.building.has(r))){
-  return `<section class="panel review-calendar"><h2 class="campaign-step-title"><span>2</span> Campaign calendar</h2><p>${ReviewStudio.building.has(r)?'Resmara is building your posts, your ad and your listing page.':'Your calendar isn’t built yet.'}</p>${!ReviewStudio.building.has(r)?(reviewCampaignBoostId()!=null?'<button class="campaign-primary" onclick="rebuildLiveCampaign()">Build my campaign</button>':'<button class="campaign-primary" onclick="buildApprovedScope()">Build campaign calendar</button>'):''}${r.scopeConfirmed&&!ReviewStudio.building.has(r)&&reviewCampaignBoostId()!=null?'<p class="fine build-charge-note">Building charges this campaign to your card on file. No card yet? You’ll add one first.</p>':''}</section>`;
+  return `<section class="panel review-calendar"><h2 class="campaign-step-title"><span>2</span> Campaign calendar</h2><p>${ReviewStudio.building.has(r)?'Resmara is building your posts, your ad and your listing page.':'Your calendar isn’t built yet.'}</p>${!ReviewStudio.building.has(r)?(reviewCampaignBoostId()!=null?'<button class="campaign-primary" onclick="rebuildLiveCampaign()">Build my campaign</button>':'<button class="campaign-primary" onclick="buildApprovedScope()">Build campaign calendar</button>'):''}${r.scopeConfirmed&&!ReviewStudio.building.has(r)&&reviewCampaignBoostId()!=null?'<p class="fine build-charge-note">Resmara builds it first. You pay to unlock it when it’s built.</p>':''}</section>`;
  }
  // Only the weeks the campaign runs: from the week of day 1 to the week of day 14.
  const start=r.scope.start,last=reviewSlot(r,{day:14}).date;

@@ -88,6 +88,14 @@ ADDITIONS = {
         ("failed_at", "DATETIME"),
         ("failure_notified_at", "DATETIME"),
         ("fail_log", "JSON"),
+        # Engine 4: two captions, Facebook tags, post style, the thumbs, Needs a look.
+        ("caption_ig", "TEXT"),
+        ("hashtags_fb", "TEXT"),
+        ("design_style", "VARCHAR"),
+        ("details_treatment", "VARCHAR"),
+        ("rating", "INTEGER"),
+        ("needs_look", "BOOLEAN DEFAULT 0"),
+        ("features", "JSON"),
     ],
     "ads": [
         ("meta_adset_id", "VARCHAR"),

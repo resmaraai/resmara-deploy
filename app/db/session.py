@@ -338,6 +338,16 @@ class Post(Base):
     # Every failure, oldest first: [{at, error}]. The console's fail log reads this, so a retry
     # shows what happened last time instead of only the newest sentence in last_error.
     fail_log = Column(JSON, default=list)
+    # Engine 4: two captions (the Instagram one never carries a link), Facebook's own 0-2 tags,
+    # the post style and how the agent's details are shown, the agent's thumbs, and the flag a
+    # post gets when the checks couldn't clear it.
+    caption_ig = Column(Text, nullable=True)
+    hashtags_fb = Column(Text, nullable=True)
+    design_style = Column(String, nullable=True)
+    details_treatment = Column(String, nullable=True)
+    rating = Column(Integer, nullable=True)          # 1 thumbs up, -1 thumbs down
+    needs_look = Column(Boolean, default=False)
+    features = Column(JSON, nullable=True)           # what the learner compares between 👍 and 👎
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # --- Social lead (Post Engine §10.4) ---

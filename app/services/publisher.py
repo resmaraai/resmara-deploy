@@ -114,11 +114,9 @@ def _classify(post: Post) -> str:
 
 
 def _message(post: Post) -> str:
-    caption = post.caption or ""
-    hashtags = post.hashtags or ""
-    if hashtags:
-        return f"{caption}\n\n{hashtags}".strip()
-    return caption
+    """The Facebook text: the caption body and its own tags, never the tag block twice."""
+    from app.services.post_rules import messages as _messages
+    return _messages(post)[0]
 
 
 def _ext(image_url: Optional[str]) -> str:
@@ -242,7 +240,9 @@ async def publish_post(post: Post, boost: Boost, ad_account: Any, db) -> Dict[st
             return {"status": "failed", "state": "failed", "refused": True,
                     "error": "Your Meta connection can't post this right now"}
     kind = _classify(post)
-    message = _message(post)
+    # Engine 4: Facebook and Instagram each get their own text; Instagram's never carries a link.
+    from app.services.post_rules import messages as _messages
+    message, ig_message = _messages(post)
 
     if ad_account is None:
         return {"status": "failed", "state": "failed",
@@ -281,7 +281,7 @@ async def publish_post(post: Post, boost: Boost, ad_account: Any, db) -> Dict[st
                 page_token = (getattr(ad_account, "page_access_token", None) or "").strip() or token
                 fb_post_id = await _publish_facebook(client, post, kind, page_id, message, page_token)
             if do_ig:
-                ig_media_id = await _publish_instagram(client, post, ig_id, message, token)
+                ig_media_id = await _publish_instagram(client, post, ig_id, ig_message, token)
     except GraphError as exc:
         # Meta answered and refused: its own error object is what decides whether this is a
         # connection problem or a rejected post, so it travels with the failure.

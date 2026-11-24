@@ -38,7 +38,7 @@ POST_FACTS = ("phone", "license", "company", "brokerLicense")
 # Fields the agent can edit; an edited field is never overwritten by Research again.
 KIT_FIELDS = ("agent", "title", "phone", "email", "website", "license", "company", "brokerage", "brokerLicense",
               "market", "palette", "fonts", "voice", "voiceOfClient", "use", "avoid", "signoff",
-              "logoUrl", "headshotUrl", "instagram")
+              "logoUrl", "headshotUrl", "instagram", "ownTag")
 PERSONAL_WORDS = re.compile(
     r"\b(wife|husband|son|daughter|kids?|children|grandkids?|church|faith|god|pray|prayer|cancer|"
     r"diagnos\w*|illness|politic\w*|democrat\w*|republican\w*|trump|biden|divorce\w*)\b", re.I)
