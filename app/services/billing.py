@@ -580,7 +580,7 @@ async def refund_failed_build(boost, db) -> dict:
 
 
 # ── Engine 10: tax, the card, receipts, refunds, disputes ──────────────────────
-TAX_CODE = "txcd_10103000"   # Software as a service, personal/business use
+TAX_CODE = "txcd_10103001"   # Software as a Service (SaaS) - Business Use (agents buy it for their business)
 
 
 def tax_enabled() -> bool:
@@ -629,12 +629,32 @@ async def tax_for(customer_id: str, cents: int, reference: str, client=None) -> 
 
 
 async def record_tax(calculation: str | None, payment_intent: str | None, client=None) -> None:
+    """Record the tax for filing, and keep the transaction id on the payment so a refund can reverse it."""
     if not calculation or not payment_intent:
         return
     try:
-        await stripe_call("POST", "/tax/transactions/create_from_calculation",
-                          [("calculation", calculation), ("reference", payment_intent)], client=client)
+        tx = await stripe_call("POST", "/tax/transactions/create_from_calculation",
+                               [("calculation", calculation), ("reference", payment_intent)], client=client)
+        if tx.get("id"):
+            await stripe_call("POST", "/payment_intents/%s" % payment_intent,
+                              [("metadata[tax_transaction]", tx["id"])], client=client)
     except Exception:  # noqa: BLE001 - logged in Stripe; the charge stands
+        pass
+
+
+async def reverse_tax(payment_intent: str, cents: int | None, refund_id: str | None, client=None) -> None:
+    """A refund on a taxed charge reverses that tax too, so it isn't filed as collected."""
+    if not tax_enabled() or not payment_intent:
+        return
+    try:
+        pi = await stripe_call("GET", "/payment_intents/%s" % payment_intent, client=client)
+        tx = ((pi or {}).get("metadata") or {}).get("tax_transaction")
+        if not tx:
+            return
+        pairs = [("original_transaction", tx), ("reference", refund_id or "refund-%s" % payment_intent)]
+        pairs += [("mode", "partial"), ("flat_amount", str(-int(cents)))] if cents else [("mode", "full")]
+        await stripe_call("POST", "/tax/transactions/create_reversal", pairs, client=client)
+    except Exception:  # noqa: BLE001 - the refund stands; the team can reverse it in Stripe
         pass
 
 
@@ -686,8 +706,10 @@ async def refund(payment_intent: str, cents: int | None = None, reason: str = ""
     pairs = [("payment_intent", payment_intent), ("metadata[reason]", (reason or "")[:300])]
     if cents:
         pairs.append(("amount", str(int(cents))))
-    return await stripe_call("POST", "/refunds", pairs, idem="resmara-refund-%s-%s" % (payment_intent, cents or "full"),
-                             client=client)
+    result = await stripe_call("POST", "/refunds", pairs, idem="resmara-refund-%s-%s" % (payment_intent, cents or "full"),
+                               client=client)
+    await reverse_tax(payment_intent, cents, (result or {}).get("id"), client=client)
+    return result
 
 
 def dispute_outcome(event: dict) -> dict | None:

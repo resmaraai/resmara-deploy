@@ -82,6 +82,7 @@ async def fake_refund(pi, cents=None, reason="", client=None):
     return {"id": "re_1"}
 
 
+REAL_REFUND = billing.refund
 billing.list_cards = fake_list_cards
 billing.detach_card = fake_detach
 billing.setup_session_card = fake_setup_card
@@ -126,6 +127,10 @@ def stripe_handler(request):
         return httpx.Response(200, json={"id": "taxcalc_1", "tax_amount_exclusive": 412, "amount_total": 4312})
     if request.url.path.endswith("/payment_intents"):
         return httpx.Response(200, json={"id": "pi_tax", "status": "succeeded"})
+    if request.url.path.endswith("/payment_intents/pi_tax"):
+        return httpx.Response(200, json={"id": "pi_tax", "metadata": {"tax_transaction": "tax_tx_1"}})
+    if request.url.path.endswith("/refunds"):
+        return httpx.Response(200, json={"id": "re_tax"})
     return httpx.Response(200, json={"id": "tx_1"})
 
 
@@ -140,6 +145,21 @@ pi_body = next((b for p_, b in CALLS if p_.endswith("/payment_intents")), "")
 ok("with Stripe Tax on, tax is added on top of the price", res.get("tax_cents") == 412 and "amount=4312" in pi_body,
    (res, pi_body[:200]))
 ok("  ...and the tax is recorded with Stripe for filing", any(p_.endswith("create_from_calculation") for p_, _ in CALLS), CALLS)
+ok("  ...with the tax transaction kept on the payment", any(p_.endswith("/payment_intents/pi_tax") and "tax_transaction" in b for p_, b in CALLS), CALLS)
+CALLS.clear()
+
+
+async def taxed_refund(cents):
+    async with httpx.AsyncClient(transport=httpx.MockTransport(stripe_handler)) as c:
+        return await _real_refund("pi_tax", cents, "test", client=c)
+
+_real_refund = REAL_REFUND
+os.environ["RESMARA_STRIPE_TAX"] = "1"
+asyncio.run(taxed_refund(1000))
+os.environ.pop("RESMARA_STRIPE_TAX", None)
+rev = next((b for p_, b in CALLS if p_.endswith("create_reversal")), "")
+ok("a refund reverses its share of the tax", "original_transaction=tax_tx_1" in rev and "mode=partial" in rev
+   and "flat_amount=-1000" in rev, rev)
 CALLS.clear()
 
 print("[purchases]")

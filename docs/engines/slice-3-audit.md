@@ -77,3 +77,10 @@ requests go to the operator addresses), email replies added to a request (needs 
 setup session Calendly event and its bookings in the Team room.
 
 Tests: `tests/test_engine10_billing.py` (43), `tests/test_engine11_support.py` (31).
+
+**Tax follow-ups (23 Nov, evening):** the tax code is now `txcd_10103001`, Stripe's "Software as a
+Service (SaaS) - Business Use", because agents buy Resmara for their business (Dan to confirm with the
+accountant). A refund on a taxed charge now reverses its share of the tax in Stripe. **Heads-up:**
+the Engine 10 brain says California doesn't tax software today; California's SB 122 makes SaaS taxable
+from **January 1, 2027**, per Stripe's guide. Resmara is based in California, so Stripe Tax and a California
+registration likely need to be in place before then (Dan and the accountant).
