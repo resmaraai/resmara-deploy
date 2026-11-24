@@ -157,7 +157,7 @@ check("  ...and said why in the second brief", b"misspelled" in edits[-1]["body"
 check("  ...the second design was kept", len(result["designed"]) == 1 and result["regenerated"] == 1,
       str(result)[:300])
 
-print("\n=== a refusal is not retried forever, and the photo is kept ===")
+print("\n=== a refusal is not retried forever, and the post gets the fallback design (Engine 4) ===")
 CALLS.clear()
 MODE["checker"] = "ok"
 MODE["checker_seen"] = 0
@@ -165,7 +165,10 @@ MODE["edit"] = "fail"
 result = run(design.design_posts(plan, Boost(), {"name": "Dana Realty"}, lambda p: (photo, "image/jpeg")))
 edits = [c for c in CALLS if c["path"].endswith("/images/edits")]
 check("a content-policy refusal is tried once", len(edits) == 1, str(len(edits)))
-check("  ...nothing was designed", result["designed"] == [], str(result["designed"])[:120])
+check("  ...never a plain photo: Resmara's fallback design, flagged Needs a look",
+      len(result["designed"]) == 1 and result["designed"][0]["note"] == "fallback"
+      and result["designed"][0].get("needs_look") is True
+      and result["designed"][0]["bytes"][:8] == b"\x89PNG\r\n\x1a\n", str(result["designed"])[:120])
 check("  ...the post is counted as a fallback", result["fallbacks"] == 1, str(result["fallbacks"]))
 check("  ...and the reason names the provider's words",
       any("content policy" in n for n in result["notes"]), str(result["notes"])[:200])
@@ -178,12 +181,13 @@ check("nothing was sent", result["calls"] == 0, str(result["calls"]))
 check("  ...and it says there was no photo",
       result["skipped"] and "no photo" in result["skipped"][0]["reason"], str(result["skipped"]))
 
-print("\n=== without the model, the step declines to pretend ===")
+print("\n=== without the model, the step says so and uses the fallback design ===")
 os.environ.pop("RESMARA_ALLOW_LOCAL_IMAGE_EDITS", None)
 check("design is unavailable off OpenAI's API", design.design_available() is False)
 skipped = run(design.design_posts(plan, Boost(), {}, lambda p: (photo, "image/png")))
-check("  ...and every post is reported skipped, not designed",
-      skipped["designed"] == [] and "not configured" in " ".join(skipped["notes"]),
+check("  ...every post gets the fallback design, flagged, and the note says the model isn't configured",
+      skipped["designed"] and all(d["note"] == "fallback" and d.get("needs_look") for d in skipped["designed"])
+      and "not configured" in " ".join(skipped["notes"]),
       str(skipped["notes"])[:160])
 os.environ["RESMARA_ALLOW_LOCAL_IMAGE_EDITS"] = "1"
 

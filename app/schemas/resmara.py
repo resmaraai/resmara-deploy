@@ -132,6 +132,8 @@ class BoostOut(BaseModel):
     until_sold: bool = False
     until_sold_at: Optional[datetime] = None
     parent_boost_id: Optional[int] = None
+    # Built and not paid for yet: My campaigns shows it blurred with Unlock my campaign.
+    locked: bool = False
     # The links the campaign runs on (§3), the pause state (§4.5) and what the listing watcher
     # last saw (§5). All optional: a campaign that has not reached launch has none of them.
     listing_url: Optional[str] = None

@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from app.db.session import get_db, SessionLocal, User, Boost, AdAccount, Asset, Post, Event
 from app.core.security import get_current_user
 from app.services.credits import CampaignStage, CampaignAction
-from app.api.billing import require_paid
+from app.api.billing import allow_build, charge_saved, is_locked, require_paid, require_unlocked
 
 router = APIRouter()
 
@@ -113,6 +113,13 @@ async def _run_build(boost_id: int, user_id: int, force: bool, openings: Optiona
             "tokens": spent.get("total_tokens"), "calls": spent.get("calls"),
         })
         db.commit()
+        # A saved card unlocks the campaign as soon as it's built; without one (or declined) it
+        # opens locked with the pay card on top.
+        if result.get("posts_created") and is_locked(boost, user, db):
+            try:
+                state["unlock"] = await charge_saved(db, boost, user)
+            except Exception as exc:  # noqa: BLE001 - a failed charge leaves it locked, never broken
+                state["unlock"] = {"status": "declined", "message": type(exc).__name__}
     except Exception as e:  # noqa: BLE001 - the build may fail for a dozen reasons; record it
         db.rollback()
         state.update({"status": "error", "error": str(e)[:400]})
@@ -152,7 +159,8 @@ async def build_campaign(boost_id: int, body: BuildRequest = BuildRequest(),
     outcome. Four model calls take minutes, which no hosted proxy will hold open.
     """
     boost = _owned_boost(boost_id, current_user, db)
-    require_paid(boost, current_user, db)
+    # Build first, then pay to unlock: no card is asked for before the build.
+    allow_build(boost, current_user, db)
     if body.photo_permission and not boost.photo_permission_at:
         # Stored, not just acknowledged: the timestamp is the record, and it is taken once so
         # a later build cannot move it.
@@ -322,12 +330,21 @@ def build_status(boost_id: int, current_user: User = Depends(get_current_user),
     started = state.get("started_at")
     if started:
         state["seconds"] = round(time.time() - started, 1)
+    # Built and waiting for payment: the campaign opens blurred with the pay card on top.
+    if state.get("status") == "done":
+        state["locked"] = is_locked(boost, current_user, db)
+        if run.get("unlock"):
+            state["unlock"] = run["unlock"]
     return state
 
 
 @router.get("/boosts/{boost_id}/plan")
 def get_plan(boost_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     boost = _owned_boost(boost_id, current_user, db)
+    if is_locked(boost, current_user, db):
+        return {"boost_id": boost.id, "address": boost.address, "stage": boost.stage,
+                "main_status": boost.main_status, "locked": True, "plan": {}, "brand_profile": {},
+                "ad_brief": {}}
     return {
         "boost_id": boost.id,
         "address": boost.address,
@@ -349,6 +366,12 @@ def list_posts(boost_id: int, current_user: User = Depends(get_current_user), db
     from app.services.post_retry import failure_payload
     boost = _owned_boost(boost_id, current_user, db)
     posts = db.query(Post).filter(Post.boost_id == boost.id).order_by(Post.day, Post.slot).all()
+    if is_locked(boost, current_user, db):
+        # Locked: the blurred preview gets three pictures and nothing to read or download.
+        return [{"id": p.id, "day": p.day, "slot": p.slot, "kind": p.kind, "locked": True,
+                 "image_url": p.image_url if i < 3 else None, "caption": None,
+                 "client_status": p.client_status, "publish_status": p.publish_status}
+                for i, p in enumerate(posts)]
     return [{
         "id": p.id, "day": p.day, "slot": p.slot, "kind": p.kind, "caption": p.caption,
         "hashtags": p.hashtags, "cta": p.cta, "image_url": p.image_url,
@@ -359,6 +382,8 @@ def list_posts(boost_id: int, current_user: User = Depends(get_current_user), db
         "fb_post_id": p.fb_post_id, "ig_media_id": p.ig_media_id, "last_error": p.last_error,
         "attempts": p.publish_attempts or 0, "next_attempt_at": p.next_attempt_at,
         "failure": failure_payload(p),
+        "caption_ig": p.caption_ig, "hashtags_fb": p.hashtags_fb, "design_style": p.design_style,
+        "rating": p.rating, "needs_look": bool(p.needs_look),
     } for p in posts]
 
 
@@ -368,6 +393,7 @@ def approve_campaign(boost_id: int, body: dict = None,
     """Client approval. Approving the posts is what unblocks the publisher, so this is the
     copy-approval half of the two-layer gate."""
     boost = _owned_boost(boost_id, current_user, db)
+    require_unlocked(boost, current_user, db)
     body = body or {}
     # "No go-live without review" (owner's item 20). The UI knows which posts were actually
     # opened; if it says something on screen was never read, approval needs a second answer.
@@ -437,3 +463,130 @@ class PrecheckRequest(BaseModel):
 
 # The Creatify-style /adflow/credits/precheck/ endpoint is gone with the credit system: a
 # campaign is bought outright, so there is no balance to pre-check. See app/api/billing.py.
+
+
+# --------------------------------------------------------------------------- Engine 4: edits, swaps, thumbs
+def _owned_post(boost_id: int, post_id: int, current_user: User, db: Session):
+    boost = _owned_boost(boost_id, current_user, db)
+    post = db.query(Post).filter(Post.id == post_id, Post.boost_id == boost.id).first()
+    if post is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return boost, post
+
+
+class PostEdit(BaseModel):
+    title: Optional[str] = None
+    caption: Optional[str] = None
+    overlay_text: Optional[str] = None
+
+
+@router.patch("/boosts/{boost_id}/posts/{post_id}")
+def edit_post(boost_id: int, post_id: int, body: PostEdit, current_user: User = Depends(get_current_user),
+              db: Session = Depends(get_db)):
+    """Save the agent's edit to a post, server-side, so what goes out is what they approved.
+
+    Fair Housing runs on every edit (Engine 4, 9f): a non-compliant edit can't be saved and is never
+    learned. An edit counts as a signal for the next campaign (it's recorded on the post).
+    """
+    from app.services import ad_rulebook, post_rules
+    boost, post = _owned_post(boost_id, post_id, current_user, db)
+    require_unlocked(boost, current_user, db)
+    changed = {}
+    for field in ("title", "caption", "overlay_text"):
+        value = getattr(body, field)
+        if value is not None and value != (getattr(post, field) or ""):
+            changed[field] = value
+    words = " ".join(changed.values())
+    issues = ad_rulebook.fair_housing_issues(words)
+    if issues:
+        raise HTTPException(status_code=422, detail={
+            "error": "fair_housing",
+            "message": "This can't be saved: it describes who the home is for, which Fair Housing law "
+                       "doesn't allow. " + "; ".join(issues[:2]) + ".",
+            "issues": issues})
+    if "caption" in changed:
+        body_text = post_rules.strip_tags(changed["caption"])
+        tags = (post.hashtags or "").strip()
+        post.caption = body_text + (("\n\n" + tags) if tags else "")
+        post.caption_ig = post_rules.instagram_caption(body_text, post.day or 0)
+    if "title" in changed:
+        post.title = changed["title"][:120]
+    if "overlay_text" in changed:
+        post.overlay_text = changed["overlay_text"][:200]
+    if changed:
+        feats = dict(post.features or {})
+        feats["edited"] = sorted(set(feats.get("edited") or []) | set(changed))
+        post.features = feats
+        _log(db, current_user, boost.id, "post_edited", {"post_id": post.id, "fields": sorted(changed)})
+    db.commit()
+    return {"id": post.id, "caption": post.caption, "caption_ig": post.caption_ig, "title": post.title,
+            "overlay_text": post.overlay_text, "edited": sorted(changed)}
+
+
+class PostRating(BaseModel):
+    value: int  # 1 thumbs up, -1 thumbs down, 0 clears it
+
+
+@router.post("/boosts/{boost_id}/posts/{post_id}/rating")
+def rate_post(boost_id: int, post_id: int, body: PostRating, current_user: User = Depends(get_current_user),
+              db: Session = Depends(get_db)):
+    """👍 / 👎 on any post: one tap, no reason asked. The learner works out the why (Engine 4, 5)."""
+    boost, post = _owned_post(boost_id, post_id, current_user, db)
+    value = 1 if body.value > 0 else -1 if body.value < 0 else None
+    post.rating = value
+    _log(db, current_user, boost.id, "post_rated", {"post_id": post.id, "value": value,
+                                                     "style": post.design_style})
+    db.commit()
+    return {"id": post.id, "rating": post.rating}
+
+
+class PhotoSwap(BaseModel):
+    asset_id: int
+
+
+@router.post("/boosts/{boost_id}/posts/{post_id}/photo")
+async def swap_photo(boost_id: int, post_id: int, body: PhotoSwap, current_user: User = Depends(get_current_user),
+                     db: Session = Depends(get_db)):
+    """Swap a post's photo and redesign the post on it (Engine 4, 9f): same words, style and agent
+    details, same checks. Never a plain photo: the fallback design if the model can't."""
+    from app.services import design as design_step
+    from app.services.content_engine import _asset_bytes, _owner_kit, _store_design
+    boost, post = _owned_post(boost_id, post_id, current_user, db)
+    require_unlocked(boost, current_user, db)
+    asset = db.query(Asset).filter(Asset.id == body.asset_id, Asset.boost_id == boost.id).first()
+    if asset is None:
+        raise HTTPException(status_code=404, detail="That photo isn't in this home's photos")
+    raw = _asset_bytes(asset)
+    if not raw:
+        raise HTTPException(status_code=409, detail="That photo file can't be read. Pick another.")
+    kit = _owner_kit(db, boost)
+    details = " · ".join(x for x in [kit.get("agent"), kit.get("phone"),
+                                     (f"Lic. {kit['license']}" if kit.get("license") else ""),
+                                     kit.get("company") or kit.get("brokerage")] if x)
+    brief = {"overlay": post.overlay_text or post.title or "", "caption": post.caption or "",
+             "room": asset.room or "", "style": post.design_style or "", "treatment": post.details_treatment or "",
+             "details": details}
+    made = await design_step.design_posts([brief], boost, {k: kit.get(k) for k in ("palette", "fonts")},
+                                          lambda _p: (raw, asset.content_type or "image/jpeg"))
+    item = (made.get("designed") or [None])[0]
+    if item is None:
+        raise HTTPException(status_code=502, detail="The post couldn't be redrawn on that photo. Try another.")
+    post.image_url = _store_design(db, boost, post, item["bytes"])
+    post.photo_file = asset.filename
+    post.photo_room = asset.room or post.photo_room
+    post.needs_look = bool(item.get("needs_look"))
+    feats = dict(post.features or {})
+    feats["swapped"] = True
+    post.features = feats
+    _log(db, current_user, boost.id, "post_photo_swapped", {"post_id": post.id, "asset_id": asset.id,
+                                                            "fallback": bool(item.get("needs_look"))})
+    db.commit()
+    return {"id": post.id, "image_url": post.image_url, "needs_look": post.needs_look}
+
+
+@router.get("/me/style-profile")
+def my_style_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """What Resmara learned about you, in plain words (shown on My Brand)."""
+    from app.services.content_engine import learned_summary, style_profile
+    prof = style_profile(db, current_user.id)
+    return {"lines": learned_summary(prof), "liked": prof["liked"], "avoid": prof["avoid"]}

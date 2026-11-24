@@ -36,7 +36,7 @@ import httpx
 from sqlalchemy import or_
 
 from app.core.config import settings
-from app.db.session import AdAccount, Boost, Event, Post
+from app.db.session import AdAccount, Boost, Event, MetaConnection, Post
 from app.services import post_retry
 
 log = logging.getLogger("resmara.publisher")
@@ -114,11 +114,9 @@ def _classify(post: Post) -> str:
 
 
 def _message(post: Post) -> str:
-    caption = post.caption or ""
-    hashtags = post.hashtags or ""
-    if hashtags:
-        return f"{caption}\n\n{hashtags}".strip()
-    return caption
+    """The Facebook text: the caption body and its own tags, never the tag block twice."""
+    from app.services.post_rules import messages as _messages
+    return _messages(post)[0]
 
 
 def _ext(image_url: Optional[str]) -> str:
@@ -227,12 +225,24 @@ async def publish_post(post: Post, boost: Boost, ad_account: Any, db) -> Dict[st
 
     Returns a dict with ``status`` in ``posted`` / ``failed``. ``simulated`` is
     True when no network call was made.
+
+    ``ad_account`` is anything with a token, a Page and an Instagram id: the agent's Meta
+    connection (``meta_engine.PublishTarget``) or, for an older account, its ad account row.
+    A connection posts to Instagram only when it can (``ig_post``).
     """
     target = (post.publish_target or "both").lower()
     do_fb = target in ("facebook", "both")
     do_ig = target in ("instagram", "both")
+    if ad_account is not None and hasattr(ad_account, "ig_post"):
+        do_ig = do_ig and ad_account.ig_post
+        do_fb = do_fb and ad_account.fb_post
+        if not (do_fb or do_ig):
+            return {"status": "failed", "state": "failed", "refused": True,
+                    "error": "Your Meta connection can't post this right now"}
     kind = _classify(post)
-    message = _message(post)
+    # Engine 4: Facebook and Instagram each get their own text; Instagram's never carries a link.
+    from app.services.post_rules import messages as _messages
+    message, ig_message = _messages(post)
 
     if ad_account is None:
         return {"status": "failed", "state": "failed",
@@ -267,9 +277,11 @@ async def publish_post(post: Post, boost: Boost, ad_account: Any, db) -> Dict[st
     try:
         async with httpx.AsyncClient(timeout=GRAPH_TIMEOUT) as client:
             if do_fb:
-                fb_post_id = await _publish_facebook(client, post, kind, page_id, message, token)
+                # Posting as the Page uses the Page's own token when Meta gave us one.
+                page_token = (getattr(ad_account, "page_access_token", None) or "").strip() or token
+                fb_post_id = await _publish_facebook(client, post, kind, page_id, message, page_token)
             if do_ig:
-                ig_media_id = await _publish_instagram(client, post, ig_id, message, token)
+                ig_media_id = await _publish_instagram(client, post, ig_id, ig_message, token)
     except GraphError as exc:
         # Meta answered and refused: its own error object is what decides whether this is a
         # connection problem or a rejected post, so it travels with the failure.
@@ -297,16 +309,19 @@ def _due_posts(db, now: str, limit: int, boost_id: Optional[int] = None) -> List
     ``publish_status='scheduled'`` so the calendar does not call it dead, and this bound is what
     stops the next sweep (15 minutes later) from burning a retry early.
     """
+    # Posting never needs an ad account (Meta spec, section 6.3): an agent's Meta connection is
+    # enough. An agent from before the connection record still needs their active ad account row.
     q = (
         db.query(Post)
         .join(Boost, Post.boost_id == Boost.id)
-        .join(AdAccount, Boost.ad_account_id == AdAccount.id)
+        .outerjoin(AdAccount, Boost.ad_account_id == AdAccount.id)
+        .outerjoin(MetaConnection, MetaConnection.user_id == Boost.user_id)
         .filter(Post.client_status == "approved")
         .filter(Post.publish_status == "scheduled")
         .filter(Post.publish_at.isnot(None))
         .filter(Post.publish_at <= now)
         .filter(or_(Post.next_attempt_at.is_(None), Post.next_attempt_at <= now))
-        .filter(AdAccount.is_active == True)  # noqa: E712
+        .filter(or_(MetaConnection.id.isnot(None), AdAccount.is_active == True))  # noqa: E712
     )
     if boost_id is not None:
         q = q.filter(Post.boost_id == boost_id)
@@ -349,8 +364,47 @@ async def publish_due(db, now: Optional[str] = None, *, limit: int = 50,
     result: Dict[str, Any] = {"checked": 0, "posted": 0, "failed": 0, "retrying": 0,
                               "skipped": 0, "details": []}
 
+    from app.services import meta_engine
+    checked_users: set = set()
     for post in _due_posts(db, now, limit, boost_id=boost_id):
         result["checked"] += 1
+        boost = db.query(Boost).filter(Boost.id == post.boost_id).first()
+
+        # Right before posting: the login, the Page and its Instagram, re-asked of Meta once per
+        # agent per run (cached 10 minutes), so a broken connection holds posts instead of failing them.
+        target = None
+        if boost is not None and meta_engine.connection_for(db, boost.user_id) is not None:
+            if boost.user_id not in checked_users and not settings.SIMULATE:
+                checked_users.add(boost.user_id)
+                from app.db.session import User as _User
+                owner = db.query(_User).filter(_User.id == boost.user_id).first()
+                if owner is not None:
+                    try:
+                        await meta_engine.check(db, owner, "pre_publish", force=False)
+                    except Exception:  # noqa: BLE001 - the post's own attempt still decides
+                        pass
+            db.refresh(post)
+            if post.publish_status != "scheduled":
+                result["skipped"] += 1
+                result["details"].append({"post_id": post.id, "status": post.publish_status,
+                                          "reason": "held: the Meta connection needs a reconnect"})
+                continue
+            target = meta_engine.publish_target(db, boost)
+        if target is not None and target.held:
+            post.publish_status = "held"
+            post.failure_note = "Held until you reconnect Meta."
+            db.commit()
+            result["skipped"] += 1
+            result["details"].append({"post_id": post.id, "status": "held"})
+            continue
+        if target is not None and not target.fb_post:
+            # Download mode: nothing is sent; the post stays on the calendar to download and share.
+            post.publish_status = "download"
+            post.failure_note = "Download this post and share it yourself."
+            db.commit()
+            result["skipped"] += 1
+            result["details"].append({"post_id": post.id, "status": "download"})
+            continue
 
         # CLAIM first: flip to 'posting' and commit before touching the network.
         claimed = claim_post(db, post.id, now=now)
@@ -360,9 +414,8 @@ async def publish_due(db, now: Optional[str] = None, *, limit: int = 50,
                                       "reason": "not approved+scheduled at claim time"})
             continue
 
-        boost = db.query(Boost).filter(Boost.id == claimed.boost_id).first()
-        ad_account = None
-        if boost is not None and boost.ad_account_id:
+        ad_account = target
+        if ad_account is None and boost is not None and boost.ad_account_id:
             ad_account = db.query(AdAccount).filter(AdAccount.id == boost.ad_account_id).first()
 
         try:

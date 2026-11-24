@@ -262,6 +262,9 @@ def list_boosts(current_user=Depends(get_current_user), db: Session = Depends(ge
         row.posts_total, row.posts_approved, row.posts_published = counted.get(b.id, (0, 0, 0))
         row.new_leads = new_leads.get(b.id, 0)
         row.image = covers.get(b.id)
+        if row.posts_total and not b.paid_at and not current_user.is_admin and not b.hidden:
+            from app.api.billing import is_locked
+            row.locked = is_locked(b, current_user, db)
         rows.append(row)
     return rows
 
@@ -394,6 +397,8 @@ def get_posts(boost_id: int, current_user=Depends(get_current_user), db: Session
     boost = db.query(Boost).filter(Boost.id == boost_id).first()
     if not boost or (boost.user_id != current_user.id and not current_user.is_admin):
         raise HTTPException(status_code=404, detail="Boost not found")
+    from app.api.billing import require_unlocked
+    require_unlocked(boost, current_user, db)
     return db.query(Post).filter(Post.boost_id == boost_id).order_by(Post.day, Post.slot).all()
 
 @router.patch("/posts/{post_id}/approve")
@@ -405,6 +410,8 @@ def approve_post(post_id: int, current_user=Depends(get_current_user), db: Sessi
     boost = db.query(Boost).filter(Boost.id == post.boost_id).first()
     if not boost or (boost.user_id != current_user.id and not current_user.is_admin):
         raise HTTPException(status_code=404, detail="Post not found")
+    from app.api.billing import require_unlocked
+    require_unlocked(boost, current_user, db)
     post.client_status = "approved"
     db.commit()
     return {"status": "approved", "post_id": post.id}

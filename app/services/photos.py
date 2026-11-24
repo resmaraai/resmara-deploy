@@ -1081,16 +1081,25 @@ async def discover(listing_url: str, limit: int = DEFAULT_LIMIT, client: httpx.A
         # sign-in, so the public HTML holds one hero image at most. A handful of photos is not
         # a gallery either: top it up from the address, which is the same inventory on Trulia.
         lookup = address or address_from_url(listing_url)
-        if len(urls) < 4:
+        # Engine 3: photos come from whichever source gives the best set. Short of a full
+        # campaign's worth (14), the same home is looked up by address too and the bigger
+        # gallery wins; a near-empty page (a hero shot) is topped up as before.
+        if len(urls) < 14:
             if lookup:
                 _, _, _, parsed_zip = parse_address(lookup)
                 extra = await _trulia_by_address(client, lookup, zipcode or parsed_zip,
                                                 limit, trace)
-                for u in extra:
-                    if u not in urls:
-                        urls.append(u)
-                    if len(urls) >= limit:
-                        break
+                if len(urls) >= 4 and len(extra) > len(urls):
+                    if trace is not None:
+                        trace.append({"url": "", "outcome": f"the address lookup had the bigger gallery "
+                                                            f"({len(extra)} vs {len(urls)}): using it"})
+                    urls = list(extra)
+                elif len(urls) < 4:
+                    for u in extra:
+                        if u not in urls:
+                            urls.append(u)
+                        if len(urls) >= limit:
+                            break
             elif trace is not None:
                 # The campaign had no address and the link carried none either, so the one
                 # route that survives a walled MLS page had nothing to look up. Say it, so

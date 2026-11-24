@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import re
 import io
 import logging
 import os
@@ -37,7 +38,7 @@ from app.services.llm import _json_object
 log = logging.getLogger("resmara.design")
 
 # Appendix C, verbatim: the worked-example zip's 14 calls were made with these.
-DEFAULT_MODEL = "gpt-image-2.5-sunburst"
+DEFAULT_MODEL = "gpt-image-2.6-sunburst"  # Engine 4, 9d: the newest OpenAI image model, as a setting
 SIZE = "1024x1280"
 QUALITY = "high"
 BACKGROUND = "opaque"
@@ -120,6 +121,12 @@ def brief_for(post: dict, boost, brand: dict | None = None) -> str:
     housing complaint waiting to happen.
     """
     bits = _brand_bits(brand)
+    kit = brand or {}
+    # The brand engine's kit (Engine 2) names colours as a palette and fonts as a pair.
+    if not bits["colors"] and kit.get("palette"):
+        bits["colors"] = [str(p[1]) for p in kit.get("palette") or [] if isinstance(p, (list, tuple)) and len(p) > 1][:4]
+    if not bits["font"] and kit.get("fonts"):
+        bits["font"] = " for headlines and ".join(str(f) for f in (kit.get("fonts") or [])[:2]) + " for small type"
     overlay = str(post.get("overlay") or post.get("headline") or "").strip()
     caption = str(post.get("caption") or "").strip()
     room = str(post.get("room") or "").strip()
@@ -141,7 +148,25 @@ def brief_for(post: dict, boost, brand: dict | None = None) -> str:
         lines.append("Add no text at all.")
     if address:
         lines.append(f'Print this address in small type in the lower corner: "{address}".')
-    lines.append(LAYOUTS)
+    style = str(post.get("style") or "").strip()
+    if style:
+        # Engine 4, section 4: one of six post styles, in this agent's brand; the layout, crop and
+        # composition are chosen fresh for this photo. Words only where the photo has calm space.
+        from app.services.post_rules import style_words
+        lines.append(f"Post style: {style_words(style)}. Choose the layout, crop and composition fresh "
+                     "for this photo, and place words only where the photo has calm space, never over "
+                     "the subject.")
+    else:
+        lines.append(LAYOUTS)
+    details = str(post.get("details") or "").strip()
+    treatment = str(post.get("treatment") or "").strip()
+    if details and treatment and treatment != "caption":
+        lines.append(f'Show the agent\'s details exactly as written, as {treatment}: "{details}".')
+    refs = post.get("references") or 0
+    if refs:
+        lines.append("The extra reference images are this agent's earlier posts they liked: match their "
+                     "typography, type sizes, spacing and colour handling so this reads as part of the "
+                     "same series, but never copy their photo, layout or words.")
     if bits["name"]:
         lines.append(f"The brand is {bits['name']}.")
     if bits["voice"]:
@@ -230,14 +255,18 @@ def _to_png(raw: bytes) -> bytes:
 
 # --------------------------------------------------------------------------- the checker
 CHECK_PROMPT = (
-    "You are checking a finished real-estate social post before it is published. "
-    "Answer with one JSON object only: "
+    "You are checking a finished real-estate social post before it is published, and you are also "
+    "its Art Director. Answer with one JSON object only: "
     '{"text_ok": true|false, "text_seen": "<the words actually visible on the image>", '
-    '"photo_intact": true|false, "problem": "<empty when fine, else one short sentence>"}. '
+    '"photo_intact": true|false, "score": <1-10>, "problem": "<empty when fine, else one short sentence>"}. '
     "text_ok is false if any word is misspelled, duplicated, cut off, or if the image carries "
     "lettering that was not asked for. photo_intact is false if the room was changed, refurnished, "
-    "or the image is not the supplied photograph."
+    "or the image is not the supplied photograph. score is the Art Director's mark for a post a "
+    "top real estate brand would be proud to share: layout, legibility on a phone, text kept off the "
+    "subject of the photo, and whether people would stop scrolling for it. 8 or more is great, 6 is "
+    "acceptable, below 6 means redo it."
 )
+ART_DIRECTOR_MIN = 6
 
 
 async def check_design(image_bytes: bytes, expected_text: str) -> dict:
@@ -257,8 +286,16 @@ async def check_design(image_bytes: bytes, expected_text: str) -> dict:
         if not isinstance(reply, dict):
             return {"ok": None, "reason": "the checker did not answer in JSON"}
         text_seen = str(reply.get("text_seen") or "")
-        ok = bool(reply.get("text_ok")) and bool(reply.get("photo_intact", True))
-        return {"ok": ok, "text_seen": text_seen, "problem": str(reply.get("problem") or "")[:300]}
+        try:
+            score = int(reply.get("score")) if reply.get("score") is not None else None
+        except (TypeError, ValueError):
+            score = None
+        weak = score is not None and score < ART_DIRECTOR_MIN
+        ok = bool(reply.get("text_ok")) and bool(reply.get("photo_intact", True)) and not weak
+        problem = str(reply.get("problem") or "")[:300]
+        if weak and not problem:
+            problem = f"the Art Director scored it {score}/10: make the layout stronger and more legible"
+        return {"ok": ok, "text_seen": text_seen, "score": score, "problem": problem}
     except Exception as exc:  # noqa: BLE001
         return {"ok": None, "reason": f"{type(exc).__name__}: {exc}"[:300]}
 
@@ -278,10 +315,66 @@ def _data_url(raw: bytes) -> str:
     return "data:image/png;base64," + base64.b64encode(raw).decode()
 
 
+# --------------------------------------------------------------------------- the fallback design
+def fallback_design(photo: bytes, overlay: str, details: str = "", colors: list | None = None) -> bytes | None:
+    """Resmara's own layout over the photo, with the words drawn in code so they're always spelled
+    right (Engine 4, 9 and "If part of a build fails"). Never a plain photo. None if the photo is unreadable."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        with Image.open(io.BytesIO(photo)) as src:
+            img = src.convert("RGB")
+    except Exception:  # noqa: BLE001
+        return None
+    W, H = 1024, 1280
+    scale = max(W / img.width, H / img.height)
+    img = img.resize((max(W, int(img.width * scale + 0.5)), max(H, int(img.height * scale + 0.5))))
+    left, top = (img.width - W) // 2, (img.height - H) // 2
+    img = img.crop((left, top, left + W, top + H))
+    accent = "#12354D"
+    for c in colors or []:
+        if re.fullmatch(r"#?[0-9a-fA-F]{6}", str(c or "")):
+            accent = "#" + str(c).lstrip("#")
+            break
+    # A soft gradient behind the words so they read on any photo.
+    shade = Image.new("L", (W, H), 0)
+    sd = ImageDraw.Draw(shade)
+    for y in range(int(H * 0.55), H):
+        sd.line([(0, y), (W, y)], fill=int(200 * (y - H * 0.55) / (H * 0.45)))
+    img = Image.composite(Image.new("RGB", (W, H), "#000000"), img, shade)
+    d = ImageDraw.Draw(img)
+    words = (overlay or "").strip()
+    y = H - 210
+    if words:
+        size = 76
+        font = ImageFont.load_default(size=size)
+        lines, line = [], ""
+        for w in words.split():
+            trial = (line + " " + w).strip()
+            if d.textlength(trial, font=font) > W - 140 and line:
+                lines.append(line)
+                line = w
+            else:
+                line = trial
+        lines.append(line)
+        lines = lines[:3]
+        y = H - 200 - len(lines) * (size + 8)
+        d.rectangle([70, y - 26, 170, y - 18], fill=accent)
+        for ln in lines:
+            d.text((70, y), ln, font=font, fill="#FFFFFF")
+            y += size + 8
+    if details:
+        small = ImageFont.load_default(size=26)
+        d.text((70, H - 86), details[:90], font=small, fill="#FFFFFF")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 # --------------------------------------------------------------------------- the step
 async def design_posts(plan_posts: list[dict], boost, brand: dict | None,
                        photo_for, *, logo: bytes | None = None, logo_mime: str = "",
-                       headshot: bytes | None = None, checker: bool = True) -> dict:
+                       headshot: bytes | None = None, checker: bool = True,
+                       references: list | None = None) -> dict:
     """Design every post in the plan. ``photo_for(post) -> (bytes, mime)`` supplies the source.
 
     Returns {"designed": [{"index", "bytes", "mime", "note"}], "skipped": [...], "calls": n,
@@ -294,8 +387,19 @@ async def design_posts(plan_posts: list[dict], boost, brand: dict | None,
     out = {"designed": [], "skipped": [], "calls": 0, "checked": 0, "regenerated": 0,
            "fallbacks": 0, "notes": [], "model": model()}
     if not design_available():
-        out["notes"].append("the image model is not configured, so the posts keep their photos")
-        out["skipped"] = [{"index": i, "reason": "no image model"} for i in range(len(plan_posts))]
+        # Never a plain photo: every post still gets the fallback design, flagged for a look.
+        for index, post in enumerate(plan_posts):
+            raw_mime = photo_for(post)
+            made = fallback_design(_to_png(raw_mime[0]), str(post.get("overlay") or ""), str(post.get("details") or ""),
+                                   (brand or {}).get("colors") or [p[1] for p in ((brand or {}).get("palette") or []) if len(p) > 1]) \
+                if raw_mime and raw_mime[0] else None
+            if made:
+                out["fallbacks"] += 1
+                out["designed"].append({"index": index, "bytes": made, "mime": "image/png", "note": "fallback",
+                                        "needs_look": True})
+            else:
+                out["skipped"].append({"index": index, "reason": "no image model and no usable photo"})
+        out["notes"].append("the image model is not configured, so the posts use Resmara's fallback design")
         return out
 
     model_name = model()
@@ -309,6 +413,14 @@ async def design_posts(plan_posts: list[dict], boost, brand: dict | None,
         brief = brief_for(post, boost, brand)
         expected = str(post.get("overlay") or post.get("headline") or "").strip()
         files = _photo_files(photo, mime, logo, logo_mime, headshot)
+        # Their own 👍 posts as references (Engine 4, 9): two per post, rotating through the pool.
+        refs = [r for r in (references or []) if r]
+        if refs:
+            picks = [refs[(index * 2 + k) % len(refs)] for k in range(min(2, len(refs)))]
+            for k, ref in enumerate(dict.fromkeys(picks)):
+                files.append(("image[]", (f"reference-{k + 1}.png", ref, "image/png")))
+            post = {**post, "references": len(set(picks))}
+            brief = brief_for(post, boost, brand)
 
         made = None
         last_error = ""
@@ -338,9 +450,17 @@ async def design_posts(plan_posts: list[dict], boost, brand: dict | None,
             made = None
 
         if not made:
+            # Retried once already: now the fallback design, flagged "Needs a look". Never a plain photo.
             out["fallbacks"] += 1
-            out["notes"].append(f"post {index + 1} kept its photo: {last_error or 'the checker rejected it twice'}")
-            out["skipped"].append({"index": index, "reason": last_error or "rejected twice"})
+            colors = (brand or {}).get("colors") or [p[1] for p in ((brand or {}).get("palette") or []) if len(p) > 1]
+            fb = fallback_design(photo, expected, str(post.get("details") or ""), colors)
+            if fb:
+                out["notes"].append(f"post {index + 1} used the fallback design and is flagged Needs a look: "
+                                    f"{last_error or 'the checks rejected it twice'}")
+                out["designed"].append({"index": index, "bytes": fb, "mime": "image/png", "note": "fallback",
+                                        "needs_look": True})
+            else:
+                out["skipped"].append({"index": index, "reason": last_error or "rejected twice"})
             continue
         out["designed"].append({"index": index, "bytes": made, "mime": "image/png",
                                 "note": "designed"})

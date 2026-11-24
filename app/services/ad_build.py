@@ -153,6 +153,17 @@ def radius_targeting(geo: Optional[dict]) -> tuple:
     return locations, notes
 
 
+FACEBOOK_POSITIONS = ("feed", "marketplace", "story", "facebook_reels")
+INSTAGRAM_POSITIONS = ("stream", "story", "reels")
+AD_HOURS = (6, 23)  # on from 6 AM, off at 11 PM
+
+
+def ad_hours_schedule() -> list:
+    """Meta's adset_schedule: every day, 6 AM to 11 PM in the viewer's time zone."""
+    return [{"start_minute": AD_HOURS[0] * 60, "end_minute": AD_HOURS[1] * 60,
+             "days": [0, 1, 2, 3, 4, 5, 6], "timezone_type": "USER"}]
+
+
 def build_ad_configs(
     boost,
     plan: Optional[dict] = None,
@@ -225,9 +236,10 @@ def build_ad_configs(
     # Housing defaults: everyone 18+, no gender split, no interests, no ZIP, no lookalikes.
     targeting["age_min"] = 18
     targeting["age_max"] = 65
+    # Everywhere Meta places housing ads (Engine 4, 9b): the feeds, Marketplace, Stories and Reels.
     targeting["publisher_platforms"] = ["facebook", "instagram"]
-    targeting["facebook_positions"] = ["feed"]
-    targeting["instagram_positions"] = ["stream"]
+    targeting["facebook_positions"] = list(FACEBOOK_POSITIONS)
+    targeting["instagram_positions"] = list(INSTAGRAM_POSITIONS)
     targeting["device_platforms"] = ["mobile", "desktop"]
 
     adset = {
@@ -239,6 +251,12 @@ def build_ad_configs(
         "status": status,
     }
     adset.update(window)
+    # The ad never runs between 11 PM and 6 AM (Engine 4, 9f): a hard limit on every ad set, using
+    # Meta's ad schedule in the viewer's time zone. Meta allows a schedule only with a lifetime
+    # budget, which this campaign always has.
+    adset["pacing_type"] = ["day_parting"]
+    adset["adset_schedule"] = ad_hours_schedule()
+    notes.append("schedule: ads run 6 AM to 11 PM only, viewer's time zone")
 
     # --- creative ----------------------------------------------------------
     resolved_page = page_id or ad.get("page_id") or settings.META_PAGE_ID or ""

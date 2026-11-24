@@ -15,6 +15,7 @@ from app.services import listing_video, listing_watch, photos
 LISTING_WORDS = re.compile(r"\b(bed(room)?s?|bath(room)?s?|sq\.?\s?ft|square feet|mls|listing|for sale)\b", re.I)
 SIGN_IN = re.compile(r"login|signin|sign-in|my\.flexmls", re.I)
 MIN_PHOTOS = 4  # one or two images is a logo and a hero shot, not a gallery
+NEED_PHOTOS = 14  # a campaign needs 14; fewer and the form asks for more (Engine 3, section 9)
 
 
 def _answer(ok, reason, message, **extra):
@@ -68,6 +69,11 @@ async def check(url: str, *, read=None, discover=None, find_video=None,
     has_video = bool(video and video.get("found"))
     if count < MIN_PHOTOS:
         return _answer(True, "no_photos", "We have the home’s details, but we can’t get the photos from this link.",
+                       opened=opened, details=True, address=address, photos=count, video=has_video, status=state)
+    if count < NEED_PHOTOS:
+        return _answer(True, "no_photos",
+                       f"We have the home’s details and {count} photos, but a campaign needs at least "
+                       f"{NEED_PHOTOS}. Add your photographer’s link or upload the rest.",
                        opened=opened, details=True, address=address, photos=count, video=has_video, status=state)
     return _answer(True, "ok", f"We have the home’s details and {count} photos.",
                    opened=opened, details=True, address=address, photos=count, video=has_video, status=state)

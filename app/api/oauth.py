@@ -62,7 +62,7 @@ def _back(payload: dict, fmt: str = ""):
 
 
 @router.get("/meta/connect")
-async def meta_connect(current_user: User = Depends(get_current_user)):
+async def meta_connect(rerequest: int = 0, current_user: User = Depends(get_current_user)):
     """Initiate Meta OAuth flow. Returns the URL the browser should visit."""
     if not settings.META_CLIENT_ID:
         # Demo mode: simulate OAuth
@@ -76,6 +76,9 @@ async def meta_connect(current_user: User = Depends(get_current_user)):
         "state": state,
         "response_type": "code",
     }
+    if rerequest:
+        # Fix it now for a permission they unticked: Facebook asks for it again.
+        params["auth_type"] = "rerequest"
     redirect_url = f"https://www.facebook.com/{settings.META_API_VERSION}/dialog/oauth?{urllib.parse.urlencode(params)}"
     return {"redirect_url": redirect_url, "state": state}
 
@@ -135,129 +138,26 @@ async def meta_callback(code: str = "", state: str = "", error: str = "",
     if long_data.get("expires_in"):
         token_expires_at = datetime.utcnow() + timedelta(seconds=int(long_data["expires_in"]))
 
-    # Fetch ad accounts
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{settings.graph_base}/me/adaccounts",
-            params={"access_token": access_token, "fields": "id,name,currency,account_status"},
-            timeout=30,
-        )
-        accounts_data = resp.json()
+    # One connection per agent, overwritten on every reconnect (Engine 1 Part B): the token is
+    # saved even with no Page and no ad account, then C1-C7 decide what the campaign can do. The
+    # ad account rows are kept in step by the engine for the ad engine and billing.
+    from app.services import meta_engine
+    meta_engine.save_login(db, current_user, access_token, expires_at=token_expires_at)
+    db.commit()
+    st = await meta_engine.check(db, current_user, "connect", force=True)
 
-    # Page + linked Instagram account, so the Instagram half of a campaign can publish.
-    async with httpx.AsyncClient() as client:
-        pages_resp = await client.get(
-            f"{settings.graph_base}/me/accounts",
-            params={"access_token": access_token,
-                    "fields": "id,name,instagram_business_account{id,username}"},
-            timeout=30,
-        )
-        pages_data = pages_resp.json()
-
-    pages_raw = [p for p in pages_data.get("data", []) if p.get("id")]
-
-    def _pick_page(account_name: str):
-        """Best Page for an ad account: name match, else the first Page with Instagram.
-
-        The ad creative must name a Page (object_story_spec.page_id) and the Instagram
-        publisher needs the linked professional account id, so both are resolved once at
-        connect time instead of being left empty for the first launch to discover.
-        """
-        needle = (account_name or "").strip().lower()
-        if needle:
-            for p in pages_raw:
-                pname = (p.get("name") or "").strip().lower()
-                if pname and (pname in needle or needle in pname):
-                    return p
-            # No containment ("Dan D Photography" vs "Daniel Daymude Photography"): score
-            # shared significant words and take the best, so the obvious Page still wins.
-            words = {w for w in needle.replace("|", " ").split() if len(w) > 2}
-            best, best_key = None, (0, 0)
-            for p in pages_raw:
-                score = len(words & set((p.get("name") or "").lower().split()))
-                # Tie-break on a linked Instagram account: that Page can publish, an
-                # unlinked one cannot, so it is the better default.
-                key = (score, 1 if p.get("instagram_business_account") else 0)
-                if key > best_key:
-                    best, best_key = p, key
-            if best is not None and best_key[0] > 0:
-                return best
-        for p in pages_raw:
-            if p.get("instagram_business_account"):
-                return p
-        return pages_raw[0] if pages_raw else None
-
-    created = []
-    for acct in accounts_data.get("data", []):
-        existing = db.query(AdAccount).filter(
-            AdAccount.user_id == current_user.id,
-            AdAccount.platform == "meta",
-            AdAccount.advertiser_id == acct["id"],
-        ).first()
-        page = _pick_page(acct.get("name", ""))
-        page_id_val = page.get("id") if page else None
-        ig_id_val = ((page or {}).get("instagram_business_account") or {}).get("id")
-        # Meta just accepted this token to list the account and told us its status, so both
-        # of those are measured facts we can store now. Spend readiness (payment method) is
-        # NOT checked here - it needs a per-account call, so it is left unmeasured and the
-        # client's check reports it rather than this silently claiming the account is ready.
-        checked_at = datetime.utcnow()
-        token_note = "connected just now"
-        if token_expires_at:
-            token_note = f"connected just now; token expires {token_expires_at.date().isoformat()}"
-        if existing:
-            existing.access_token = access_token
-            existing.is_active = True
-            existing.token_expires_at = token_expires_at
-            existing.page_id = existing.page_id or page_id_val
-            existing.ig_user_id = existing.ig_user_id or ig_id_val
-            existing.token_status = "healthy"
-            existing.token_checked_at = checked_at
-            existing.token_note = token_note
-            existing.account_status = acct.get("account_status")
-            existing.account_checked_at = checked_at
-            db.add(existing)
-            db.commit()
-            db.refresh(existing)
-            created.append(existing)
-            # This is the agent's own fix for a dead token, so it is also the moment the posts
-            # that died waiting on it go back in the queue - no second sweep, no manual repost.
-            from app.services import post_retry
-            post_retry.requeue_connection_failures(db, existing)
-        else:
-            new_acct = AdAccount(
-                user_id=current_user.id, platform="meta",
-                advertiser_id=acct["id"], account_name=acct.get("name", ""),
-                currency=acct.get("currency", "USD"), access_token=access_token,
-                budget=5000.0, token_expires_at=token_expires_at,
-                page_id=page_id_val, ig_user_id=ig_id_val,
-                token_status="healthy", token_checked_at=checked_at, token_note=token_note,
-                account_status=acct.get("account_status"), account_checked_at=checked_at,
-            )
-            db.add(new_acct)
-            db.commit()
-            db.refresh(new_acct)
-            created.append(new_acct)
-
-    pages = [{"id": p.get("id"), "name": p.get("name"),
-              "ig_id": (p.get("instagram_business_account") or {}).get("id"),
-              "ig_username": (p.get("instagram_business_account") or {}).get("username")}
-             for p in pages_data.get("data", [])]
-
-    if created:
-        # Remember on the account that this agent connected Meta (item 8). The gate and the
-        # "every sign-in lands on Accounts" rule both read this, not a browser flag.
-        from datetime import datetime as _dt, timezone as _tz
-        current_user.meta_connected_at = _dt.now(_tz.utc)
-        db.commit()
-
+    pages = st.get("pages") or []
+    page = st.get("page") or {}
+    ad = st.get("ad_account") or {}
     return _back({
-        "meta": "connected" if created else "no_accounts",
-        "accounts": len(created),
+        "meta": "connected" if st.get("connected") else ("several_pages" if "several_pages" in (st.get("issues") or [])
+                                                         else "limited"),
+        "accounts": 1 if ad else 0,
         "pages": len(pages),
-        "ig": next((p["ig_id"] for p in pages if p.get("ig_id")), None),
-        "page_id": pages[0]["id"] if pages else None,
-        "detail": ", ".join(a.account_name or a.advertiser_id for a in created) or "no ad accounts visible to this login",
+        "ig": (st.get("instagram") or {}).get("username"),
+        "page_id": page.get("id"),
+        "issues": ",".join(st.get("issues") or []),
+        "detail": page.get("name") or (st.get("lines") or [{}])[0].get("line") or "connected",
     }, format)
 
 def _require_system_token(x_resmara_token: str = Header(default="")):
@@ -298,9 +198,17 @@ async def meta_check_all(x_resmara_token: str = Depends(_require_system_token),
         if c.get("refreshed"):
             refreshed.append(c["account"])
         requeued += int(c.get("posts_requeued") or 0)
+    # The full C1-C7 check for every agent with a live campaign, the breakage emails and the 5%
+    # alarm (Engine 1 Part B, sections 4-5). It's cheap to run on every sweep: it reads Meta only.
+    from app.services import meta_engine
+    try:
+        daily = await meta_engine.daily_sweep(db)
+    except Exception as exc:  # noqa: BLE001 - the token sweep must still answer
+        daily = {"error": f"{type(exc).__name__}: {exc}"[:200]}
     # The day's failed posts, by kind, ride along with the sweep that already runs on a
     # timer: a summary to us, not a second mail blast of its own.
-    return {"checked": len(checks), "simulated": simulated, "refreshed": refreshed,
+    return {"meta_connections": daily,
+            "checked": len(checks), "simulated": simulated, "refreshed": refreshed,
             "needs_reconnect": reconnect, "not_ready_to_spend": not_ready,
             "posts_requeued": requeued,
             "failed_posts": post_retry.daily_summary(db),

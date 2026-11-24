@@ -198,16 +198,17 @@ check(bool(ads[0].primary_text and ads[0].headline and ads[0].description),
       "Ad has primary_text/headline/description")
 
 base = date.fromisoformat("2026-11-10")
-ok_dates = all(
-    datetime.fromisoformat(p.publish_at).date() == base + timedelta(days=p.day - 1)
-    for p in posts
-)
-ok_times = all(
-    (datetime.fromisoformat(p.publish_at).hour, datetime.fromisoformat(p.publish_at).minute) == (9, 0)
-    for p in posts
-)
-check(ok_dates, "every post.publish_at is on go-live date + (day-1)")
-check(ok_times, "every slot-1 post.publish_at is at 09:00 (per_day=1 -> all slot 1)")
+# Engine 4: publish_at is stored in UTC (what the publisher compares against) for the listing's
+# local hour, only between 6 AM and 11 PM; slot 1 defaults to the evening, when audiences scroll most.
+from datetime import timezone as _tz
+from app.services import post_rules as _pr
+_zone = _pr.local_zone(getattr(posts[0], "address", None) or db.query(Boost).get(posts[0].boost_id).address)
+_local = lambda p: datetime.fromisoformat(p.publish_at).replace(tzinfo=_tz.utc).astimezone(_zone)
+ok_dates = all(_local(p).date() == base + timedelta(days=p.day - 1) for p in posts)
+ok_times = all((_local(p).hour, _local(p).minute) == (_pr.DEFAULT_HOURS[0], 0) for p in posts)
+check(ok_dates, "every post.publish_at is on go-live date + (day-1), in the listing's own time zone")
+check(ok_times, "every slot-1 post goes out at the slot-1 hour, local (per_day=1 -> all slot 1)")
+check(all(6 <= _local(p).hour < 23 for p in posts), "every post is between 6 AM and 11 PM local")
 
 targets_ok = all(
     p.publish_target == ("instagram" if p.kind == "short_video" else "both") for p in posts

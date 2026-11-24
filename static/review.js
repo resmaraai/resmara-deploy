@@ -341,7 +341,7 @@ function changeReviewMonth(offset){
 }
 function reviewCalendar(r,c){
  if(r.scopeFirst&&(!r.items.length||ReviewStudio.building.has(r))){
-  return `<section class="panel review-calendar"><h2 class="campaign-step-title"><span>2</span> Campaign calendar</h2><p>${ReviewStudio.building.has(r)?'Resmara is building your posts, your ad and your listing page.':'Your calendar isn’t built yet.'}</p>${!ReviewStudio.building.has(r)?(reviewCampaignBoostId()!=null?'<button class="campaign-primary" onclick="rebuildLiveCampaign()">Build my campaign</button>':'<button class="campaign-primary" onclick="buildApprovedScope()">Build campaign calendar</button>'):''}${r.scopeConfirmed&&!ReviewStudio.building.has(r)&&reviewCampaignBoostId()!=null?'<p class="fine build-charge-note">Building charges this campaign to your card on file. No card yet? You’ll add one first.</p>':''}</section>`;
+  return `<section class="panel review-calendar"><h2 class="campaign-step-title"><span>2</span> Campaign calendar</h2><p>${ReviewStudio.building.has(r)?'Resmara is building your posts, your ad and your listing page.':'Your calendar isn’t built yet.'}</p>${!ReviewStudio.building.has(r)?(reviewCampaignBoostId()!=null?'<button class="campaign-primary" onclick="rebuildLiveCampaign()">Build my campaign</button>':'<button class="campaign-primary" onclick="buildApprovedScope()">Build campaign calendar</button>'):''}${r.scopeConfirmed&&!ReviewStudio.building.has(r)&&reviewCampaignBoostId()!=null?'<p class="fine build-charge-note">Resmara builds it first. You pay to unlock it when it’s built.</p>':''}</section>`;
  }
  // Only the weeks the campaign runs: from the week of day 1 to the week of day 14.
  const start=r.scope.start,last=reviewSlot(r,{day:14}).date;
@@ -480,7 +480,9 @@ async function buildCampaignFromBackend(){
  }catch(e){
   // 402 = this campaign has not been paid for. The API says so in a machine-readable detail,
   // so show the price and the checkout button instead of "build paused" and a dead end.
-  if(e&&e.status===402){ReviewStudio.building.delete(r);showPaywall(boostId,e.detail);return}
+  if(e&&e.status===402){ReviewStudio.building.delete(r);if(typeof unlockCard==='function'){unlockCard(boostId,([...state.campaigns,...examples][ReviewStudio.active]||{}).address,{price_cents:e.detail&&e.detail.price_cents});return}showPaywall(boostId,e.detail);return}
+  // One locked campaign at a time: unlock (or replace) the waiting one first.
+  if(e&&e.status===409&&e.detail&&e.detail.error==='unlock_first'&&typeof unlockFirst==='function'){ReviewStudio.building.delete(r);unlockFirst(e.detail);return}
   if(progress?.isConnected&&modal.open)show(`<h2>Campaign build paused</h2><p>${esc(e.message)}</p><p class="fine">Your approved scope is saved. You can retry any time.</p><div class="modal-actions"><button class="alt" onclick="modal.close()">Back to campaign</button></div>`);
  }finally{ReviewStudio.building.delete(r)}
 }

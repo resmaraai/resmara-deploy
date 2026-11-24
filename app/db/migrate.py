@@ -88,6 +88,14 @@ ADDITIONS = {
         ("failed_at", "DATETIME"),
         ("failure_notified_at", "DATETIME"),
         ("fail_log", "JSON"),
+        # Engine 4: two captions, Facebook tags, post style, the thumbs, Needs a look.
+        ("caption_ig", "TEXT"),
+        ("hashtags_fb", "TEXT"),
+        ("design_style", "VARCHAR"),
+        ("details_treatment", "VARCHAR"),
+        ("rating", "INTEGER"),
+        ("needs_look", "BOOLEAN DEFAULT 0"),
+        ("features", "JSON"),
     ],
     "ads": [
         ("meta_adset_id", "VARCHAR"),
@@ -269,7 +277,9 @@ def ensure_unique_indexes() -> list[str]:
     Facebook account always lands on the same Resmara account": without it, a race between two
     sign-ins could create two accounts for one person.
     """
-    wanted = [("users", "ix_users_facebook_id_unique", "facebook_id")]
+    wanted = [("users", "ix_users_facebook_id_unique", "facebook_id"),
+              # One Page, one Resmara account (Engine 1 Part B, section 3).
+              ("meta_connections", "ix_meta_connections_page_unique", "page_id")]
     done = []
     for table, index, column in wanted:
         try:
