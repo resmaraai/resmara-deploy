@@ -27,6 +27,12 @@ _DEFAULT_SCOPES = [
     # "Under contract!" posts.
     "read_insights", "ads_read", "pages_manage_ads", "instagram_manage_insights",
     "instagram_manage_comments", "pages_read_user_content",
+    # App Review, 24 Nov: comment replies on our own posts (instagram_manage_comments), the
+    # Page's own feed (pages_read_user_content) and the login address the App Review video has
+    # to show on the consent screen (email). All three are submitted to Meta; the recording
+    # needs the dialog to ask for them, so they belong in the default list as well as in
+    # render.yaml - the live service's META_SCOPES value is what the dialog actually sends.
+    "email",
 ]
 META_SCOPES = [s.strip() for s in os.getenv("META_SCOPES", ",".join(_DEFAULT_SCOPES)).split(",") if s.strip()]
 

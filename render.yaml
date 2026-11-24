@@ -105,9 +105,9 @@ services:
       # Instagram insights are new with the app switch: the readiness audit and the day 7/14
       # report read all four. Keep this list in step with the app's use cases, or Meta answers
       # Invalid Scopes. A preview environment needs an environment group carrying this list.
-      - key: META_SCOPES
+      - key: META_SCOPES      # the consent dialog sends exactly this list, in this order
         value: >-
-          ads_management,ads_read,pages_manage_ads,read_insights,business_management,pages_read_engagement,pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish,instagram_manage_insights
+          ads_management,ads_read,pages_manage_ads,read_insights,business_management,pages_read_engagement,pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish,instagram_manage_insights,instagram_manage_comments,pages_read_user_content,email
       - key: META_SYSTEM_TOKEN       # our own ad spend: Marketing page + token health
         sync: false
       - key: META_AD_ACCOUNT_ID      # 16 digits, no act_ prefix
