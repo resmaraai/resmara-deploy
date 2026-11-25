@@ -235,6 +235,24 @@ def main() -> int:
             BuildroomTask(title="Engine 5 · Website", area="both", status="todo",
                           notes="Shipped by PR #11.", created_by="dan@example.com",
                           created_at=datetime(2026, 11, 16, 12, 0, tzinfo=timezone.utc)),
+            # Adam's handoff, sitting in todo: "Ready for Dan", the PR is merged and live.
+            BuildroomTask(title="Ready handoff · closes", area="both", status="todo",
+                          notes="2. Ready for Dan: built end to end in PR #11. "
+                                "https://github.com/x/pull/11",
+                          created_by="adam@example.com",
+                          created_at=datetime(2026, 11, 16, 12, 0, tzinfo=timezone.utc)),
+            # The same words on a card written after the PR merged: not evidence of anything.
+            BuildroomTask(title="Ready handoff · newer", area="both", status="todo",
+                          notes="2. Ready for Dan: PR #11. https://github.com/x/pull/11",
+                          created_by="adam@example.com",
+                          created_at=datetime(2026, 11, 20, 12, 0, tzinfo=timezone.utc)),
+            # Somebody is on it: never overrule a claim, even for a ready handoff.
+            BuildroomTask(title="Ready handoff · claimed", area="both", status="todo",
+                          claimed_by="adam@example.com",
+                          claimed_at=datetime(2026, 11, 22, 12, 0, tzinfo=timezone.utc),
+                          notes="2. Ready for Dan: PR #11. https://github.com/x/pull/11",
+                          created_by="adam@example.com",
+                          created_at=datetime(2026, 11, 16, 12, 0, tzinfo=timezone.utc)),
             BuildroomTask(title="Engine 6 · Active campaign", area="both", status="review",
                           claimed_by="adam@example.com",
                           claimed_at=datetime(2026, 11, 22, 12, 0, tzinfo=timezone.utc),
@@ -255,6 +273,9 @@ def main() -> int:
         claimed_card = row(db, "Engine 6 · Active campaign")
         junk_live = row(db, "3. **Run it until it sells:**")
         junk_waiting = row(db, "2. **Dark mode:**")
+        ready_card = row(db, "Ready handoff · closes")
+        ready_newer = row(db, "Ready handoff · newer")
+        ready_claimed = row(db, "Ready handoff · claimed")
 
     check("a card whose live PR merged after it was written is closed",
           shipped is not None and shipped.status == "done", shipped.status if shipped else "missing")
@@ -272,6 +293,18 @@ def main() -> int:
           owes_card is not None and owes_card.status == "review"
           and any("Engine 2" in s for s in rec.get("skipped", [])), str(rec.get("skipped")))
     check("a todo card is never closed by a release", todo_card.status == "todo", todo_card.status)
+    check("a 'Ready for Dan' todo card closes when its PR is merged and live",
+          ready_card is not None and ready_card.status == "done",
+          ready_card.status if ready_card else "missing")
+    check("and its close names the PR and the build",
+          ready_card is not None and "PR #11" in (ready_card.test_note or "")
+          and "cccc333" in (ready_card.test_note or ""), (ready_card.test_note or "") if ready_card else "")
+    check("a 'Ready for Dan' card written after the merge is left alone",
+          ready_newer is not None and ready_newer.status == "todo",
+          ready_newer.status if ready_newer else "missing")
+    check("a claimed 'Ready for Dan' card is never touched",
+          ready_claimed is not None and ready_claimed.status == "todo",
+          ready_claimed.status if ready_claimed else "missing")
     check("a claimed card is never touched", claimed_card.status == "review", claimed_card.status)
     check("the report says what it closed and deleted",
           any("Engine 4" in s for s in rec.get("closed", [])) and len(rec.get("deleted", [])) == 1,
