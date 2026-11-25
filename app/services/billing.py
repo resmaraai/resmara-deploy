@@ -106,6 +106,15 @@ def round_of(boost) -> int:
         return 0
 
 
+def promos_allowed() -> bool:
+    """Whether Checkout shows the promotion-code field. On unless STRIPE_ALLOW_PROMOS says no.
+
+    Off is not the same as "no codes exist": with the field off, every code in the account is
+    unredeemable, which is the silent failure this switch exists to make visible.
+    """
+    return (os.getenv("STRIPE_ALLOW_PROMOS", "1") or "1").strip().lower() not in ("0", "false", "no", "off")
+
+
 def checkout_payload(boost_id: int, user_id: int, address: str, base_url: str,
                      cents: int | None = None, customer_id: str | None = None,
                      save_card: bool = True, round_no: int = 0, embedded: bool = False) -> list:
@@ -122,6 +131,12 @@ def checkout_payload(boost_id: int, user_id: int, address: str, base_url: str,
     `round_no` is stamped on both the session and the payment intent. A repeat round is $39, and
     this is what lets Stripe (and the Team room) tell the two prices apart later without guessing
     from the amount.
+
+    `allow_promotion_codes` puts the "Add promotion code" field on Checkout. Without it a code
+    minted in Stripe cannot be redeemed at all: Stripe only applies a promotion code to a session
+    that asked for one, and it answers "This promotion code is invalid" for a perfectly good code
+    on a session that did not. That is what a coach's referral code and the Founding Agent code
+    need, and no discount is computed here - Stripe holds the code, its amount and its expiry.
     """
     cents = price_cents() if cents is None else cents
     round_no = max(0, int(round_no or 0))
@@ -167,6 +182,10 @@ def checkout_payload(boost_id: int, user_id: int, address: str, base_url: str,
         pairs.append(("line_items[0][price_data][tax_behavior]", "exclusive"))
         pairs.append(("line_items[0][price_data][product_data][tax_code]", TAX_CODE))
         pairs.append(("billing_address_collection", "auto"))
+    if promos_allowed():
+        # The one line that makes a Stripe promotion code redeemable. Set STRIPE_ALLOW_PROMOS=0 to
+        # take the field off Checkout without deleting any code.
+        pairs.append(("allow_promotion_codes", "true"))
     if customer_id:
         pairs.append(("customer", customer_id))
         # A customer moving house should not leave checkout with a stale billing address.
