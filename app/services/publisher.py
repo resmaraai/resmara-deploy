@@ -383,6 +383,13 @@ async def publish_due(db, now: Optional[str] = None, *, limit: int = 50,
     for post in _due_posts(db, now, limit, boost_id=boost_id):
         result["checked"] += 1
         boost = db.query(Boost).filter(Boost.id == post.boost_id).first()
+        # A sample campaign (the demo book shown to prospects) is never published: its calendar is
+        # an illustration, and handing it to Meta would post a demo home to a real Page.
+        if boost is not None and (boost.plan or {}).get("_sample"):
+            result["skipped"] += 1
+            result["details"].append({"post_id": post.id, "status": "sample",
+                                      "reason": "sample campaign - never published"})
+            continue
 
         # Right before posting: the login, the Page and its Instagram, re-asked of Meta once per
         # agent per run (cached 10 minutes), so a broken connection holds posts instead of failing them.
