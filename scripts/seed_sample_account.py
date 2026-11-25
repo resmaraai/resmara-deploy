@@ -3,7 +3,7 @@
 The team showed Resmara from an account full of failed test builds ("Build failed", "testing",
 duplicates). This script does two jobs, deliberately in one place so the demo can be rebuilt:
 
-    python scripts/seed_sample_account.py --clear-tests      # back up, then delete every boost
+    python scripts/seed_sample_account.py --clear-tests      # back up, then delete TEST accounts' boosts
     python scripts/seed_sample_account.py --seed             # build the demo book of campaigns
     python scripts/seed_sample_account.py --clear-tests --seed
 
@@ -47,6 +47,7 @@ from PIL import Image  # noqa: E402
 from app.db.session import (  # noqa: E402
     Ad, Asset, Base, Boost, Event, Lead, ListingSite, Order, Post, SessionLocal, User,
 )
+from app.core.testdata import is_test_user  # noqa: E402
 
 SAMPLE_EMAIL = "resmaraai@gmail.com"
 
@@ -228,15 +229,31 @@ def backup(db, path: Path) -> dict:
     return {k: (len(v) if isinstance(v, list) else v) for k, v in dump.items()}
 
 
-def clear_tests(db, *, keep_sample: bool = False) -> list[str]:
-    """Delete every campaign that is not a paid one. A row with a real order is never touched."""
+def clear_tests(db, *, keep_sample: bool = False, include_emails=None) -> list[str]:
+    """Delete campaigns that belong to a test account. Never a person's campaign.
+
+    The rule used to be "every campaign with no paid order", which on 24 Nov 2026 deleted a
+    collaborator's real build for 892 Coggins St, Redding - 16 uploaded photos, no backup of the
+    image bytes - one hour after it failed on provider credits. A demo reset must not be able to
+    do that again, so the owner is checked: only an account the team marked as a test account
+    (``users.is_test``) or one using a throwaway test email is cleared. A real address can still
+    be cleared on purpose by naming it in ``include_emails``.
+    """
+    wanted = {(e or "").strip().lower() for e in (include_emails or set()) if e}
     paid = {o.boost_id for o in db.query(Order).filter(Order.status.in_(("paid", "complete"))).all()}
+    owners = {u.id: u for u in db.query(User).all()}
     gone = []
     for b in db.query(Boost).all():
         if keep_sample and (b.plan or {}).get("_sample"):
             continue
         if b.id in paid:
             print(f"  keeping boost {b.id} ({b.address}): a real order exists")
+            continue
+        owner = owners.get(b.user_id)
+        by_request = owner is not None and (owner.email or "").strip().lower() in wanted
+        if not (is_test_user(owner) or by_request):
+            who = owner.email if owner is not None else "no account"
+            print(f"  keeping boost {b.id} ({b.address}): {who} is not a test account")
             continue
         gone.append(f"boost {b.id} · {b.address} · {b.main_status}")
         db.query(Event).filter(Event.boost_id == b.id).delete()
@@ -511,7 +528,11 @@ async def seed(db, user: User) -> list[str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--clear-tests", action="store_true", help="delete every unpaid campaign")
+    ap.add_argument("--clear-tests", action="store_true",
+                    help="delete unpaid campaigns that belong to TEST accounts (never a person's)")
+    ap.add_argument("--include-email", action="append", default=[], metavar="ADDRESS",
+                    help="also clear this account's unpaid campaigns (repeatable; the deliberate way "
+                         "to clear a real account)")
     ap.add_argument("--seed", action="store_true", help="(re)build the sample account's campaigns")
     ap.add_argument("--email", default=SAMPLE_EMAIL)
     args = ap.parse_args()
@@ -551,7 +572,7 @@ def main() -> int:
             path = Path.home() / "resmara-backups" / f"test-campaigns-{stamp}.json"
             counts = backup(db, path)
             print(f"backup written: {path} ({counts})")
-            gone = clear_tests(db, keep_sample=True)
+            gone = clear_tests(db, keep_sample=True, include_emails=args.include_email)
             print(f"deleted {len(gone)} test campaigns:")
             for line in gone:
                 print("  -", line)
