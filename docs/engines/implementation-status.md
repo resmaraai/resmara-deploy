@@ -1,7 +1,15 @@
 # Resmara engines: what is built, what is next, what is blocked
 
-**Date:** 23 Nov 2026 · **Read from:** the code (committed and in the working tree), the live bundle
-on www.resmara.com (`cc2ab03`), and the eleven engine brains in `docs/engines/`.
+**Date:** 25 Nov 2026 · **Read from:** the code, the live bundle on www.resmara.com
+(`a26cc0fa0508`), and the eleven engine brains in `docs/engines/`.
+
+**Shipped since the 23 Nov version of this file.** Slices 1–3 are merged and inside the live build:
+PR #39 (`4158799`, sign-up to first campaign — Engines 1B/C, 2, tour, 3, 4), PR #40 (`1e6d60b`,
+the live campaign — Engines 5, 6, 8) and PR #41 (`1ee7591`, the business side — Engines 10 and 11),
+plus Engine 9 in PR #31 (`30496f9`). Each PR's commit was checked as an ancestor of the live build
+with GitHub's compare API, not from the PR badge. So Engine 9 is live (not "undeployed"), the
+sign-up tour is live, and Engines 10 and 11 are built except the three money emails the Build room
+still carries as #66, #67 and #68.
 
 The tracker's column "Sent to Dan" means *designed and delivered*. Every engine PR (#18, #22–#36)
 touched only `docs/` - zero app files - so nothing in them reached a customer. This file is the
@@ -124,49 +132,49 @@ turn (offer, reminder, start of a new round), and "Run it again" for any finishe
 
 ---
 
-## Engine 9 · Marketing (Website, Email campaigns, Digital ads) - **built in the working tree, not deployed**
+## Engine 9 · Marketing (Website, Email campaigns, Digital ads) - **built and live**
 
 `app/api/marketing.py`, `marketing_ads.py`, `mailchimp.py`, `attribution.py`, the Marketing /
-Website / Digital ads tabs in `static/admin.html`, and `tests/test_engine9_marketing.py` exist
-locally but are **uncommitted**, so production does not have them.
+Website / Digital ads tabs in `static/admin.html`, and `tests/test_engine9_marketing.py` shipped in
+PR #31 (`30496f9`), inside the live build.
 
 | Channel | Status |
 |---------|--------|
-| Marketing parent page + per-channel rows | **Built, undeployed** |
-| Attribution: where each sign-up came from | **Built, undeployed** |
-| Digital ads read-out | **Built - Blocked** → needs Resmara's own Meta ad account id + system token |
-| Website channel | **Built - Blocked** → needs GA4 property + service account |
+| Marketing parent page + per-channel rows | **Built, live** |
+| Attribution: where each sign-up came from | **Built, live** |
+| Digital ads read-out | **Built, live** → reads Resmara's own Meta ad account id + system token (set on Render) |
+| Website channel | **Built, live** → GA4 property + service account, Clarity and PageSpeed keys are set |
 | Email campaigns (Mailchimp) | **Built - Blocked** → needs a Mailchimp API key and audience id |
 
 ---
 
-## Engine 10 · Billing - **paid end to end, the card form and tax are not**
+## Engine 10 · Billing - **built; the money emails and Stripe Tax are what is left**
 
 | Piece | Status |
 |-------|--------|
 | $49 campaign, packs, webhook, refunds, saved cards | **Built**, live (Stripe live account, `enabled: true`) |
-| Card form inside our own pop-up (Stripe Elements) | **Not built** (Checkout redirect today) |
-| Stripe Tax | **Blocked** → must be switched on in the Stripe dashboard (Dan/Adam), then `automatic_tax: true` in code |
-| Receipts, refunds, chargebacks, closing an account stops billing | **Partial** |
+| Card form inside our own pop-up (Stripe Elements), Change/Remove card, Coming up, receipts | **Built** (PR #41) |
+| Stripe Tax | **Built behind `RESMARA_STRIPE_TAX=1`** → blocked on switching Stripe Tax on in the Stripe dashboard (Dan/Adam) and registering in the states that require it |
+| Receipts, refunds, chargebacks, closing an account stops billing | **Built** (PR #41) |
+| Money emails: acknowledgment when Run it until it sells is turned on, yearly reminder, 30-day price notice | **Not built** — Build room #66, #67, #68 |
 
 ---
 
-## Engine 11 · Support - **tickets built, inbox not**
+## Engine 11 · Support - **built; the shared inbox is what is left**
 
 | Piece | Status |
 |-------|--------|
 | Tickets from the client sidebar, replies, "not measured" honesty | **Built** |
 | Ask Resmara answers from the account's real state | **Built** (`help.py`) |
 | One shared `support@resmara.com` inbox | **Blocked** → the mailbox has to exist (domain is on GoDaddy; Resend can send from it, nothing receives yet) |
-| Which listing? + 1 business-day promise + reply-by times | **Not built** |
+| Which listing? + 1 business-day promise + reply-by times | **Built** (PR #41) |
 
 ---
 
-## Sign-up tour (PR #23) - **not built**
+## Sign-up tour (PR #23) - **built and live**
 
 Finish pop-up (brand + Facebook status, "Show me around"), fixes-first order, one setup plan, the
-tour itself, then "Let's start your first campaign". Screens exist in `docs/journey/`; the flow
-sits behind the Facebook login, which now exists.
+tour itself, then "Let's start your first campaign" — shipped in PR #39 behind the Facebook door.
 
 ---
 
@@ -177,15 +185,15 @@ sits behind the Facebook login, which now exists.
 | 1 | Real customers cannot finish "Log in with Facebook" | 1 | Meta App Review: `email` (advanced), then `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic`, `instagram_content_publish`, `ads_read`, `ads_management`, `pages_manage_ads`, `read_insights`, `instagram_manage_insights` | Meta dashboard (Dan's Facebook login) |
 | 2 | No invisible bot check | 1 | Cloudflare Turnstile site + secret key (free) → `RESMARA_TURNSTILE_SECRET` | Dan (Cloudflare) |
 | 3 | Facebook login callback must be allow-listed | 1 | Facebook Login → Valid OAuth Redirect URIs += `https://www.resmara.com/api/auth/facebook/callback` | Meta dashboard |
-| 4 | Website numbers ("not connected yet") | 5, 9 | `GA4_PROPERTY_ID` + GA4 service-account JSON; `META_AD_ACCOUNT_ID` + `META_SYSTEM_TOKEN`; Clarity project id | Dan/Adam |
-| 5 | Digital ads channel | 9 | the same Meta ad account + system token as #4 | Dan |
+| 4 | ~~Website numbers ("not connected yet")~~ **resolved 24 Nov** | 5, 9 | `GA4_PROPERTY_ID` + `GA4_SA_JSON`, `META_AD_ACCOUNT_ID` + `META_SYSTEM_TOKEN`, `CLARITY_PROJECT_ID`/`CLARITY_TOKEN` are all set on Render; Website and Digital ads read real data | done |
+| 5 | ~~Digital ads channel~~ **resolved 24 Nov** | 9 | same keys as #4 — Resmara's own ad account 1151413287580354 is wired | done |
 | 6 | Email campaigns (Mailchimp) | 9 | Mailchimp API key + audience id | Adam/Dan |
-| 7 | Stripe Tax | 10 | switch Stripe Tax on in the Stripe dashboard, then one code change | Dan/Adam |
+| 7 | Stripe Tax | 10 | the code is behind `RESMARA_STRIPE_TAX=1`; switch Stripe Tax on in the Stripe dashboard and register where required | Dan/Adam |
 | 8 | Receiving mail at support@resmara.com | 11 | an actual mailbox (MX) for the domain, or a forwarding rule to an inbox we read | Dan/Adam |
 | 9 | Facebook Page/Instagram/ad permissions in the same login window | 1 | same App Review as #1 (the code already reads `META_SCOPES`; no build needed) | Meta |
 | 10 | Preview environments per PR | - | Render workspace upgrade ($25/mo) - not needed for launch | Dan (spend) |
 
-Nothing else on the list is waiting on anyone: the remaining engines are build work, and that is
-what happens next, in this order - Engine 1 Part B/C (connection + audit + to-do list), Engine 3
-gate, Engine 4 design (themes, layout library, art director), Engine 2 brand kit, Engine 8 emails,
-Engine 10 card form, Engine 11 support inbox screens, then the sign-up tour on top.
+Nothing else on the list is waiting on anyone: the remaining engine work is the three money emails
+(Build room #66, #67, #68), the terms/renewal-consent records (#61, #62, #64, #65), and the rest of
+the brains' "not built" rows above (Engine 1 Part B/C connection + audit, Engine 2 full kit, Engine 3
+gate, Engine 4 themes/layout library/art director, Engine 8 emails).
