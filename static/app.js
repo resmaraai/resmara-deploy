@@ -27,6 +27,11 @@ async function syncLiveCampaigns(){
   // until_sold is in the signature too: turning autopilot on or off (here or on a phone) is a
   // visible change and the card must repaint, not wait for a reload.
   const signature=list=>list.map(c=>[campaignBoostId(c),c.image||'',c.status,c.until_sold?'on':'off',Number(c.new_leads||0),c.launched_at||'',c.locked?'L':'',c.card_state||'',c.paused_at||''].join(':')).join(',').slice(0,4000);
+  // state.campaigns is persisted in this browser, so a campaign deleted on the server (here, on a
+  // phone, or by the team) used to stay on the list forever and could never be removed from it.
+  // Anything the account no longer owns goes; local drafts have no boost id and are kept.
+  const owned=new Set(list.map(b=>b&&b.id!=null?String(b.id):'').filter(Boolean));
+  state.campaigns=state.campaigns.filter(c=>{const id=campaignBoostId(c);return id==null||owned.has(String(id))});
   const before=signature(state.campaigns);
   list.forEach(b=>{
    if(!b||b.id==null)return;
