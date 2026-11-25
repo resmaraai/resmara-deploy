@@ -61,6 +61,11 @@ _OWES_MORE = ("not built", "not yet", "blocked on", "to be written", "to write",
 # the next person can see why a card with a live pull request is still in review.
 _HELD = "release watcher:"
 
+# A card that says it is waiting for the operator to land a named pull request — Adam's "Ready for
+# Dan" handoff. When that pull request is merged and live, the operator's half is finished, so the
+# card closes itself instead of sitting in todo while the work already serves traffic.
+_READY_FOR_OPERATOR = re.compile(r"ready for (?:dan|the operator)", re.IGNORECASE)
+
 
 
 def _operator() -> str:
@@ -169,7 +174,10 @@ def reconcile(db: Session, payload: Dict[str, Any], live_commit: str = "") -> Di
       merged and live *and was merged after the row was created* — the PR is then evidence that the
       card's work shipped. A card that says it still owes something (``_OWES_MORE``), that somebody
       has claimed, or that a person has already tested is reported in ``skipped`` and left alone.
-      ``todo`` rows are never closed: "not started" is not "shipped".
+    * the one ``todo`` row it may close is a card that says in its own words that it is waiting for
+      the operator to land a named pull request (``_READY_FOR_OPERATOR``) — Adam's "Ready for Dan"
+      handoff. Same evidence, same guards: the PR merged after the card was written and is live.
+      Any other ``todo`` row is never closed: "not started" is not "shipped".
     """
     out: Dict[str, List[str]] = {"closed": [], "deleted": [], "skipped": []}
     live: Dict[int, Dict[str, Any]] = {}
@@ -191,8 +199,10 @@ def reconcile(db: Session, payload: Dict[str, Any], live_commit: str = "") -> Di
                 out["deleted"].append(f"#{row.id} {row.title}")
                 db.delete(row)
             continue
-        if marker or row.status != "review":
+        if marker or row.status not in ("review", "todo"):
             continue
+        if row.status == "todo" and not _READY_FOR_OPERATOR.search(row.notes or ""):
+            continue                      # "not started" is not "shipped"
         # The PR has to have merged after the card existed: an older card that merely mentions a
         # pull request number is not evidence that this card's work shipped.
         opened = _as_utc(row.created_at)
@@ -209,12 +219,12 @@ def reconcile(db: Session, payload: Dict[str, Any], live_commit: str = "") -> Di
                 continue          # explained once already: repeating it every sweep is noise
             number = shipped[0]
             _append(row, f"{_HELD} PR #{number} is merged and live, but this card says it still "
-                         f"owes work, so it stays in review for a person to look at")
+                         f"owes work, so it stays in {row.status} for a person to look at")
             out["skipped"].append(f"#{row.id} {row.title}")
             continue
         number = shipped[0]
         _append(row, f"PR #{number} went live; nothing was claimed and nothing was left owed, "
-                     f"so the release watcher closed this review row")
+                     f"so the release watcher closed this {row.status} row")
         row.status = "done"
         row.tested_by = SYNC_BY
         row.tested_at = stamp
