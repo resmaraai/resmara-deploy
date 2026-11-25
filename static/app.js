@@ -30,7 +30,11 @@ async function syncLiveCampaigns(){
   const before=signature(state.campaigns);
   list.forEach(b=>{
    if(!b||b.id==null)return;
-   const card={address:b.address,area:(b.campaign_days||14)+'-day campaign · $'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',status:liveStatusLabel(b),boostId:b.id,live:true,day:0,hidden:b.hidden===true,posts_total:b.posts_total||0,posts_approved:b.posts_approved||0,posts_published:b.posts_published||0,url:'',media:'',image:b.image||undefined,budget:'$'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',until_sold:b.until_sold===true,until_sold_at:b.until_sold_at||null,new_leads:b.new_leads||0,launched_at:b.launched_at||null,go_live_date:b.go_live_date||null,stage:b.stage||null,locked:b.locked===true};
+   const card={address:b.address,area:(b.campaign_days||14)+'-day campaign · $'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',status:liveStatusLabel(b),boostId:b.id,live:true,day:0,hidden:b.hidden===true,posts_total:b.posts_total||0,posts_approved:b.posts_approved||0,posts_published:b.posts_published||0,url:'',media:'',image:b.image||undefined,budget:'$'+Number(b.ad_budget_usd||0).toFixed(0)+'/day',until_sold:b.until_sold===true,until_sold_at:b.until_sold_at||null,new_leads:b.new_leads||0,launched_at:b.launched_at||null,go_live_date:b.go_live_date||null,start:b.go_live_date||null,stage:b.stage||null,locked:b.locked===true,
+   // Pause/pending/sold and completed are the server's answers (campaign_state.card_state); the
+   // card and the "Turn it back on" button read them, so dropping them here made a paused or sold
+   // campaign look Active on every list.
+   card_state:b.card_state||null,paused_at:b.paused_at||null,paused_reason:b.paused_reason||null,listing_status:b.listing_status||null};
    const existing=state.campaigns.find(c=>String(campaignBoostId(c))===String(b.id));
    if(existing)Object.assign(existing,card);else state.campaigns.push(card);
   });
@@ -107,7 +111,7 @@ function campaignPhaseRaw(c){
  if(c.phase)return c.phase;
  const st=String(c.status||'').toLowerCase();
  if(c.renewed||st.includes('republish'))return 'republished';
- if(c.completed||st.includes('complete')||(c.live&&c.posts_total&&c.posts_published>=c.posts_total))return 'completed';
+ if(c.completed||/^completed/i.test(String(c.card_state||''))||st.includes('complete')||(c.live&&c.posts_total&&c.posts_published>=c.posts_total))return 'completed';
  return 'active';
 }
 const PHASE_LABEL={staged:'Staged',ready:'Ready to go live',active:'Active',republished:'Republished',completed:'Completed'};
