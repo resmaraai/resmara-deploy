@@ -24,7 +24,7 @@ PASSED = 0
 FAILED = 0
 
 MAIL_KEYS = ("RESEND_API_KEY", "SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "SMTP_PORT",
-             "SMTP_SSL", "SMTP_STARTTLS", "SMTP_FROM", "MAIL_FROM")
+             "SMTP_SSL", "SMTP_STARTTLS", "SMTP_FROM", "MAIL_FROM", "MAIL_REPLY_TO")
 
 
 def check(label, condition, detail=None):
@@ -183,6 +183,14 @@ def main():
     check("but MAIL_FROM still overrides it",
           mail.default_sender() == "Resmara <hello@resmara.com>", mail.default_sender())
     os.environ.pop("MAIL_FROM")
+    # A reply to a reset or a receipt has to reach a person who reads it, so the header is set on
+    # every message rather than left to whatever the transport defaults to.
+    check("replies go to support@resmara.com", mail.default_reply_to() == "support@resmara.com",
+          mail.default_reply_to())
+    os.environ["MAIL_REPLY_TO"] = "team@resmara.com"
+    check("and MAIL_REPLY_TO can override it", mail.default_reply_to() == "team@resmara.com",
+          mail.default_reply_to())
+    os.environ.pop("MAIL_REPLY_TO")
 
     # ---- SMTP alone: a real conversation ----------------------------------------------
     print("\n[smtp]")
@@ -198,6 +206,8 @@ def main():
           server.message[:200])
     check("the recipient was addressed", "owner@resmara.test" in server.message, server.message[:200])
     check("the subject was set", "Reset your Resmara password" in server.message, server.message[:200])
+    check("the smtp message carries the reply-to header",
+          "Reply-To: support@resmara.com" in server.message, server.message[:400])
     check("a login was attempted", bool(server.credentials), server.credentials)
     check("the credential never appears in the transcript",
           "abcd efgh ijkl mnop" not in (server.credentials or ""), server.credentials)
@@ -239,6 +249,8 @@ def main():
           and stub.body.get("to") == ["owner@resmara.test"]
           and stub.body.get("subject") == "Your receipt"
           and stub.body.get("text") == "$49 paid", stub.body)
+    check("the resend payload carries the reply-to address",
+          stub.body.get("reply_to") == "support@resmara.com", stub.body.get("reply_to"))
 
     # ---- Resend refuses, SMTP rescues -----------------------------------------------
     # The free plan has no SMTP at all and Resend's free tier stops at 100/day, so both halves of
@@ -284,6 +296,23 @@ def main():
     state = mail.delivery_state()
     check("the console shows the fallback", state["fallback"] == "smtp", state)
     check("and still calls email configured", state["configured"] is True, state)
+    check("the reply-to is reported without the credential",
+          state["reply_to"] == "support@resmara.com", state)
+    check("a verified sender is not called a sandbox", state["sandbox"] is False, state)
+
+    # ---- Resend's test sender is not delivery ---------------------------------------
+    # onboarding@resend.dev only reaches the Resend account owner. Reporting "email works" while
+    # every customer message is dropped is the lie this state exists to prevent.
+    print("\n[resend test sender]")
+    reset_env(RESEND_API_KEY="re_test_123", MAIL_FROM="Resmara <onboarding@resend.dev>")
+    state = mail.delivery_state()
+    check("the test sender is flagged as a sandbox", state["sandbox"] is True, state)
+    check("and the note says who actually receives it",
+          "owner" in state["note"] and "verified" in state["note"], state["note"])
+    check("the key still counts as configured", state["configured"] is True, state)
+    reset_env(RESEND_API_KEY="re_test_123", MAIL_FROM="Resmara <support@resmara.com>")
+    check("a real sender on our own domain is not a sandbox",
+          mail.delivery_state()["sandbox"] is False, mail.delivery_state())
 
     # ---- restore env -----------------------------------------------------------------
     print("\n[restore env]")

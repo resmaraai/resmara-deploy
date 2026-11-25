@@ -31,6 +31,12 @@ RESEND_ENDPOINT = "https://api.resend.com/emails"
 # address they have never seen reads as phishing, and Gmail files it as such.
 DEFAULT_FROM = "Resmara <support@resmara.com>"
 
+# Where a customer's reply should land. support@resmara.com is a live Google Workspace mailbox
+# (Nov 2026), so a reply to a reset, receipt or support notice reaches a person instead of the
+# sending account. MAIL_REPLY_TO overrides it; the header is set on both providers so switching
+# transport cannot quietly drop it.
+DEFAULT_REPLY_TO = "support@resmara.com"
+
 # What the last send attempt actually did. This is what the operator console and the event log
 # report, so "email is configured" and "the message went" stop looking identical. Holds no
 # credential: provider names, a boolean and human-readable reasons only.
@@ -75,6 +81,11 @@ def default_sender() -> str:
     return _env("MAIL_FROM") or _env("SMTP_FROM") or DEFAULT_FROM
 
 
+def default_reply_to() -> str:
+    """Who a reply goes to. Always an address on the domain customers already know."""
+    return _env("MAIL_REPLY_TO") or DEFAULT_REPLY_TO
+
+
 def _send_via_resend(to: str, subject: str, body: str):
     """One POST to Resend. Returns (accepted, reason).
 
@@ -87,7 +98,8 @@ def _send_via_resend(to: str, subject: str, body: str):
             RESEND_ENDPOINT,
             timeout=10,  # short: a dead primary must not stall the fallback behind it
             headers={"Authorization": "Bearer %s" % resend_key()},
-            json={"from": default_sender(), "to": [to], "subject": subject, "text": body},
+            json={"from": default_sender(), "to": [to], "subject": subject, "text": body,
+                  "reply_to": default_reply_to()},
         )
     except httpx.HTTPError as exc:
         return False, "resend unreachable (%s)" % exc.__class__.__name__
@@ -126,6 +138,7 @@ def _send_via_smtp(to: str, subject: str, body: str):
     msg["From"] = sender
     msg["To"] = to
     msg["Subject"] = subject
+    msg["Reply-To"] = default_reply_to()
     msg.set_content(body)
 
     try:
@@ -193,10 +206,20 @@ def delivery_state() -> dict:
         note = "email works via %s, falling back to %s" % (kind, order[1])
     else:
         note = "email works via %s" % kind
+    sender = default_sender() if order else None
+    # Resend's onboarding@resend.dev test sender delivers to the account owner only. A row that
+    # says "email works" while every customer message is dropped is the same lie as an empty
+    # inbox reported as delivered, so the state names it and the console row reads warn.
+    sandbox = bool(sender and "resend.dev" in sender.lower())
+    if sandbox:
+        note = ("Resend's test sender is in use: mail only reaches the Resend account owner until "
+                "resmara.com is verified")
     return {
         "configured": bool(order),
         "provider": kind or None,
         "fallback": order[1] if len(order) > 1 else None,
-        "from": default_sender() if order else None,
+        "from": sender,
+        "reply_to": default_reply_to() if order else None,
+        "sandbox": sandbox,
         "note": note,
     }

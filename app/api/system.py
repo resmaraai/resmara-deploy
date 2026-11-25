@@ -177,10 +177,18 @@ def _run_checks(db: Session) -> List[Dict[str, Any]]:
 
     # Email.
     try:
-        if mail.mail_configured():
-            rows.append(_row("Email", "ok", "Mail provider configured", checked_at))
+        state = mail.delivery_state()
+        if not state["configured"]:
+            rows.append(_row("Email", "warn",
+                             "No mail provider: reset links are handed over by hand", checked_at))
+        elif state.get("sandbox"):
+            # A provider being configured is not delivery: Resend's test sender only reaches the
+            # account owner, so customer resets and confirmations go nowhere.
+            rows.append(_row("Email", "warn", state["note"], checked_at))
         else:
-            rows.append(_row("Email", "warn", "No mail provider: reset links are handed over by hand", checked_at))
+            rows.append(_row("Email", "ok",
+                             "Mail sends from %s" % (state.get("from") or "the configured sender"),
+                             checked_at))
     except Exception as exc:                                     # noqa: BLE001
         rows.append(_row("Email", "fail", str(exc)[:200], checked_at))
 
