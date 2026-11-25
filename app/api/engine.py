@@ -46,6 +46,24 @@ INTERRUPTED_ERROR = (
     "Nothing was lost: start the build again."
 )
 
+# What a provider refusal looks like when the account behind the API key has run out of
+# credit. A customer can do nothing about it, and the raw text they used to get was
+# `Client error '429 Too Many Requests' ... insufficient_quota` — which reads like a Resmara
+# bug and hides the one fact that matters: the campaign itself is intact.
+_PROVIDER_QUOTA_MARKERS = ("insufficient_quota", "credit_balance_exhausted",
+                           "no credits remaining", "exceeded your current quota")
+
+
+def provider_error_text(raw: str) -> str:
+    """A build failure in words the customer can act on; anything else passes through."""
+    text = str(raw or "").strip()
+    low = text.lower()
+    if any(marker in low for marker in _PROVIDER_QUOTA_MARKERS):
+        return ("Resmara's AI provider is out of credit, so this build stopped before it wrote any "
+                "posts. Nothing else is missing - the campaign, its photos and the approved scope "
+                "are saved, and the build runs again once the account is topped up.")
+    return text
+
 
 
 def _owned_boost(boost_id: int, current_user: User, db: Session) -> Boost:
@@ -122,7 +140,7 @@ async def _run_build(boost_id: int, user_id: int, force: bool, openings: Optiona
                 state["unlock"] = {"status": "declined", "message": type(exc).__name__}
     except Exception as e:  # noqa: BLE001 - the build may fail for a dozen reasons; record it
         db.rollback()
-        state.update({"status": "error", "error": str(e)[:400]})
+        state.update({"status": "error", "error": provider_error_text(e)[:400]})
         try:
             from app.services.llm import take_usage
             spent = take_usage()  # a failed run still burned tokens; say how many
@@ -135,7 +153,7 @@ async def _run_build(boost_id: int, user_id: int, force: bool, openings: Optiona
             user = db.query(User).filter(User.id == user_id).first()
             if user:
                 _log(db, user, boost_id, "error", {
-                    "where": "build_campaign", "error": str(e)[:400],
+                    "where": "build_campaign", "error": provider_error_text(e)[:400],
                     "tokens": spent.get("total_tokens"), "calls": spent.get("calls"),
                 })
                 db.commit()
