@@ -20,6 +20,7 @@ sent. The API key is read from the environment and written only into the request
 never logged, echoed in a response, or pasted into a reason string.
 """
 import os
+import re
 import smtplib
 from email.message import EmailMessage
 
@@ -86,6 +87,35 @@ def default_reply_to() -> str:
     return _env("MAIL_REPLY_TO") or DEFAULT_REPLY_TO
 
 
+# Resend's own test sender. It delivers to the account owner and to nobody else, so a send that
+# "works" with it in place still leaves every customer without their reset or confirmation.
+TEST_SENDER_DOMAINS = ("resend.dev",)
+
+
+def _address_of(sender: str) -> str:
+    """'Resmara <support@resmara.com>' -> 'support@resmara.com'."""
+    sender = (sender or "").strip()
+    if "<" in sender and ">" in sender:
+        return sender[sender.index("<") + 1:sender.index(">")].strip()
+    return sender
+
+
+def _domain_of(sender: str) -> str:
+    address = _address_of(sender)
+    return address.rsplit("@", 1)[-1].lower() if "@" in address else ""
+
+
+def verified_domains() -> list:
+    """Domains Resend has confirmed, from MAIL_VERIFIED_DOMAINS (comma separated).
+
+    A sending-only API key cannot read /domains, so the app cannot ask Resend whether resmara.com
+    is verified. Until somebody records the confirmation - or a real send succeeds - the console
+    says the domain is unconfirmed rather than reporting a healthy provider whose every message
+    Resend refuses.
+    """
+    return [d.strip().lower() for d in _env("MAIL_VERIFIED_DOMAINS").split(",") if d.strip()]
+
+
 def _send_via_resend(to: str, subject: str, body: str):
     """One POST to Resend. Returns (accepted, reason).
 
@@ -106,11 +136,55 @@ def _send_via_resend(to: str, subject: str, body: str):
 
     if resp.status_code in (200, 201, 202):
         return True, ""
-    if resp.status_code in (401, 403):
-        return False, "resend rejected the key or the sending domain is not verified (HTTP %d)" % resp.status_code
-    if resp.status_code == 429:
-        return False, "resend daily limit reached (HTTP 429)"
-    return False, "resend answered HTTP %d" % resp.status_code
+    return False, _resend_reason(resp)
+
+
+def _resend_message(resp) -> str:
+    """Resend's own sentence from an error body, shortened and stripped of anything key-shaped.
+
+    The reason is stored on events and shown in the operator console, so it carries the
+    actionable text ("the domain is not verified") and never the request that produced it.
+    """
+    body = None
+    try:
+        body = resp.json()
+    except Exception:  # noqa: BLE001 - a non-JSON body (a Cloudflare page) is still evidence
+        body = None
+    message = ""
+    if isinstance(body, dict):
+        message = str(body.get("message") or body.get("name") or "")
+    if not message:
+        message = (resp.text or "").strip()
+    message = " ".join(message.split())
+    message = re.sub(r"\b(?:re|sk|rk)_[A-Za-z0-9_\-]{6,}", "[redacted]", message)
+    return message[:160]
+
+
+def _resend_reason(resp) -> str:
+    """What a refused send actually means. One guess ("key or domain") hides both diagnoses.
+
+    A 403 is three different problems - an unverified domain, the test sender addressing a
+    stranger, or Cloudflare answering before Resend ever sees the request - and the fix differs
+    for each. The console and the customer-facing notice quote this string.
+    """
+    status = resp.status_code
+    message = _resend_message(resp)
+    low = message.lower()
+    if "error code: 1010" in low or "cloudflare" in low:
+        return "blocked before Resend answered (Cloudflare 1010)"
+    if status == 401:
+        return "resend rejected the API key (HTTP 401)"
+    if status == 429:
+        return "resend daily limit reached (HTTP 429)"
+    if status == 403:
+        if "own email address" in low:
+            return "Resend's test sender only delivers to the account owner (HTTP 403)"
+        if "not verified" in low or "verify your domain" in low:
+            return ("the sending domain is not verified in Resend (HTTP 403)%s"
+                    % (": " + message if message else ""))
+        return "resend refused the message (HTTP 403)%s" % (": " + message if message else "")
+    return ("resend answered HTTP %d: %s" % (status, message)) if message else (
+        "resend answered HTTP %d" % status)
 
 
 def _smtp_password() -> str:
@@ -171,13 +245,14 @@ def send_email(to: str, subject: str, body: str) -> bool:
     """
     order = try_order()
     errors = []
-    _LAST.update({"provider": "", "ok": False, "reason": "", "errors": errors, "fell_back": False})
+    _LAST.update({"provider": "", "ok": False, "reason": "", "errors": errors, "fell_back": False,
+                  "from": "", "config": tuple(order)})
 
     for kind in order:
         ok, reason = _SENDERS[kind](to, subject, body)
         if ok:
             _LAST.update({"provider": kind, "ok": True, "reason": "",
-                          "fell_back": errors != []})
+                          "fell_back": errors != [], "from": default_sender()})
             return True
         errors.append("%s: %s" % (kind, reason) if reason else kind)
         _LAST["provider"] = kind
@@ -199,27 +274,73 @@ def delivery_state() -> dict:
     """What the operator console should say about email, without revealing a credential."""
     order = try_order()
     kind = order[0] if order else ""
+    has_fallback = len(order) > 1
+    sender = default_sender() if order else None
+    domain = _domain_of(sender or "")
+    # Resend's onboarding@resend.dev test sender delivers to the account owner only. A row that
+    # says "email works" while every customer message is dropped is the same lie as an empty
+    # inbox reported as delivered.
+    sandbox = bool(domain and any(domain.endswith(d) or domain == d
+                                  for d in TEST_SENDER_DOMAINS))
+    # Two ways a domain counts as proven: somebody recorded it in MAIL_VERIFIED_DOMAINS, or a real
+    # send through Resend with this same sender was accepted since this process started. A
+    # sending-only key cannot read /domains, and "presence of a key" proves nothing about whether
+    # Resend will accept the message.
+    proven_by_send = bool(_LAST.get("ok")) and _LAST.get("provider") == "resend" and (
+        _domain_of(_LAST.get("from") or "") == domain)
+    confirmed = bool(domain) and (domain in verified_domains() or proven_by_send)
+    unconfirmed = bool(kind == "resend" and domain and not sandbox and not confirmed)
+
     if not order:
         note = ("no email provider: set RESEND_API_KEY (recommended: HTTP, works on hosts that "
                 "block SMTP) or SMTP_HOST/SMTP_USER/SMTP_PASSWORD (Gmail app password)")
-    elif len(order) > 1:
+    elif sandbox:
+        note = ("Resend's test sender is in use: mail only reaches the Resend account owner until "
+                "resmara.com is verified")
+    elif unconfirmed:
+        note = ("%s is not confirmed as verified in Resend, so it refuses every message from it: "
+                "add the domain's records at resend.com/domains, then set "
+                "MAIL_VERIFIED_DOMAINS=%s" % (domain, domain))
+        if has_fallback:
+            note += " (mail falls back to %s meanwhile)" % order[1]
+    elif has_fallback:
         note = "email works via %s, falling back to %s" % (kind, order[1])
     else:
         note = "email works via %s" % kind
-    sender = default_sender() if order else None
-    # Resend's onboarding@resend.dev test sender delivers to the account owner only. A row that
-    # says "email works" while every customer message is dropped is the same lie as an empty
-    # inbox reported as delivered, so the state names it and the console row reads warn.
-    sandbox = bool(sender and "resend.dev" in sender.lower())
-    if sandbox:
-        note = ("Resend's test sender is in use: mail only reaches the Resend account owner until "
-                "resmara.com is verified")
     return {
         "configured": bool(order),
         "provider": kind or None,
-        "fallback": order[1] if len(order) > 1 else None,
+        "fallback": order[1] if has_fallback else None,
         "from": sender,
         "reply_to": default_reply_to() if order else None,
         "sandbox": sandbox,
+        "domain": domain or None,
+        "domain_verified": bool(confirmed),
+        "unconfirmed": unconfirmed,
         "note": note,
     }
+
+
+def console_row() -> dict:
+    """The operator console's Email row: a status and one plain sentence.
+
+    Kept here, not in the API, so the rules the row obeys are the rules under test: a configured
+    provider is not delivery, an unverified sending domain is not delivery, and a send that just
+    failed is named instead of being hidden behind a green row.
+    """
+    state = delivery_state()
+    if not state["configured"]:
+        return {"status": "warn",
+                "note": "No mail provider: reset links are handed over by hand"}
+    if state["sandbox"] or state["unconfirmed"]:
+        return {"status": "warn", "note": state["note"]}
+    last = last_attempt()
+    # Only an attempt made under the transport configured now is evidence about email today: a
+    # failure recorded against a provider that has since been removed (or added) says nothing
+    # about whether the next message will go out.
+    if (not last.get("ok") and last.get("reason")
+            and tuple(last.get("config") or ()) == tuple(try_order())):
+        return {"status": "warn", "note": "The last send failed: %s" % last["reason"]}
+    return {"status": "ok",
+            "note": "Mail sends from %s via %s"
+                    % (state.get("from") or "the configured sender", state["provider"])}
