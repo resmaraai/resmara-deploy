@@ -33,9 +33,9 @@ and a Mailchimp key and audience. Nothing to build in this slice; it's Dan's eng
 
 | Brain decision | Status | Where / what's wrong |
 |---|---|---|
-| Chat answers from the guide, library, approved answers and the account | ✅ | `help.py` |
+| Chat answers from the guide, library, approved answers and the account | ✅ | `help.py` — corrected 25 Nov: this was marked ✅ too early; it only matched approved answers until the brain-gaps PR |
 | First message says it's an AI assistant | ❌ | |
-| Signed-out visitors get product answers | 🟡 | to check |
+| Signed-out visitors get product answers | ✅ | brain-gaps PR, 25 Nov |
 | Support page: Which listing?, the 1 business day promise, "We'll reply by Tuesday at 5 PM" | ❌ | subject and message only |
 | Confirmation email to the agent; requests to support@resmara.com | ❌🔒 | emails operator addresses; the shared inbox doesn't exist yet |
 | Each team reply emailed to the agent with See the reply | ❌ | |
