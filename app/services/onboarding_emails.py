@@ -1,6 +1,6 @@
 """Engine 1 Part A §6-7: the four onboarding emails, and what makes each one honest.
 
-Adam's spec: from support@resmara.com, written as Adam, personal, short, one clear next step,
+Adam's spec: from support@resmara.com, signed by the Resmara team (Adam, 25 Nov: never by name), personal, short, one clear next step,
 AI-written from the agent's *real* account facts - never a guess, never a promise. Four emails at
 most (welcome, day 3, day 7, day 14), and they stop the moment a campaign launches, because from
 then on the campaign itself is the relationship.
@@ -14,7 +14,7 @@ What is code here, on purpose:
   * "never twice", recorded as one event per step on the account.
 
 The wording comes from templates that carry the facts. When a model is configured it rewrites the
-template in Adam's voice; if the model is unavailable or returns nothing, the template is what the
+template in the team's voice; if the model is unavailable or returns nothing, the template is what the
 agent reads - a real email, not silence.
 
 Since 25 Nov (Adam): once Mailchimp is connected, every follow-up email is a Mailchimp series, so
@@ -32,7 +32,7 @@ from app.db.session import Boost, Event, Lead, User
 from app.services import mail
 
 STEPS = (("welcome", 0), ("day3", 3), ("day7", 7), ("day14", 14))
-FROM_NAME = "Adam, Resmara support"
+FROM_NAME = "The Resmara team"
 
 SITUATIONS = {
     "not_back": "Looks like you haven't been back yet. Need a hand getting started?",
@@ -144,7 +144,7 @@ def compose(step: str, user: User, f: dict) -> tuple[str, str]:
     if step == "welcome":
         subject = "Welcome to Resmara"
         body = (f"{hi}\n\n"
-                f"I'm Adam - I look after support at Resmara. Thanks for joining.\n\n"
+                f"Thanks for joining Resmara. We're glad you're here.\n\n"
                 f"The first thing to do is connect your Facebook Page, Instagram and ad account, "
                 f"because that's what lets Resmara post and run ads for you. "
                 f"{'You already have that done - nice.' if f['meta_connected'] else 'It takes about two minutes.'}\n\n"
