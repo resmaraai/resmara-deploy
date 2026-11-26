@@ -158,7 +158,7 @@ function obIgSwitch() {
 }
 
 // Free setup session: the real Calendly booking page, right in the pop-up.
-const SETUP_CALENDLY = 'https://calendly.com/d/d32t-m77-tmt/real-estate-boost-onboarding-session';
+const SETUP_CALENDLY = 'https://calendly.com/resmara-support/30min';
 function obBook(standalone) {
   const [first, ...rest] = String(state.name || '').split(' ');
   const q = new URLSearchParams({ embed_type: 'Inline', embed_domain: location.hostname || 'resmara.com', hide_gdpr_banner: '1', hide_landing_page_details: '1', primary_color: 'd94c0d', name: state.name || '', email: state.email || '', first_name: first || '', last_name: rest.join(' ') });
