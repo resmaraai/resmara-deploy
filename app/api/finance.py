@@ -38,21 +38,27 @@ SETTINGS_ID = 1
 # they are opinions about the world, not facts in the database, and the honest place for them is
 # a row the operator owns rather than a constant that needs a deploy to change.
 DEFAULT_ASSUMPTIONS: dict[str, float] = {
-    # Delivery: one campaign is ~46k model tokens plus photo tagging; measured at ~$0.02 raw and
-    # budgeted at $0.10 so a retry-heavy build is still covered.
-    "engine_cost_per_campaign_usd": 0.10,
+    # Delivery, measured on production rather than assumed: the last real build logged 160,592
+    # tokens (gpt-5.5 $5/$30 per 1M, mini $0.75/$4.50) and made 14 designed posts + 6 ad creatives
+    # on gpt-image-2.6 at $0.10-0.16 an image. Range across builds is $3.20-5.10; this is the middle.
+    "engine_cost_per_campaign_usd": 4.03,
     # Photos are ~50 MB a campaign. R2 is $0.015/GB-month, so this is under a cent.
     "gb_per_campaign": 0.05,
     "r2_usd_per_gb_month": 0.015,
-    # Paid hosting once off Render's free plan: web Starter, Postgres 256 MB, cron, domain.
-    "hosting_web_usd": 7.00,
+    # The bill that actually arrives. Render charges $25 a month (costs ledger): the team workspace
+    # seat plus the $6 Postgres and $1 cron. The web service itself is on Render's free plan today,
+    # so its line is $0 - set it to 7.00 when the Starter plan is switched on.
+    "hosting_workspace_usd": 18.00,
+    "hosting_web_usd": 0.00,
     "hosting_postgres_usd": 6.00,
     "hosting_cron_usd": 1.00,
     "hosting_domain_usd": 1.17,
     # Refunds, chargebacks and the odd redo.
     "refund_buffer_pct": 2.0,
-    # The repeat model: how often an average agent buys, and how long they stay.
-    "campaigns_per_agent_per_year": 8.0,
+    # The repeat model. NAR's 2026 Member Profile puts the median agent at nine transaction sides a
+    # year, roughly 45% of them seller side, so ~4 listings; a listing buys one campaign plus the
+    # odd $39 repeat. Five is that arithmetic, not a target.
+    "campaigns_per_agent_per_year": 5.0,
     "retention_years": 2.0,
     # The margin a price has to leave before acquisition is paid out of it.
     "target_margin_pct": 60.0,
@@ -69,6 +75,7 @@ BOUNDS: dict[str, tuple[float, float]] = {
     "engine_cost_per_campaign_usd": (0.0, 100.0),
     "gb_per_campaign": (0.0, 5.0),
     "r2_usd_per_gb_month": (0.0, 1.0),
+    "hosting_workspace_usd": (0.0, 1000.0),
     "hosting_web_usd": (0.0, 1000.0),
     "hosting_postgres_usd": (0.0, 1000.0),
     "hosting_cron_usd": (0.0, 1000.0),
@@ -87,7 +94,8 @@ FIELDS = [
      "hint": "Tokens and photo tagging for one 14-day build.", "unit": "$", "step": "0.01"},
     {"key": "gb_per_campaign", "label": "Photo storage per campaign",
      "hint": "Roughly 20 listing photos.", "unit": "GB", "step": "0.01"},
-    {"key": "hosting_web_usd", "label": "Web service", "hint": "Render Starter.",
+    {"key": "hosting_workspace_usd", "label": "Render workspace", "hint": "The team seat on Render's bill.", "unit": "$/mo", "step": "0.01"},
+    {"key": "hosting_web_usd", "label": "Web service", "hint": "Free today; $7 on Starter.",
      "unit": "$/mo", "step": "0.01"},
     {"key": "hosting_postgres_usd", "label": "Postgres", "hint": "The real database.",
      "unit": "$/mo", "step": "0.01"},
@@ -143,7 +151,8 @@ def finance(db: Session = Depends(get_db), current_user: User = Depends(team_acc
     price_cents = billing.price_cents()
     price = price_cents / 100.0
 
-    fixed_monthly = (a["hosting_web_usd"] + a["hosting_postgres_usd"] + a["hosting_cron_usd"]
+    fixed_monthly = (a["hosting_workspace_usd"] + a["hosting_web_usd"]
+                     + a["hosting_postgres_usd"] + a["hosting_cron_usd"]
                      + a["hosting_domain_usd"])
     storage_per_campaign_month = a["gb_per_campaign"] * a["r2_usd_per_gb_month"]
 
@@ -261,6 +270,7 @@ def finance(db: Session = Depends(get_db), current_user: User = Depends(team_acc
             "repeat_label": billing.price_label(billing.repeat_price_cents()),
         },
         "fixed": {
+            "workspace_usd": a["hosting_workspace_usd"],
             "web_usd": a["hosting_web_usd"],
             "postgres_usd": a["hosting_postgres_usd"],
             "cron_usd": a["hosting_cron_usd"],

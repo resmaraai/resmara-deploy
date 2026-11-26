@@ -117,10 +117,10 @@ ok("the explanation rides in data-tip, not a native title",
 ok("a square can quote its own breakdown instead of the dictionary",
    "function tipFor(l, explain)" in console)
 ok("the hosting square lists what the monthly bill pays for",
-   all(bit in console for bit in ("hostingTip", "Web service · ", "Database · ",
-                                  "Publisher cron · ", "Domain · ", "Total ")))
+   all(bit in console for bit in ("hostingTip", "Render workspace · ", "Web service · ",
+                                  "Database · ", "Publisher cron · ", "Domain · ", "Total ")))
 ok("the cost-per-sale square lists its parts with live figures",
-   all(bit in console for bit in ("costTip", "Stripe · ", "Model and photo tagging · ",
+   all(bit in console for bit in ("costTip", "Stripe · ", "Models and image edits · ",
                                   "Photo storage · ", "Hosting share · ", "Refund buffer · ")))
 ok("one card, fixed, so a section's overflow cannot clip it",
    "#tipCard{position:fixed" in console and "function showTip(" in console)

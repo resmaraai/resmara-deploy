@@ -3728,14 +3728,16 @@ function renderFinance(){
   const hostingTip = [
     'The bill that arrives whether or not we sell anything:',
     '',
+    'Render workspace · ' + money(f.workspace_usd) + ' — the team seat on Render’s bill',
     'Web service · ' + money(f.web_usd) + ' — the public site, sign-in, the admin console and the API',
     'Database · ' + money(f.postgres_usd) + ' — Postgres: accounts, campaigns, posts, orders, receipts',
     'Publisher cron · ' + money(f.cron_usd) + ' — the job that sends scheduled posts on time',
     'Domain · ' + money(f.domain_usd) + ' — resmara.com at GoDaddy, about $14 a year divided by twelve',
     '',
     'Total ' + money(f.total_monthly_usd) + ' a month · ' + money(f.annual_usd) + ' a year.',
-    'Plans assumed: Render Starter web + Basic Postgres. Both are on the free plan today, so the '
-      + 'only line actually being charged is the domain.',
+    'What is actually charged: the Render workspace seat, the 256 MB Postgres and the publisher '
+      + 'cron (billed together at $25 a month), and the domain. The web service is still on Render’s '
+      + 'free plan — it sleeps when idle, so the first visit of the day waits about 50 seconds.',
     (d.ledger && d.ledger.entries ? 'The Start-up costs ledger records ' + money(d.ledger.monthly_recurring_usd)
                                   + ' a month actually repeating.'
       : 'The Start-up costs ledger has no rows yet, so nothing here is recorded as actually paid.')
@@ -3744,7 +3746,8 @@ function renderFinance(){
     'What one ' + d.price.label + ' campaign costs us before it sells:',
     '',
     'Stripe · ' + money(u.stripe_fee_usd) + ' — ' + A.stripe_pct + '% + ' + money(A.stripe_fixed_usd) + ' on every charge',
-    'Model and photo tagging · ' + money(u.engine_usd) + ' — the engine writes the plan and the posts',
+    'Models and image edits · ' + money(u.engine_usd) + ' — the plan and post copy (about 160k tokens '
+      + 'a build) plus 14 designed posts and 6 ad creatives on gpt-image-2.6',
     'Photo storage · ' + money(u.storage_usd) + ' — ' + A.gb_per_campaign + ' GB per campaign at '
       + money(A.r2_usd_per_gb_month) + '/GB-month',
     'Hosting share · ' + money(u.hosting_usd) + ' — one campaign’s slice of the monthly bill at '
@@ -3818,7 +3821,7 @@ function renderFinance(){
     const byKey = {}; (d.fields || []).forEach(f => { byKey[f.key] = f; });
     const groups = [
       ['Each campaign', ['engine_cost_per_campaign_usd', 'gb_per_campaign', 'refund_buffer_pct']],
-      ['Hosting each month', ['hosting_web_usd', 'hosting_postgres_usd', 'hosting_cron_usd', 'hosting_domain_usd']],
+      ['Hosting each month', ['hosting_workspace_usd', 'hosting_web_usd', 'hosting_postgres_usd', 'hosting_cron_usd', 'hosting_domain_usd']],
       ['Agents', ['campaigns_per_agent_per_year', 'retention_years', 'planning_volume_per_month']],
       ['Goal', ['target_margin_pct']],
     ];

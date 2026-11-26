@@ -92,8 +92,9 @@ def main() -> int:
     expected_be = -(-f["total_monthly_usd"] // b["per_sale_after_delivery_usd"])  # ceil
     check("break-even rounds up, never down", b["campaigns_per_month"] == int(expected_be),
           "%s vs %s" % (b["campaigns_per_month"], expected_be))
-    check("hosting is the four line items added up",
-          abs(round(f["web_usd"] + f["postgres_usd"] + f["cron_usd"] + f["domain_usd"], 2)
+    check("hosting is the five line items added up",
+          abs(round(f["workspace_usd"] + f["web_usd"] + f["postgres_usd"] + f["cron_usd"]
+                    + f["domain_usd"], 2)
               - f["total_monthly_usd"]) <= 0.01, str(f["total_monthly_usd"]))
     check("fixed cost is annualised correctly",
           abs(f["annual_usd"] - f["total_monthly_usd"] * 12) <= 0.05, str(f["annual_usd"]))
@@ -116,6 +117,7 @@ def main() -> int:
 
     # ── assumptions: refused when wrong, effective when right ─────────────────
     before = body["unit"]["contribution_usd"]
+    eng0 = body["assumptions"]["engine_cost_per_campaign_usd"]
     check("an unknown assumption is refused",
           client.put("/api/admin/finance/assumptions", headers=admin,
                      json={"values": {"nonsense": 1}}).status_code == 400)
@@ -126,16 +128,16 @@ def main() -> int:
           client.put("/api/admin/finance/assumptions", headers=admin,
                      json={"values": {"engine_cost_per_campaign_usd": "cheap"}}).status_code == 400)
     r = client.put("/api/admin/finance/assumptions", headers=admin,
-                   json={"values": {"engine_cost_per_campaign_usd": 5.10}})
+                   json={"values": {"engine_cost_per_campaign_usd": eng0 + 5.0}})
     check("a real change saves", r.status_code == 200, str(r.status_code))
     after = client.get("/api/admin/finance", headers=admin).json()
     check("and it moves the model", abs(after["unit"]["contribution_usd"] - (before - 5.0)) <= 0.02,
           "%s -> %s" % (before, after["unit"]["contribution_usd"]))
     check("and it is remembered",
-          abs(after["assumptions"]["engine_cost_per_campaign_usd"] - 5.10) <= 0.001,
+          abs(after["assumptions"]["engine_cost_per_campaign_usd"] - (eng0 + 5.0)) <= 0.001,
           str(after["assumptions"]["engine_cost_per_campaign_usd"]))
     client.put("/api/admin/finance/assumptions", headers=admin,
-               json={"values": {"engine_cost_per_campaign_usd": 0.10}})
+               json={"values": {"engine_cost_per_campaign_usd": eng0}})
 
     # ── real money shows up ───────────────────────────────────────────────────
     with SessionLocal() as db:
