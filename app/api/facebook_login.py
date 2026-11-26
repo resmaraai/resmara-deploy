@@ -143,12 +143,14 @@ async def facebook_start(request: Request, payload: dict | None = None, db: Sess
     # Kept on the server against the state's nonce: the Facebook redirect only carries the state.
     source = payload.get("source") if isinstance(payload.get("source"), dict) else None
     invite = str(payload.get("invite_code") or "").strip()[:64]
-    if source or invite:
-        nonce = fb.read_state(state).get("n")
-        db.add(Event(event_type="facebook_signup_context",
-                     payload={"n": nonce, "source": {str(k)[:40]: str(v)[:200] for k, v in (source or {}).items()},
-                              "invite": invite}))
-        db.commit()
+    # The "Send me marketing tips" box, ticked by default (Adam, 25 Nov); unticked means no
+    # marketing or follow-up emails, only account emails.
+    marketing = payload.get("marketing_optin") is not False
+    nonce = fb.read_state(state).get("n")
+    db.add(Event(event_type="facebook_signup_context",
+                 payload={"n": nonce, "source": {str(k)[:40]: str(v)[:200] for k, v in (source or {}).items()},
+                          "invite": invite, "marketing": marketing}))
+    db.commit()
     return {"redirect_url": fb.dialog_url(state), "terms_version": version}
 
 
@@ -217,6 +219,7 @@ async def facebook_callback(request: Request, background: BackgroundTasks, code:
                     terms_accepted_at=datetime.now(timezone.utc),
                     terms_version=str(consent.get("v") or fb.TERMS_VERSION)[:40],
                     signup_ip=ip or None, signup_ua=ua or None,
+                    marketing_optin=context.get("marketing") is not False,
                     is_admin=email in {a.strip().lower() for a in (settings.ADMIN_EMAILS or "").split(",") if a.strip()})
         db.add(user)
         db.flush()

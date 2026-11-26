@@ -2096,7 +2096,7 @@ function paintEmail(){
   const parts = ['emSeries', 'emBrought', 'emTags'];
   if (!e) {
     h.innerHTML = hero({eyebrow: 'Email campaigns · last 30 days', big: 'Not readable yet', small: 'the back end did not answer',
-      steps: [{n: '—', l: 'On the list'}, {n: '—', l: 'Opened'}, {n: '—', l: 'Clicked'}, {n: '—', l: 'Bought after an email'}]});
+      steps: [{n: '—', l: 'Open rate'}, {n: '—', l: 'Click rate'}, {n: '—', l: 'Bounce rate'}, {n: '—', l: 'Bought after an email'}]});
     parts.forEach(id => { const el = $(id); if (el) { el.className = 'hint'; el.textContent = 'Appears once the back end answers.'; } });
     const s = $('sum-email'); if (s) s.textContent = 'not readable';
     return;
@@ -2108,8 +2108,9 @@ function paintEmail(){
     small: on ? (e.audience && e.audience.name ? esc(e.audience.name) : 'Resmara clients') + (e.audience && e.audience.last_sync ? ' · last sign-up ' + esc(when(e.audience.last_sync)) : '')
               : esc(e.why || 'Mailchimp is not connected yet'),
     steps: [
-      {n: on ? Number(e.opened || 0).toLocaleString('en-US') : '—', l: 'Opened', s: on ? 'unique opens, all campaigns' : 'needs Mailchimp'},
-      {n: on ? Number(e.clicked || 0).toLocaleString('en-US') : '—', l: 'Clicked', s: on ? 'unique clicks, all campaigns' : 'needs Mailchimp'},
+      {n: on && e.open_rate != null ? e.open_rate + '%' : '—', l: 'Open rate', s: on ? (e.sent ? Number(e.opened || 0).toLocaleString('en-US') + ' opened of ' + Number(e.sent).toLocaleString('en-US') + ' sent' : 'nothing sent yet') : 'needs Mailchimp'},
+      {n: on && e.click_rate != null ? e.click_rate + '%' : '—', l: 'Click rate', s: on ? (e.sent ? Number(e.clicked || 0).toLocaleString('en-US') + ' clicked' : 'nothing sent yet') : 'needs Mailchimp'},
+      {n: on && e.bounce_rate != null ? e.bounce_rate + '%' : '—', l: 'Bounce rate', s: on ? (e.sent ? Number(e.bounced || 0).toLocaleString('en-US') + ' bounced' : 'nothing sent yet') : 'needs Mailchimp', cls: e.bounce_rate > 2 ? 'warn' : ''},
       {n: Number(e.paying || 0).toLocaleString('en-US'), l: 'Bought after an email', s: 'counted here, and real', cls: e.paying ? 'good' : ''},
       {n: e.unsubscribed === null || e.unsubscribed === undefined ? '—' : Number(e.unsubscribed).toLocaleString('en-US'), l: 'Unsubscribed', s: 'never emailed marketing again'}]});
 
@@ -2124,11 +2125,13 @@ function paintEmail(){
           '<div class="chips">' + (sr.on ? '<span class="pill ok">On</span>' : '<span class="pill warn">Off</span>') + '</div>' +
           '<div><button class="tk-toggle" data-series="' + esc(sr.key) + '" data-on="' + (sr.on ? '1' : '0') + '">' + (sr.on ? 'Turn off' : 'Turn on') + '</button></div>' +
         '</div>' +
-        '<div class="scrollx" style="margin-top:8px"><table style="min-width:520px"><thead><tr><th style="min-width:200px">email</th><th>sent</th><th>opened</th><th>clicked</th><th>last sent</th></tr></thead><tbody>' +
+        '<div class="scrollx" style="margin-top:8px"><table style="min-width:640px"><thead><tr><th style="min-width:200px">email</th><th>sent</th><th>open rate</th><th>click rate</th><th>bounced</th><th>unsubscribed</th><th>last sent</th></tr></thead><tbody>' +
         (sr.emails || []).map(em => '<tr><td>' + esc(em.name) + (em.in_mailchimp ? '' : ' <span class="pill warn">not built yet</span>') + '</td>' +
-          '<td>' + (em.sent === null ? '—' : esc(String(em.sent))) + '</td>' +
-          '<td>' + (em.opened === null ? '—' : esc(String(em.opened))) + '</td>' +
-          '<td>' + (em.clicked === null ? '—' : esc(String(em.clicked))) + '</td>' +
+          '<td>' + (em.sent == null ? '—' : esc(String(em.sent))) + '</td>' +
+          '<td>' + (em.open_rate == null ? '—' : esc(em.open_rate + '%') + ' <span class="hint">(' + esc(String(em.opened)) + ')</span>') + '</td>' +
+          '<td>' + (em.click_rate == null ? '—' : esc(em.click_rate + '%') + ' <span class="hint">(' + esc(String(em.clicked)) + ')</span>') + '</td>' +
+          '<td>' + (em.bounced == null ? '—' : esc(String(em.bounced)) + (em.bounce_rate != null ? ' <span class="hint">(' + esc(em.bounce_rate + '%') + ')</span>' : '')) + '</td>' +
+          '<td>' + (em.unsubscribed == null ? '—' : esc(String(em.unsubscribed))) + '</td>' +
           '<td>' + (em.sent_at ? esc(when(em.sent_at)) : '—') + '</td></tr>').join('') +
         '</tbody></table></div></div>').join('') +
         (e.series_connected ? '' : '<p class="hint" style="margin:10px 0 0">' + esc(e.series_why || 'Mailchimp is not connected, so no email has numbers yet.') + '</p>');

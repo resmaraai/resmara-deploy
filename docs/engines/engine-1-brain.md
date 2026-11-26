@@ -92,6 +92,9 @@ Two different things, kept apart:
 
 ### 6. Looking after every new agent (onboarding emails)
 
+> **Changed 25 Nov (Adam):** these emails move to Mailchimp (Engine 9, "Welcome and check-ins")
+> so every one is tracked. The app sends them only until Mailchimp is connected.
+
 From **support@resmara.com**, written as **Adam, Resmara's customer support**. Personal, short,
 one clear next step. AI writes each one from the agent's real account facts.
 

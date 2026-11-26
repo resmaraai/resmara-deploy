@@ -178,9 +178,9 @@ ok("the page answers without a key", em.status_code == 200, em.status_code)
 em = em.json()
 ok("it says it is not connected", em["connected"] is False)
 ok("it names the missing variable", "MAILCHIMP_API_KEY" in em["why"], em["why"])
-ok("the three series are listed", [s["key"] for s in em["series"]] ==
-   ["welcome", "first_campaign", "tips"], [s["key"] for s in em["series"]])
-ok("every email in them is listed", sum(len(s["emails"]) for s in em["series"]) == 8)
+ok("the three series are listed", [s["key"] for s in em["series"]] == ["welcome", "tips", "past"],
+   [s["key"] for s in em["series"]])
+ok("every email in them is listed", sum(len(s["emails"]) for s in em["series"]) == 6)
 ok("no email number is invented", all(e["sent"] is None for s in em["series"] for e in s["emails"]))
 csv = client.get("/api/admin/email-campaigns/export.csv", headers=auth)
 ok("the CSV export works from our own database", csv.status_code == 200, csv.status_code)

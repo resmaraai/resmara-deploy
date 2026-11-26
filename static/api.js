@@ -235,13 +235,15 @@
   // The Terms box is ticked before any of this is called: the server refuses to start the
   // Facebook dialog without it, and the consent it records is what the new account is stamped
   // with. The redirect comes back as a one-time ticket, never as a token in the URL.
-  function facebookStart(termsVersion, inviteCode) {
+  function facebookStart(termsVersion, inviteCode, marketingOptin) {
     // The visit's own tags travel with the Facebook door, so Marketing can credit the ad or
     // email that brought the agent (Engine 9, section 1a). The invite code is for private beta.
     var body = { terms_accepted: true, terms_version: termsVersion || TERMS_VERSION };
     var source = signupSource();
     if (source && Object.keys(source).length) body.source = source;
     if (inviteCode) body.invite_code = String(inviteCode).trim().slice(0, 64);
+    // The "Send me marketing tips" box: ticked unless the agent unticked it.
+    body.marketing_optin = marketingOptin !== false;
     return json('/api/auth/facebook/start', 'POST', body);
   }
 

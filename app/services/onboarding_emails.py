@@ -16,6 +16,12 @@ What is code here, on purpose:
 The wording comes from templates that carry the facts. When a model is configured it rewrites the
 template in Adam's voice; if the model is unavailable or returns nothing, the template is what the
 agent reads - a real email, not silence.
+
+Since 25 Nov (Adam): once Mailchimp is connected, every follow-up email is a Mailchimp series, so
+each one is tracked (sent, opened, clicked, bounced, unsubscribed). From then on this module sends
+nothing: a new account goes onto the Mailchimp list at sign-up, tagged "signed up, no campaign yet",
+and the "Welcome and check-ins" series (day 0, 3, 7, 14) runs there. Until Mailchimp is connected,
+the emails below keep going out, so no new agent is ever left without them.
 """
 import hashlib
 import hmac
@@ -186,8 +192,18 @@ def _send(db, user: User, step: str, f: dict) -> dict:
     return {"step": step, "to": user.email, "sent": bool(ok), "subject": subject}
 
 
+def mailchimp_owns() -> bool:
+    """Mailchimp sends the follow-ups once it is connected (Adam, 25 Nov)."""
+    from app.services import mailchimp
+    return mailchimp.configured()
+
+
 def send_welcome(user: User, db) -> dict:
-    """The first email, at the moment the account exists. Never to a test or closed account."""
+    """The first email, at the moment the account exists. Never to a test or closed account.
+    With Mailchimp connected, the account goes onto the list instead and its series sends it."""
+    if mailchimp_owns():
+        from app.services import mailchimp
+        return {"step": "welcome", "sent": False, "reason": "mailchimp", "list": mailchimp.add_signup(db, user)}
     f = account_facts(db, user)
     if f["test"] or f["closed"] or not f["opted_in"] or _already_sent(db, user, "welcome"):
         return {"step": "welcome", "sent": False, "reason": "not eligible"}
@@ -196,6 +212,8 @@ def send_welcome(user: User, db) -> dict:
 
 def run_due(db, now: datetime | None = None) -> dict:
     """Send every onboarding email whose day has come. Idempotent: one email per step, ever."""
+    if mailchimp_owns():
+        return {"sent": [], "skipped": 0, "stopped_after_launch": 0, "owner": "mailchimp"}
     now = now or datetime.now(timezone.utc)
     sent, skipped, stopped = [], 0, []
     users = db.query(User).all()

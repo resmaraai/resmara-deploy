@@ -211,10 +211,16 @@ const FB_TERMS = '<label class="terms-agree" style="display:flex;gap:10px;align-
  + '<a href="privacy.html" target="_blank" rel="noopener" style="color:#12354d;font-weight:700;text-decoration:underline">Privacy Policy</a>, including the '
  + '<b>arbitration agreement and class action waiver</b> in section 17 of the Terms.</span></label>';
 
+// Marketing tips: ticked by default, untick to say no (Adam, 25 Nov). Account emails always go.
+const FB_TIPS = '<label class="terms-agree" style="display:flex;gap:10px;align-items:flex-start;margin:10px 0 4px;font-size:14px;line-height:1.45;color:#12354d;cursor:pointer">'
+ + '<input type="checkbox" id="fbTips" checked style="margin-top:3px;width:18px;height:18px;flex:0 0 18px">'
+ + '<span>Send me marketing tips for my listings. Unsubscribe any time.</span></label>';
+
 function fbLoginPopup() {
  show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>Log in with Facebook</h2>
  <p>Resmara does everything through Facebook: your Page, your Instagram and your ad account. Logging in connects them, so there is nothing else to set up first.</p>
  ${FB_TERMS}
+ ${FB_TIPS}
  <details class="invite-toggle"><summary>Have an invite code?</summary><label class="field">Invite code<input id="fbInvite" maxlength="64" autocomplete="off" spellcheck="false" placeholder="From your invitation"></label></details>
  <p class="fine" id="fbStatus" role="status"></p>
  <div class="modal-actions">
@@ -233,7 +239,8 @@ async function fbLoginBegin() {
  if (go) { go.disabled = true; go.textContent = 'Opening Facebook…'; }
  try {
   const invite = (document.getElementById('fbInvite') || {}).value || '';
-  const reply = await RM.facebookStart(RM.termsVersion ? RM.termsVersion() : undefined, invite);
+  const tips = document.getElementById('fbTips');
+  const reply = await RM.facebookStart(RM.termsVersion ? RM.termsVersion() : undefined, invite, tips ? tips.checked : true);
   if (reply && reply.redirect_url) { location.href = reply.redirect_url; return; }
   throw new Error('Facebook did not answer with a login window.');
  } catch (err) {
