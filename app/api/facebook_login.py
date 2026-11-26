@@ -139,7 +139,30 @@ async def facebook_start(request: Request, payload: dict | None = None, db: Sess
     db.add(Event(event_type="facebook_login_attempt", payload={"ip": ip, "step": "start"}))
     db.commit()
     state = fb.make_state(version)
+    # Where this visit came from (Engine 9, section 1a) and any invite code (Engine 1, section 3).
+    # Kept on the server against the state's nonce: the Facebook redirect only carries the state.
+    source = payload.get("source") if isinstance(payload.get("source"), dict) else None
+    invite = str(payload.get("invite_code") or "").strip()[:64]
+    if source or invite:
+        nonce = fb.read_state(state).get("n")
+        db.add(Event(event_type="facebook_signup_context",
+                     payload={"n": nonce, "source": {str(k)[:40]: str(v)[:200] for k, v in (source or {}).items()},
+                              "invite": invite}))
+        db.commit()
     return {"redirect_url": fb.dialog_url(state), "terms_version": version}
+
+
+def _signup_context(db: Session, nonce: str | None) -> dict:
+    """The source and invite code saved at /facebook/start for this sign-in, if any."""
+    if not nonce:
+        return {}
+    since = datetime.now(timezone.utc) - timedelta(seconds=fb.STATE_TTL_SECONDS + 60)
+    rows = (db.query(Event).filter(Event.event_type == "facebook_signup_context", Event.created_at >= since)
+            .order_by(Event.id.desc()).limit(500).all())
+    for row in rows:
+        if isinstance(row.payload, dict) and row.payload.get("n") == nonce:
+            return row.payload
+    return {}
 
 
 @router.get("/facebook/callback")
@@ -176,7 +199,16 @@ async def facebook_callback(request: Request, background: BackgroundTasks, code:
             # Same person, same address: link the Facebook to the account they already have.
             user.facebook_id = fb_id
             user.facebook_name = name
+    context = _signup_context(db, consent.get("n")) if user is None else {}
     if user is None:
+        from app.services.access import signup_block_reason
+        blocked = None
+        if settings.SIGNUP_EMAILS or settings.SIGNUP_CODE:     # private beta is switched on
+            blocked = signup_block_reason(email, context.get("invite"), settings.SIGNUP_EMAILS,
+                                          settings.SIGNUP_CODE, settings.ADMIN_EMAILS)
+        if blocked:
+            # Private beta: no account without the invite code (or an invited address).
+            return _back({"fb": "error", "reason": blocked[:160]}, format)
         user = User(email=email or f"fb-{fb_id}@facebook.resmara.invalid",
                     hashed_password=get_password_hash(secrets.token_urlsafe(32)),
                     name=name, facebook_id=fb_id, facebook_name=name,
@@ -191,7 +223,9 @@ async def facebook_callback(request: Request, background: BackgroundTasks, code:
         created = True
         try:
             from app.services import attribution
-            attribution.stamp_signup(db, user, {"source": "facebook"})
+            # The visit's own tags (utm, fbclid, ad id, referrer) decide the channel; "facebook" is
+            # only the door, so it never stands in for them.
+            attribution.stamp_signup(db, user, context.get("source") or {"door": "facebook"})
         except Exception:  # noqa: BLE001 - attribution must never cost a sign-up
             pass
         db.add(Event(user_id=user.id, event_type="user_registered",

@@ -470,7 +470,9 @@ async function buildCampaignFromBackend(){
     const st=(await RM.buildStatus(boostId).catch(()=>null))||{};
     if(progress?.isConnected){
      const secs=Math.round((Date.now()-waitStart)/1000);
-     progress.textContent=`Running the content engine… ${secs}s${st.posts_created?` · ${st.posts_created} posts drafted`:''}`;
+     // Engine 3, section 3: what it is doing right now, in the agent's words.
+     const STAGE={'photos tagged':'Picking the best photos','searching the listing sites':'Searching Zillow, Realtor.com, Redfin and other sites',"building the home's file":"Building the home’s file",'planning the calendar':'Planning your 14 days','calendar drafted':'Writing 14 days of posts in your voice','writing photo copy':'Writing 14 days of posts in your voice','writing posts':'Writing 14 days of posts in your voice','designing the posts':'Designing your posts, the ad and your listing page'};
+     progress.textContent=`${STAGE[st.stage]||'Reading your listing'}… ${secs}s${st.posts_created?` · ${st.posts_created} posts drafted`:''}`;
     }
     if(st.status==='error') throw new Error(st.error||'The content engine stopped without an error message.');
     if(st.status==='done'){finalStatus=st;last='done';break}

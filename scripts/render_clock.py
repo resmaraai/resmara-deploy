@@ -130,6 +130,12 @@ def main() -> int:
         run_step("own posts", "/api/admin/listings/own-posts", 240, quiet_when='"found":0')
         # Engine 5: every live listing website renders and has its photos.
         run_step("listing websites", "/api/admin/sites/check", 180, quiet_when='"flagged":[]')
+        # Engine 1, Part B 7: the Weekly Meta review, Monday mornings (one per week, server-side).
+        if now.weekday() == 0:
+            run_step("weekly Meta review", "/api/admin/meta/weekly-review/run", 180, quiet_when='"already_done"')
+        # Engine 4, 9b: the platform rules (banned hashtags, Meta's housing ad rules), monthly.
+        if now.day == 1:
+            run_step("platform rules", "/api/admin/platform-rules/refresh", 300, quiet_when='"fresh"')
         # Engine 1 §6: welcome / day 3 / day 7 / day 14, once each, stopping at the first
         # launched campaign. Idempotent server-side, so a doubled tick sends nothing twice.
         status, body = post_body("/api/admin/onboarding/emails/run", 180)

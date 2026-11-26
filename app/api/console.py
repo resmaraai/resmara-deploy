@@ -11,7 +11,10 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel
+from app.core.config import settings
+from app.core.security import get_current_user_optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -441,3 +444,63 @@ def activity(limit: int = 60, kind: Optional[str] = None,
             "address": boost.address if boost else None,
         })
     return out
+
+
+@router.get("/admin/connections/setup")
+def setup_stuck(user=Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
+    """Engine 1, Part C 5a: how many agents are stuck on each setup item, most first."""
+    from app.services import meta_engine
+    counts = meta_engine.team_counts(db)
+    rows = [{"key": k, "line": meta_engine.OUTCOMES.get(k, {}).get("line", k), "agents": n}
+            for k, n in counts.items() if k != "ok"]
+    rows.sort(key=lambda r: (-r["agents"], meta_engine.OUTCOMES.get(r["key"], {}).get("rank", 99)))
+    return {"items": rows, "all_set": counts.get("ok", 0)}
+
+
+# ---------------------------------------------------------------- Engine 1, Part B 7: weekly Meta review
+@router.get("/admin/meta/weekly-review")
+def meta_weekly_review(user=Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
+    """The latest Weekly Meta review (or none yet)."""
+    from app.db.session import Event
+    ev = (db.query(Event).filter(Event.event_type == "meta_weekly_review").order_by(Event.id.desc()).first())
+    return {"review": ({"id": ev.id, "created_at": ev.created_at.isoformat() if ev.created_at else None,
+                        **(ev.payload or {})} if ev else None)}
+
+
+class _ReviewDecision(BaseModel):
+    index: int
+    approve: bool
+
+
+@router.post("/admin/meta/weekly-review/{review_id}/decide")
+def meta_review_decide(review_id: int, body: _ReviewDecision, user=Depends(team_access.needs("agents")),
+                       db: Session = Depends(get_db)):
+    from app.services import meta_engine
+    try:
+        return meta_engine.decide_suggestion(db, review_id, body.index, body.approve,
+                                             who=(user.name or user.email or ""))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/admin/meta/weekly-review/run")
+async def meta_review_run(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db),
+                          user=Depends(get_current_user_optional)):
+    """Run by the clock on Mondays (or by an operator). Saves one review per week."""
+    ok_token = bool(settings.PUBLISH_TOKEN) and x_resmara_token == settings.PUBLISH_TOKEN
+    if not ok_token and not (user is not None and getattr(user, "is_admin", False)):
+        raise HTTPException(status_code=403, detail="Operator only")
+    from app.services import meta_engine
+    return await meta_engine.weekly_review(db)
+
+
+@router.post("/admin/platform-rules/refresh")
+async def platform_rules_refresh(force: bool = False, x_resmara_token: str = Header(default=""),
+                                 db: Session = Depends(get_db), user=Depends(get_current_user_optional)):
+    """Engine 4, 9b: the monthly re-read of the platforms' rules (banned hashtags, Meta's housing
+    ad rules). Run by the clock on the 1st, or by an operator."""
+    ok_token = bool(settings.PUBLISH_TOKEN) and x_resmara_token == settings.PUBLISH_TOKEN
+    if not ok_token and not (user is not None and getattr(user, "is_admin", False)):
+        raise HTTPException(status_code=403, detail="Operator only")
+    from app.services import learning_library
+    return await learning_library.refresh_platform_rules(db, force=force)

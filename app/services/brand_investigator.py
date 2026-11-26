@@ -181,6 +181,85 @@ def meta_facts(db, user: User) -> Dict[str, Any]:
     }
 
 
+# --------------------------------------------------------------------------- the social audit
+SOCIAL_AUDIT_SYSTEM = """You study one real estate agent's own recent social posts (images and captions) for a
+marketing studio. Report only what you can see. POSITIVE ONLY: skip politics, complaints, rants, anything
+negative, divisive or sarcastic. PERSONA, NOT PERSONAL: never mention family, children, health, religion or
+politics. Reply with ONE JSON object:
+{"posting": "how often and what they post about, one line", "best": "what gets the most response, one line",
+ "voice": "how they write: tone, phrases they repeat, sign-off, emoji habits, one or two lines",
+ "look": "their graphics and photo style: colours, lettering, layouts, one line",
+ "own_logo": true|false, "hashtags": ["tags they repeat"], "signoff": "their sign-off or empty"}"""
+
+
+async def social_posts(db, user: User, *, client=None) -> Dict[str, Any]:
+    """The agent's own last 30 Instagram posts and recent Page posts, read with their own Meta
+    connection (Engine 2, section 2: Facebook Page and Instagram come first). Empty when they only
+    have a personal profile: Meta doesn't let apps read those."""
+    from app.services import meta_engine
+    conn = meta_engine.connection_for(db, user.id)
+    out: Dict[str, Any] = {"instagram": [], "page": []}
+    if conn is None:
+        return out
+    base = settings.graph_base
+    owns = client is None
+    client = client or httpx.AsyncClient(timeout=20)
+    try:
+        token = conn.page_access_token or conn.access_token or ""
+        if conn.ig_user_id and token:
+            try:
+                r = await client.get(f"{base}/{conn.ig_user_id}/media", params={
+                    "fields": "caption,media_type,media_url,thumbnail_url,timestamp,like_count,comments_count",
+                    "limit": 30, "access_token": token})
+                for m in (r.json() or {}).get("data") or []:
+                    out["instagram"].append({"caption": _clean(m.get("caption"), 600),
+                                             "image": m.get("thumbnail_url") or m.get("media_url") or "",
+                                             "likes": m.get("like_count"), "comments": m.get("comments_count"),
+                                             "at": m.get("timestamp")})
+            except Exception:  # noqa: BLE001 - one source fewer
+                pass
+        if conn.page_id and conn.page_access_token:
+            try:
+                r = await client.get(f"{base}/{conn.page_id}/posts", params={
+                    "fields": "message,created_time,full_picture", "limit": 25,
+                    "access_token": conn.page_access_token})
+                for m in (r.json() or {}).get("data") or []:
+                    if m.get("message") or m.get("full_picture"):
+                        out["page"].append({"caption": _clean(m.get("message"), 600),
+                                            "image": m.get("full_picture") or "", "at": m.get("created_time")})
+            except Exception:  # noqa: BLE001
+                pass
+    finally:
+        if owns:
+            await client.aclose()
+    return out
+
+
+async def social_audit(posts: Dict[str, Any]) -> Dict[str, Any]:
+    """A vision AI studies their recent images and captions (the Boost "social audit")."""
+    from app.services import llm
+    items = (posts.get("instagram") or []) + (posts.get("page") or [])
+    if not items or not llm.llm_available():
+        return {}
+    lines = []
+    for i, m in enumerate(items[:40], 1):
+        stats = ""
+        if m.get("likes") is not None:
+            stats = f" ({m.get('likes')} likes, {m.get('comments') or 0} comments)"
+        lines.append(f"{i}. {m.get('at') or ''}{stats}: {scrub_personal(m.get('caption') or '')[:300]}")
+    images = [m["image"] for m in items if m.get("image")][:8]
+    try:
+        text = await llm.chat_text(SOCIAL_AUDIT_SYSTEM, "THEIR RECENT POSTS:\n" + "\n".join(lines),
+                                   model=settings.OPENAI_MODEL_VISION or settings.OPENAI_MODEL,
+                                   images=images, max_completion_tokens=600, timeout=60.0)
+        found = llm._json_object(text) or {}
+    except Exception as exc:  # noqa: BLE001
+        log.info("social audit failed: %s", exc)
+        return {}
+    return {k: (scrub_personal(str(v))[:400] if isinstance(v, str) else v) for k, v in found.items()
+            if k in ("posting", "best", "voice", "look", "own_logo", "hashtags", "signoff")}
+
+
 # --------------------------------------------------------------------------- building
 def assemble(found: Dict[str, Any], facts: Dict[str, Any]) -> Dict[str, Any]:
     """The investigator's answer + Meta's facts -> the brand kit in My Brand's shape."""
@@ -265,11 +344,30 @@ def merge(existing: Dict[str, Any], fresh: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def fact_confidence(kit: Dict[str, Any], found: Dict[str, Any], facts: Dict[str, Any]) -> Dict[str, str]:
+    """Engine 2, section 3: each fact is "confirmed" (two places agree, or the state license lookup),
+    "found once", or "not found"."""
+    out: Dict[str, str] = {}
+    page_text = " ".join(str(facts.get(k) or "") for k in ("about", "phone", "website", "address")).lower()
+    for key in ("phone", "license", "company", "brokerLicense", "email", "website"):
+        value = str(kit.get(key) or "").strip()
+        if not value:
+            out[key] = "not found"
+            continue
+        src = str((kit.get("factSources") or {}).get(key) or "").lower()
+        digits = re.sub(r"\D", "", value)
+        on_page = bool(value.lower() in page_text or (digits and len(digits) >= 6 and digits in re.sub(r"\D", "", page_text)))
+        lookup = key in ("license", "brokerLicense") and any(w in src for w in ("dre.ca.gov", "license", "licens", ".gov"))
+        out[key] = "confirmed" if (lookup or (on_page and src and "facebook" not in src)) else "found once"
+    return out
+
+
 async def investigate(db, user: User) -> Dict[str, Any]:
     """Look the agent up and return their kit. Never raises for a missing source."""
     from app.services import llm
     facts = meta_facts(db, user)
     text = await site_text(facts.get("website") or "")
+    audit = await social_audit(await social_posts(db, user))
     found: Dict[str, Any] = {}
     note = ""
     if llm.llm_available():
@@ -278,6 +376,9 @@ async def investigate(db, user: User) -> Dict[str, Any]:
             about=_clean(facts["about"], 800), phone=facts["phone"] or "", website=facts["website"] or "none",
             address=facts["address"] or "", instagram=("@" + facts["instagram"]) if facts["instagram"] else "none",
             site_text=_clean(text, 4000))
+        if audit:
+            prompt += ("\n\nTHEIR OWN RECENT POSTS, STUDIED (use this first for the voice, the sign-off, what they "
+                       "post about and their look): " + json.dumps(audit)[:2500])
         try:
             reply = await llm.responses_text(prompt, model=settings.research_model, reasoning_effort="low",
                                              tools=[{"type": "web_search"}])
@@ -287,6 +388,15 @@ async def investigate(db, user: User) -> Dict[str, Any]:
     else:
         note = "Built from your Facebook Page; the web investigation runs once the AI is configured."
     kit = assemble(found if isinstance(found, dict) else {}, facts)
+    if audit:
+        # What their own posts show (section 2, "What it works out": posting habits and voice).
+        kit["postingHabits"] = audit.get("posting") or ""
+        kit["bestPosts"] = audit.get("best") or ""
+        if audit.get("signoff") and not kit.get("signoff"):
+            kit["signoff"] = _clean(audit["signoff"], 80)
+        kit["socialAudit"] = {"look": audit.get("look") or "",
+                              "own_logo": bool(audit.get("own_logo"))}
+    kit["confidence"] = fact_confidence(kit, found if isinstance(found, dict) else {}, facts)
     d = _now()
     kit["researched"] = f"{d.day} {d.strftime('%b %Y')}"
     if note:

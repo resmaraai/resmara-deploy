@@ -56,7 +56,14 @@ def clean_tag(tag: str) -> str:
 
 def allowed(tag: str) -> bool:
     bare = tag.lstrip("#").lower()
-    return bool(bare) and bare not in GENERIC_TAGS and not FAIR_HOUSING_TAGS.search(bare)
+    if not bare or bare in GENERIC_TAGS or FAIR_HOUSING_TAGS.search(bare):
+        return False
+    # Banned or restricted on Instagram, per the monthly platform rules refresh (Engine 4, 9b).
+    try:
+        from app.services.learning_library import banned_tags
+        return bare not in banned_tags()
+    except Exception:  # noqa: BLE001
+        return True
 
 
 def city_of(address: str) -> str:

@@ -1,25 +1,25 @@
 # Resmara engine tracker
 
-The engines, their brains and their stage. Each engine has one Build room task in the Team room. **Started:** 21 Nov 2026 · **Last updated:** 23 Nov 2026 (evening)
+The engines, their brains and their stage. Each engine has one Build room task in the Team room. **Started:** 21 Nov 2026 · **Last updated:** 25 Nov 2026
 
 **Stages now live in the Build room** (one task per engine; the five stages are defined in
 `docs/engines/README.md`). This list is the engines and their brains. As of 23 Nov 2026 every engine
 was at **1. Planned**: the PRs below were plans with no app code. Slice 1 is now built in PR #39
-(Ready for Dan), slice 2 in #40 and slice 3 in #41. Engine 1 Part A and Engine 9 were built by Dan on 23 Nov.
+(Ready for Dan), slice 2 in #40 and slice 3 in #41. Engine 1 Part A and Engine 9 were built by Dan on 23 Nov. #39, #40 and #41 are merged and live. On 25 Nov every brain was checked line by line against the live code; the gaps found are built in the brain-gaps PR (see `implementation-status.md`).
 
 | Engine | Build room task | Brain (plan PR) | Stage |
 |--------|-----------------|-----------------|-------|
-| Sign-up & Facebook connection (Engine 1) | #26 | `engine-1-brain.md` (#18) | 2. Ready for Dan (#39; Part A built by Dan) |
-| Brand kit (Engine 2) | #27 | `engine-2-brain.md` (#22) | 2. Ready for Dan (#39) |
-| Sign-up tour | #83 | `resmara-signup-tour-engine.md` (#23) | 2. Ready for Dan (#39) |
-| Listing link check (Engine 3) | #28 | `engine-3-brain.md` (#24) | 2. Ready for Dan (#39) |
-| Campaign build & pay to unlock (Engine 4) | #29 | `engine-4-brain.md` (#26) | 2. Ready for Dan (#39) |
-| Listing website (Engine 5) | #30 | `engine-5-brain.md` (#27, #28) | 2. Ready for Dan (#40) |
-| Live campaign: posting, ads, leads & reports (Engine 6) | #31 | `engine-6-brain.md` (#28) | 2. Ready for Dan (#40) |
-| Run it until it sells (Engine 8) | #33 | `engine-8-brain.md` (#29) | 2. Ready for Dan (#40) |
-| Marketing pages in the Team room (Engine 9) | #84 | `engine-9-brain.md` (#31) | Built by Dan (waiting on credentials) |
-| Billing (Engine 10) | #85 | `engine-10-brain.md` (#35) | 2. Ready for Dan (#41) |
-| Support & Ask Resmara (Engine 11) | #86 | `engine-11-brain.md` (#36) | 2. Ready for Dan (#41) |
+| Sign-up & Facebook connection (Engine 1) | #26 | `engine-1-brain.md` (#18) | 5. Live (#39) · gaps in the brain-gaps PR |
+| Brand kit (Engine 2) | #27 | `engine-2-brain.md` (#22) | 5. Live (#39) · gaps in the brain-gaps PR |
+| Sign-up tour | #83 | `resmara-signup-tour-engine.md` (#23) | 5. Live (#39) |
+| Listing link check (Engine 3) | #28 | `engine-3-brain.md` (#24) | 5. Live (#39) · gaps in the brain-gaps PR |
+| Campaign build & pay to unlock (Engine 4) | #29 | `engine-4-brain.md` (#26) | 5. Live (#39) · gaps in the brain-gaps PR |
+| Listing website (Engine 5) | #30 | `engine-5-brain.md` (#27, #28) | 5. Live (#40) |
+| Live campaign: posting, ads, leads & reports (Engine 6) | #31 | `engine-6-brain.md` (#28) | 5. Live (#40) · gaps in the brain-gaps PR |
+| Run it until it sells (Engine 8) | #33 | `engine-8-brain.md` (#29) | 5. Live (#40) · gaps in the brain-gaps PR |
+| Marketing pages in the Team room (Engine 9) | #84 | `engine-9-brain.md` (#31) | Built by Dan (waiting on credentials) · gaps in the brain-gaps PR |
+| Billing (Engine 10) | #85 | `engine-10-brain.md` (#35) | 5. Live (#41) |
+| Support & Ask Resmara (Engine 11) | #86 | `engine-11-brain.md` (#36) | 5. Live (#41) · gaps in the brain-gaps PR |
 
 (Engine 7 was folded into Engine 9.)
 

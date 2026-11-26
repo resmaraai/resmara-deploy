@@ -18,13 +18,15 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import logging
+import os
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.core.security import get_admin_user, get_current_user
+from app.core.security import get_admin_user, get_current_user, get_current_user_optional
 from app.core.config import settings
 from app.db.session import Event, HelpAnswer, HelpMiss, User, get_db
 from app.services import llm, team_access
@@ -37,7 +39,6 @@ MAX_ANSWER = 4000
 
 # How many questions the chat may put to the model per account per hour. The chat falls back to
 # the built-in library on a refusal, so a limit costs the agent nothing but a plainer answer.
-ASK_LIMIT_PER_HOUR = 40
 
 # The places the chat may tell an agent to go. Anything else is dropped rather than rendered as
 # a button that leads nowhere.
@@ -141,10 +142,16 @@ def approved_answers(db: Session = Depends(get_db)):
 
 # --- the chat itself ------------------------------------------------------------------
 
-ASK_SYSTEM = """You answer questions from real estate agents using Resmara, inside the app.
+ASK_SYSTEM = """You answer questions from real estate agents (or visitors) about Resmara, inside the app.
 
-You may use ONLY the answer library given to you. Do not invent features, prices, dates or
-policies. If the library does not answer the question, say so by returning sure=false.
+You may use ONLY what you are given: the guide, the answer library and, for a signed-in agent,
+their own account snapshot. Do not invent features, prices, dates or policies. Never claim to have
+done anything: you are read-only and cannot charge, cancel, post or change anything. If those
+sources do not answer the question, return sure=false.
+
+When the question is about the agent's own account ("why didn't my post go out?", "is my Facebook
+connected?"), answer from the snapshot, naming their real campaign or Page. A signed-out visitor has
+no snapshot: answer product questions only.
 
 Reply with ONE JSON object, nothing else:
 {"answer": "1-3 short sentences, plain English, no markdown", "sure": true|false, "go": "view-or-null"}
@@ -153,18 +160,115 @@ Reply with ONE JSON object, nothing else:
 setup, growth, photos - only when sending the agent to that page genuinely helps, otherwise null.
 If sure is false, answer must be an empty string."""
 
+ASK_MAX_CHARS = 500
+# Engine 11, section 3: 20 questions an hour per agent, and a daily cost cap (start at $5); past
+# the cap the chat answers from the library only (the browser's own matching), never the model.
+ASK_LIMIT_PER_HOUR = 20
+
+
+def _daily_cap_usd() -> float:
+    try:
+        return max(0.0, float(os.getenv("RESMARA_ASK_DAILY_USD", "5")))
+    except ValueError:
+        return 5.0
+
+
+def _usd(usage: dict) -> float:
+    """Rough dollars for one call's tokens (the chat model's list price per million tokens)."""
+    try:
+        per_in = float(os.getenv("RESMARA_ASK_PRICE_IN", "0.40"))
+        per_out = float(os.getenv("RESMARA_ASK_PRICE_OUT", "1.60"))
+    except ValueError:
+        per_in, per_out = 0.40, 1.60
+    u = usage or {}
+    return (int(u.get("prompt_tokens") or 0) * per_in + int(u.get("completion_tokens") or 0) * per_out) / 1_000_000
+
+
+def spent_today(db: Session) -> float:
+    start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = db.query(Event).filter(Event.event_type == "help_ask", Event.created_at >= start).all()
+    return sum(_usd((r.payload or {}).get("usage") or {}) for r in rows if isinstance(r.payload, dict))
+
+
+_GUIDE: dict = {}
+
+
+def guide_text() -> str:
+    """The help guide the chat reads (static/help/resmara-guide.md), cached by modification time."""
+    path = Path(__file__).resolve().parents[2] / "static" / "help" / "resmara-guide.md"
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return ""
+    if _GUIDE.get("mtime") != mtime:
+        _GUIDE.update(mtime=mtime, text=path.read_text(encoding="utf-8")[:16000])
+    return _GUIDE.get("text") or ""
+
+
+def account_snapshot(db: Session, user: User) -> str:
+    """The signed-in agent's own account, in plain lines (campaigns, connection, card, failed posts,
+    open requests). Nothing about anyone else."""
+    from app.db.session import Boost, Post, SupportTicket
+    lines = [f"Name: {user.name or '-'}"]
+    try:
+        from app.services import meta_engine
+        st = meta_engine.status(db, user)
+        caps = st.get("capabilities") or {}
+        lines.append("Facebook: " + (st.get("headline") or ("connected" if st.get("connected") else "not connected")))
+        if st.get("page"):
+            lines.append(f"Facebook Page: {st['page'].get('name')}")
+        if st.get("instagram"):
+            lines.append(f"Instagram: @{st['instagram'].get('username')}")
+        if st.get("ad_account"):
+            lines.append(f"Ad account: {st['ad_account'].get('name')}")
+        if caps:
+            lines.append("Can post to Facebook: %s; Instagram: %s; run the ad: %s" % (
+                "yes" if caps.get("fb_post") else "no", "yes" if caps.get("ig_post") else "no",
+                "yes" if caps.get("ad") else "no"))
+        for ln in (st.get("lines") or [])[:3]:
+            lines.append("Setup item open: " + str(ln.get("line") if isinstance(ln, dict) else ln))
+    except Exception:  # noqa: BLE001 - the snapshot is best-effort
+        pass
+    lines.append("Card saved: " + ("yes" if user.stripe_customer_id else "no"))
+    boosts = db.query(Boost).filter(Boost.user_id == user.id).order_by(Boost.id.desc()).limit(8).all()
+    for b in boosts:
+        posts = db.query(Post).filter(Post.boost_id == b.id).all()
+        failed = [p for p in posts if (p.publish_status or "") == "failed"]
+        held = [p for p in posts if (p.publish_status or "") == "held"]
+        state = "paused" if b.paused_at else ("live" if b.launched_at else ("built, locked" if not b.paid_at else "built, not launched"))
+        bit = f"Campaign {str(b.address or '').split(',')[0]}: {state}"
+        if b.until_sold:
+            bit += ", Run it until it sells on"
+        if failed:
+            note = (failed[0].failure_note or "").strip()[:140]
+            bit += f", {len(failed)} post(s) failed" + (f" ({note})" if note else "")
+        if held:
+            bit += f", {len(held)} post(s) held until Facebook is reconnected"
+        lines.append(bit)
+    if not boosts:
+        lines.append("Campaigns: none yet")
+    open_reqs = db.query(SupportTicket).filter(SupportTicket.user_id == user.id,
+                                               SupportTicket.status != "closed").count()
+    lines.append(f"Open support requests: {open_reqs}")
+    return "\n".join(lines)[:3000]
+
+
+def _ip(request: Request) -> str:
+    fwd = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    return fwd or (request.client.host if request.client else "")
+
 
 @router.post("/help/ask")
-async def ask(payload: AskIn, current_user: User = Depends(get_current_user),
-              db: Session = Depends(get_db)):
-    """The question the built-in library could not answer, put to the model over that library.
+async def ask(payload: AskIn, request: Request, db: Session = Depends(get_db),
+              current_user: Optional[User] = Depends(get_current_user_optional)):
+    """A question the browser's library could not settle, put to the model over the guide, the
+    answer library and (signed in) the agent's own account.
 
-    The model is not allowed to invent: it is handed the approved answers and told to return
-    ``sure: false`` when they do not cover the question. A false goes straight back to the
-    library-then-a-person path the chat already had, so a bad model answer can never reach an
-    agent - only a confident one built from text the team approved.
+    The model is not allowed to invent: it returns ``sure: false`` when those sources don't cover
+    the question, and a false goes straight back to the library-then-a-person path, so a bad model
+    answer never reaches anyone. Signed-out visitors get product answers only.
     """
-    question = (payload.question or "").strip()[:500]
+    question = (payload.question or "").strip()[:ASK_MAX_CHARS]
     if len(question) < 3:
         raise HTTPException(status_code=400, detail="A question is required")
     unavailable = {"answer": None, "sure": False, "go": None, "reason": "no_model"}
@@ -172,20 +276,25 @@ async def ask(payload: AskIn, current_user: User = Depends(get_current_user),
         return unavailable
 
     since = datetime.utcnow() - timedelta(hours=1)
-    used = (db.query(Event)
-            .filter(Event.user_id == current_user.id)
-            .filter(Event.event_type == "help_ask")
-            .filter(Event.created_at >= since)
-            .count())
+    ip = _ip(request)
+    recent = db.query(Event).filter(Event.event_type == "help_ask", Event.created_at >= since)
+    if current_user is not None:
+        used = recent.filter(Event.user_id == current_user.id).count()
+    else:
+        used = sum(1 for e in recent.filter(Event.user_id.is_(None)).all()
+                   if isinstance(e.payload, dict) and e.payload.get("ip") == ip)
     if used >= ASK_LIMIT_PER_HOUR:
         return {"answer": None, "sure": False, "go": None, "reason": "rate_limited"}
+    if spent_today(db) >= _daily_cap_usd():
+        return {"answer": None, "sure": False, "go": None, "reason": "daily_cap"}
 
     rows = (db.query(HelpAnswer)
             .filter(HelpAnswer.active.is_(True))
             .order_by(HelpAnswer.created_at.desc())
             .limit(80).all())
-    library = "\n\n".join(f"Q: {r.question}\nA: {r.answer}" for r in rows)[:12000]
-    if not library:
+    library = "\n\n".join(f"Q: {r.question}\nA: {r.answer}" for r in rows)[:8000]
+    guide = guide_text()
+    if not library and not guide:
         return {"answer": None, "sure": False, "go": None, "reason": "empty_library"}
 
     history = ""
@@ -193,11 +302,14 @@ async def ask(payload: AskIn, current_user: User = Depends(get_current_user),
         if isinstance(turn, dict) and turn.get("q"):
             history += f"\nEarlier question: {str(turn.get('q'))[:200]}"
 
-    prompt = (f"Page the agent is on: {payload.page or 'unknown'}{history}\n\n"
-              f"Question: {question}\n\nAnswer library:\n{library}")
+    snapshot = account_snapshot(db, current_user) if current_user is not None else \
+        "(signed-out visitor: product questions only, no account answers)"
+    prompt = (f"Page they are on: {payload.page or 'unknown'}{history}\n\n"
+              f"Question: {question}\n\nTheir account:\n{snapshot}\n\n"
+              f"Guide:\n{guide}\n\nAnswer library:\n{library or '(empty)'}")
     try:
         data = await llm.chat_json(ASK_SYSTEM, prompt, model=settings.OPENAI_MODEL,
-                                   max_completion_tokens=500, timeout=8.0)
+                                   max_completion_tokens=500, timeout=10.0)
     except Exception as exc:                                     # noqa: BLE001 - the chat falls back
         log.info("help ask failed: %s", exc)
         return {**unavailable, "reason": "model_error"}
@@ -207,10 +319,12 @@ async def ask(payload: AskIn, current_user: User = Depends(get_current_user),
     sure = bool(data.get("sure")) and bool(answer)
     go = data.get("go")
     go = go if isinstance(go, str) and go.strip().lower() in GO_VIEWS else None
+    if current_user is None:
+        go = None if go not in ("home", "setup") else go
 
-    db.add(Event(user_id=current_user.id, event_type="help_ask",
+    db.add(Event(user_id=current_user.id if current_user is not None else None, event_type="help_ask",
                  payload={"question": question[:300], "sure": sure, "page": payload.page,
-                          "usage": usage}))
+                          "usage": usage, "ip": ip if current_user is None else None}))
     db.commit()
 
     if not sure:

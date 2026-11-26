@@ -68,7 +68,21 @@ def account_facts(db, user: User) -> dict:
         "opted_in": bool(getattr(user, "marketing_optin", True)),
         "closed": user.closed_at is not None,
         "test": bool(getattr(user, "is_test", False)),
+        # The first open item on their setup to-do list (Engine 1, Part C 5a), named in the emails.
+        "meta_todo": _first_setup_item(db, user),
     }
+
+
+def _first_setup_item(db, user: User) -> dict | None:
+    try:
+        from app.services import meta_engine
+        todo = meta_engine.status(db, user).get("todo") or []
+    except Exception:  # noqa: BLE001 - an email never waits on the Meta check
+        return None
+    if not todo:
+        return None
+    first = todo[0]
+    return {"key": first.get("key"), "line": first.get("line") or "", "means": first.get("means") or ""}
 
 
 def situation(f: dict) -> str:
@@ -77,6 +91,8 @@ def situation(f: dict) -> str:
         return "not_back"
     if not f["meta_connected"]:
         return "no_meta"
+    if f.get("meta_todo") and not f["running"] and not f["launched"]:
+        return "meta_gap"
     if f["running"]:
         return "running"
     if f["staged"]:
@@ -104,6 +120,17 @@ def _links() -> str:
             "Reply to this email and it comes straight to me.")
 
 
+def _setup_item_lines(f: dict) -> str:
+    """The exact thing still in the way, from their setup to-do list, and what it means."""
+    item = f.get("meta_todo") or {}
+    if not item.get("line"):
+        return "The Accounts page shows exactly what's left and what to do.\n\n"
+    out = f"Here's what's left: {item['line']}"
+    if item.get("means"):
+        out += f" {item['means']}"
+    return out + f"\n\nFix it from Accounts: {settings.PUBLIC_BASE_URL}/#accounts\n\n"
+
+
 def compose(step: str, user: User, f: dict) -> tuple[str, str]:
     """Subject and body from the facts. One next step, no promises."""
     hi = _greeting(user)
@@ -123,8 +150,7 @@ def compose(step: str, user: User, f: dict) -> tuple[str, str]:
         line = SITUATIONS[sit]
         body = (f"{hi}\n\n{line}\n\n")
         if sit == "meta_gap":
-            body += ("Facebook is connected, but one thing on your side still needs fixing - the Accounts page "
-                     "shows exactly which, and what to do.\n\n")
+            body += _setup_item_lines(f)
         if sit == "running":
             body += (f"Your campaign for {f['first_running_address'] or 'your listing'} is live, with "
                      f"{f['leads']} lead{'s' if f['leads'] != 1 else ''} so far.\n\n")
@@ -133,6 +159,8 @@ def compose(step: str, user: User, f: dict) -> tuple[str, str]:
     if step == "day7":
         subject = "One thing still in the way"
         line = SITUATIONS[sit]
+        if sit == "meta_gap":
+            line += "\n\n" + _setup_item_lines(f).strip()
         body = (f"{hi}\n\n{line}\n\nIf it would help to do it together, book a session and we'll do it "
                 f"with you - it's free.\n\n{_links()}\n\n{FROM_NAME}")
         return subject, body

@@ -520,10 +520,12 @@ async def get_report(boost_id: int, day: int = 7, current_user: User = Depends(g
     organic = await organic_results(db, boost, ad_account, from_iso, to_iso)
     paid = await ad_numbers(db, boost, from_iso, to_iso)
     db.commit()
+    paid["ok"] = paid.get("source") == "meta"      # the PDF and the reading check this
+    _fill_post_numbers(organic, posts, day)
     summary = organic.get("summary") or {}
     measured = int(summary.get("measured") or 0)
 
-    return {
+    out = {
         "boost_id": boost.id,
         "address": boost.address,
         "report_day": day,
@@ -546,8 +548,11 @@ async def get_report(boost_id: int, day: int = 7, current_user: User = Depends(g
             "ad_clicks": paid.get("clicks"),
         },
         "generated_at": datetime.utcnow().isoformat(),
+        "until_sold": bool(boost.until_sold),
         **_report_extras(db, boost, current_user),
     }
+    out["summary"], out["recommendations"] = report_reading(out, day)
+    return out
 
 
 def _report_extras(db: Session, boost, user) -> dict:
@@ -576,10 +581,113 @@ def _report_extras(db: Session, boost, user) -> dict:
     audit = [{"at": e.created_at.isoformat() if e.created_at else None, "line": (e.payload or {}).get("line")}
              for e in db.query(Event).filter(Event.boost_id == boost.id, Event.event_type == "ad_audit")
              .order_by(Event.id.asc()).all() if (e.payload or {}).get("line")]
+    hooks = report_hooks(db, boost)
+    open_leads = [l for l in db.query(Lead).filter(Lead.boost_id == boost.id).all()
+                  if (l.status or "new") == "new"]
     kit = dict(getattr(user, "brand", None) or {})
-    return {"leads": leads, "website": website, "audit": audit,
+    return {"leads": leads, "website": website, "audit": audit, "hooks": hooks,
+            "open_leads": [{"name": l.author_name or l.author_handle or l.email or "Someone",
+                            "source": l.source} for l in open_leads[:10]],
             "prepared_by": {"agent": kit.get("agent") or getattr(user, "name", "") or "",
                             "brokerage": kit.get("company") or kit.get("brokerage") or ""}}
+
+
+def _fill_post_numbers(organic: dict, posts: list, day: int) -> None:
+    """Totals, the top posts, each post's own numbers and views per day, from Meta's per-post rows.
+    Only measured numbers count; a post Meta didn't answer for stays out (never a zero)."""
+    rows = [r for r in (organic.get("posts") or []) if isinstance(r, dict)]
+    by_id = {p.id: p for p in posts}
+    summ = organic.setdefault("summary", {})
+    for key, out in (("likes", "likes"), ("comments", "comments"), ("shares", "shares"),
+                     ("saved", "saves"), ("views", "views")):
+        vals = [r.get(key) for r in rows if r.get(key) is not None]
+        summ[out] = sum(int(v or 0) for v in vals) if vals else None
+    each = []
+    for r in rows:
+        p = by_id.get(r.get("db_id"))
+        score = int(r.get("reach") or r.get("views") or 0)
+        each.append({"day": r.get("day"), "platform": r.get("platform"), "url": r.get("url"),
+                     "title": (p.title or "") if p else "", "caption": ((p.caption or "")[:120]) if p else "",
+                     "image": (p.image_url or "") if p else "", "reach": r.get("reach"), "views": r.get("views"),
+                     "likes": r.get("likes"), "comments": r.get("comments"), "shares": r.get("shares"),
+                     "saves": r.get("saved"), "score": score})
+    organic["each_post"] = sorted(each, key=lambda e: (e.get("day") or 0))
+    organic["top_posts"] = [dict(e, stat=f"{int(e['reach'] or 0):,} reached" if e.get("reach") else "")
+                            for e in sorted(each, key=lambda e: -e["score"])[:3] if e["score"]]
+    daily = [0] * max(1, min(int(day or 14), 14))
+    seen = False
+    for r in rows:
+        d = int(r.get("day") or 0)
+        if 1 <= d <= len(daily) and (r.get("views") is not None or r.get("reach") is not None):
+            daily[d - 1] += int(r.get("views") or r.get("reach") or 0)
+            seen = True
+    organic["daily"] = daily if seen else []
+
+
+def report_hooks(db: Session, boost) -> list:
+    """Engine 6, section 9: each hook side by side, from the numbers the live ad audit last read.
+    The winner is the hook with the best click rate once it has ~500 views; none before that."""
+    from app.services import ad_audit
+    rows = []
+    for ad in db.query(Ad).filter(Ad.boost_id == boost.id).all():
+        for v in (ad.versions or []):
+            if not isinstance(v, dict) or v.get("status") in ("skipped", "failed"):
+                continue
+            ins = v.get("insights") or {}
+            imp = int(ins.get("impressions") or 0)
+            clicks = int(ins.get("inline_link_clicks") or ins.get("clicks") or 0)
+            label = ("Hook %s" % v.get("n")) if v.get("kind") == "hook" else \
+                ("The video ad" if "video" in str(v.get("kind") or "") else "The main ad")
+            rows.append({"label": label, "hook": v.get("hook") or "", "views": imp, "clicks": clicks,
+                         "click_rate": round(ad_audit.click_rate(ins) * 100, 2) if imp else None,
+                         "status": v.get("status") or "", "winner": False})
+    ready = [r for r in rows if r["views"] >= 500 and r["click_rate"] is not None]
+    if len(ready) > 1:
+        max(ready, key=lambda r: r["click_rate"])["winner"] = True
+    return rows
+
+
+def report_reading(report: dict, day: int) -> tuple:
+    """Resmara's summary and recommendations, worked out from the numbers in the report (never
+    invented: a line only appears when the number behind it does)."""
+    organic, paid = report.get("organic") or {}, report.get("paid") or {}
+    summ = organic.get("summary") or {}
+    leads = report.get("leads") or {}
+    total_leads = sum(int(v or 0) for v in leads.values())
+    website = report.get("website") or {}
+    bits = []
+    if int(summ.get("measured") or 0):
+        bits.append(f"your posts reached {int(summ.get('reach') or 0):,} people")
+    if paid.get("ok") and paid.get("link_clicks") is not None:
+        bits.append(f"the ad sent {int(paid.get('link_clicks') or 0):,} clicks to the listing")
+    if website.get("visits"):
+        bits.append(f"the listing website had {int(website['visits']):,} visits")
+    if total_leads:
+        bits.append(f"{total_leads} lead{'s' if total_leads != 1 else ''} came in")
+    summary = ""
+    if bits:
+        summary = ("In the first %d days, " % day if day < 14 else "Over the 14 days, ") + \
+            ", ".join(bits[:-1]) + (" and " if len(bits) > 1 else "") + bits[-1] + "."
+        summary = summary[0].upper() + summary[1:]
+    recs = []
+    open_leads = report.get("open_leads") or []
+    if open_leads:
+        names = ", ".join(l["name"] for l in open_leads[:3])
+        recs.append(f"Follow up with {names}" + (f" and {len(open_leads) - 3} more" if len(open_leads) > 3 else "")
+                    + ": they're on your leads board and haven't been contacted yet.")
+    winner = next((h for h in report.get("hooks") or [] if h.get("winner")), None)
+    if winner:
+        recs.append(f"{winner['label']} (\"{winner['hook'][:60]}\") is getting the most clicks, so Meta is "
+                    "putting more of the budget behind it.")
+    top = (organic.get("top_posts") or [])[:1]
+    if top and (top[0].get("title") or top[0].get("caption")):
+        recs.append(f"Your best post so far is \"{str(top[0].get('title') or top[0].get('caption'))[:60]}\". "
+                    "Sharing it to your own stories adds reach for free.")
+    if website.get("url") and not website.get("visits"):
+        recs.append(f"Share your listing website ({website['url']}) in your own posts and texts; it hasn't had visits yet.")
+    if day >= 14 and not report.get("until_sold"):
+        recs.append("If it hasn't sold, Run it again or turn on Run it until it sells to keep it in front of buyers.")
+    return summary, recs[:4]
 
 
 @router.get("/reports/{boost_id}/download")

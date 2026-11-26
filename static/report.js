@@ -55,8 +55,54 @@ function liveReportData(c, day, data) {
       likes: meta ? s.likes : null, comments: meta ? s.comments : null, shares: meta ? s.shares : null, saves: meta ? s.saves : null,
       clicks: paid.source === 'meta' ? paid.clicks : null, engagements: meta ? s.interactions : null },
     top: (organic.top_posts || []).slice(0, 3).map(p => ({ img: p.image, headline: p.title || p.caption, views: p.views, stat: p.stat || '' })),
-    daily: organic.daily || [], summary: data && data.summary || '', recs: (data && data.recommendations) || []
+    daily: organic.daily || [], summary: data && data.summary || '', recs: (data && data.recommendations) || [],
+    // Engine 6, section 9: the agent report's own sections (the seller version never shows these).
+    agentOnly: {
+      ad: paid.source === 'meta' || paid.ok ? paid : null, adReason: paid.reason || '',
+      leads: (data && data.leads) || null, website: (data && data.website) || null,
+      hooks: (data && data.hooks) || [], posts: organic.each_post || [], audit: (data && data.audit) || []
+    }
   };
+}
+
+function money(v) { return v === null || v === undefined || v === '' ? '–' : '$' + Number(v).toFixed(2); }
+
+function agentReportHTML(a) {
+  if (!a) return '';
+  const out = [];
+  if (a.ad) {
+    out.push(`<section class="pr-sec"><span class="pr-label">THE AD</span><div class="pr-small">
+      <div><b>${money(a.ad.spend)}</b><span>Spent so far (billed by Meta)</span></div>
+      <div><b>${money(a.ad.cpc)}</b><span>Cost per click</span></div>
+      <div><b>${fmtN(a.ad.link_clicks ?? a.ad.clicks)}</b><span>Clicks</span></div>
+      <div><b>${a.ad.ctr != null && a.ad.ctr !== '' ? esc(String(a.ad.ctr)) + '%' : '–'}</b><span>Click rate</span></div>
+      <div><b>${fmtN(a.ad.reach)}</b><span>Reach</span></div>
+      <div><b>${a.ad.frequency != null && a.ad.frequency !== '' ? esc(String(a.ad.frequency)) : '–'}</b><span>Frequency</span></div>
+    </div></section>`);
+  } else if (a.adReason) {
+    out.push(`<section class="pr-sec"><span class="pr-label">THE AD</span><p class="fine">${esc(a.adReason)}</p></section>`);
+  }
+  if (a.hooks && a.hooks.length) {
+    out.push(`<section class="pr-sec"><span class="pr-label">EACH HOOK SIDE BY SIDE</span><table class="pr-table"><thead><tr><th>Version</th><th>Views</th><th>Clicks</th><th>Click rate</th></tr></thead><tbody>${a.hooks.map(h => `<tr class="${h.winner ? 'win' : ''}"><td><b>${esc(h.label)}</b>${h.winner ? '<em>Winning</em>' : ''}${h.hook ? `<small>${esc(h.hook)}</small>` : ''}</td><td>${fmtN(h.views)}</td><td>${fmtN(h.clicks)}</td><td>${h.click_rate == null ? '–' : esc(String(h.click_rate)) + '%'}</td></tr>`).join('')}</tbody></table></section>`);
+  }
+  if (a.leads) {
+    const L = a.leads, total = Object.values(L).reduce((x, y) => x + (Number(y) || 0), 0);
+    out.push(`<section class="pr-sec"><span class="pr-label">LEADS BY SOURCE · ${total} IN ALL</span><div class="pr-small">
+      <div><b>${L.ad_comments || 0}</b><span>Ad comments</span></div><div><b>${L.post_comments || 0}</b><span>Post comments</span></div>
+      <div><b>${L.website_form || 0}</b><span>Website form</span></div><div><b>${L.calls || 0}</b><span>Calls</span></div>
+      <div><b>${L.texts || 0}</b><span>Texts</span></div></div></section>`);
+  }
+  if (a.website && a.website.visits !== undefined) {
+    const src = Object.entries(a.website.sources || {}).sort((x, y) => y[1] - x[1]).slice(0, 5);
+    out.push(`<section class="pr-sec"><span class="pr-label">YOUR LISTING WEBSITE</span><div class="pr-small"><div><b>${fmtN(a.website.visits)}</b><span>Visits</span></div></div>${src.length ? `<p class="fine">What sent them: ${src.map(([k, v]) => esc(k) + ' ' + v).join(' · ')}</p>` : ''}</section>`);
+  }
+  if (a.posts && a.posts.length) {
+    out.push(`<section class="pr-sec"><span class="pr-label">EVERY POST</span><table class="pr-table"><thead><tr><th>Day</th><th>Post</th><th>Reach</th><th>Views</th><th>Likes</th><th>Comments</th><th>Shares</th><th>Saves</th></tr></thead><tbody>${a.posts.map(p => `<tr><td>${esc(String(p.day || ''))}</td><td>${esc(p.title || p.caption || '')}<small>${esc(p.platform || '')}</small></td><td>${fmtN(p.reach)}</td><td>${fmtN(p.views)}</td><td>${fmtN(p.likes)}</td><td>${fmtN(p.comments)}</td><td>${fmtN(p.shares)}</td><td>${fmtN(p.saves)}</td></tr>`).join('')}</tbody></table></section>`);
+  }
+  if (a.audit && a.audit.length) {
+    out.push(`<section class="pr-sec"><span class="pr-label">WHAT RESMARA CHECKED AND CHANGED</span><ul class="pr-audit">${a.audit.map(x => `<li>${esc(x.line)}</li>`).join('')}</ul></section>`);
+  }
+  return out.join('');
 }
 
 function propertyReportHTML(d) {
@@ -92,6 +138,7 @@ function propertyReportHTML(d) {
   ${d.summary && d.day < 14 ? `<section class="pr-sec pr-read"><span class="pr-label">WHAT’S HAPPENING</span><p>${esc(d.summary)}</p></section>` : ''}
   ${d.top.length ? `<section class="pr-sec"><span class="pr-label">TOP PERFORMING POSTS</span><div class="pr-top">${d.top.map((p, i) => `<figure>${p.img ? `<img src="${esc(mediaPath(p.img))}" alt="">` : '<div class="pr-noimg"></div>'}<em>#${i + 1}</em><figcaption><b>${esc(p.headline || '')}</b><small>${fmtN(p.views)} views${p.stat ? ' · ' + esc(p.stat) : ''}</small></figcaption></figure>`).join('')}</div></section>` : ''}
   ${d.daily.length ? `<section class="pr-sec"><span class="pr-label">DAILY ACTIVITY · POST VIEWS</span><div class="pr-chart">${d.daily.map((v, i) => `<div class="${i === peak ? 'peak' : ''}"><small>${i === peak ? fmtN(v) : ''}</small><i style="height:${Math.max(4, Math.round(v / max * 100))}%"></i><span>${i + 1}</span></div>`).join('')}</div><p class="pr-chart-note">Day of the campaign. Busiest day: day ${peak + 1}.</p></section>` : ''}
+  ${agentReportHTML(d.agentOnly)}
   ${d.recs.length ? `<section class="pr-sec pr-recs"><div class="pr-recs-head"><span class="robot-avatar" aria-hidden="true"></span><div><span class="pr-label">RECOMMENDATIONS BY RESMARA</span><b>${d.day >= 14 ? 'Summary and what to do next' : 'What happens in week two'}</b></div></div>${d.day >= 14 && d.summary ? `<p class="pr-wrap">${esc(d.summary)}</p><span class="pr-label pr-next">WHAT TO DO NEXT</span>` : ''}<ol>${d.recs.map(r => `<li>${esc(r)}</li>`).join('')}</ol></section>` : ''}
   <footer class="pr-foot"><span>Prepared with <b>Resmara</b> · resmara.com</span><span>${d.illustrative ? 'Example report · illustrative numbers' : 'Figures from Meta for this period'}</span></footer>
 </article>`;

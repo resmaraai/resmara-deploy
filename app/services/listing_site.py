@@ -406,6 +406,11 @@ async def build(db, boost: Boost, *, writer: Optional[Callable] = None,
     if not words:
         content = clean_words(offline_words(boost, photos), photos)[0]
         _alert_team(db, boost, "The listing website's words couldn't be written; it went up with the plan's story.")
+    # Engine 3, section 4: facts the code found only online (not on the pasted listing page) are held
+    # for "Looks right" too, whatever the writer said.
+    hf = ((boost.plan or {}).get("home_file") or {}) if isinstance(getattr(boost, "plan", None), dict) else {}
+    held = [k for k in hf.get("please_check") or [] if k in (content.get("facts") or {})]
+    content["please_check"] = list(dict.fromkeys(list(content.get("please_check") or []) + held))
     content["photos"] = [a.filename for a in photos]
     content["rooms"] = {a.filename: (a.room or "") for a in photos}
     video = (getattr(boost, "video_url", None) or "").strip()
@@ -551,6 +556,16 @@ def apply_price_readings(db, site: ListingSite, readings: Dict[str, Optional[int
         changed = previous and agreed != previous
         site.price_cents, site.price_hold = agreed, None
         touch(db, site)
+        if changed and len(prices) >= 2:
+            # Validated: the listing and at least one other source agree on the new price (Engine 8,
+            # section 4). The next round can lead with "Improved price" - never the number.
+            boost = db.query(Boost).filter(Boost.id == site.boost_id).first()
+            if boost is not None:
+                plan = dict(boost.plan or {})
+                plan["price_update"] = {"at": _now().isoformat(), "words": "Improved price",
+                                        "lower": bool(agreed < previous), "validated": True}
+                boost.plan = plan
+                db.commit()
         return "price_changed" if changed else "price_shown"
     if prices:   # sources disagree
         return suspect_price_change(db, site, "the listing sites show different prices", send=send)

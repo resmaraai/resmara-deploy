@@ -224,6 +224,7 @@ tr.testrow td{background:#fbfdff;color:#849bae}
 button.ghost.tiny.is-test-on{background:#12354d!important;color:#fff!important;border-color:#12354d!important}
 html.dark .test-note{background:#1d3a50;color:#fff}
 html.dark button.ghost.tiny.is-test-on{background:#fff!important;color:#12354d!important}
+.mr-sug{border-top:1px solid #e2f0f8;padding:10px 0}.mr-sug p{margin:0 0 8px}
 .fin-disputed{background:#fdeee6}.fin-disputed b{color:#d94c0d}
 .fin-refund-btn{margin-left:10px;padding:4px 10px;font-size:12px}
 .fin-refund-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0 12px 0}.fin-refund-form input{padding:6px 8px}
@@ -1108,6 +1109,7 @@ html.dark .rel-body{color:#d6e6f1}
       <div class="attn" id="attn-health"></div>
       <div class="body">
         <div class="br-card" style="margin-top:0"><h3 class="card-title">Every part of Resmara</h3><div id="sysChecks" class="hint">Checking…</div></div>
+        <div class="br-card"><h3 class="card-title">Weekly Meta review</h3><div id="metaReview" class="hint">Loading…</div></div>
         <div class="br-card"><h3 class="card-title">This server</h3><div class="rows" id="healthRows"></div>
         <div class="hint" id="healthNote" style="margin-top:10px"></div></div>
         <h3 class="card-title" style="margin-top:22px">Storage</h3>
@@ -1777,7 +1779,34 @@ document.addEventListener('click', e => {
 // ── system check: every part of Resmara, green or red ──
 // Needs GET /api/admin/system-check from the back end (runs every 15 minutes there).
 let sysRows = null;
+// Engine 1, Part B 7: last week's Meta errors the fixed list didn't know, and the AI's suggestions.
+let metaReviewRow = null;
+async function loadMetaReview(){
+  const el = $('metaReview'); if (!el) return;
+  try { metaReviewRow = (await api('/api/admin/meta/weekly-review')).review; } catch (err) { el.textContent = 'Could not read the review: ' + err.message; return; }
+  paintMetaReview();
+}
+function paintMetaReview(){
+  const el = $('metaReview'); if (!el) return;
+  const r = metaReviewRow;
+  if (!r) { el.className = 'hint'; el.textContent = 'The first review is saved next Monday morning.'; return; }
+  const sug = r.suggestions || [];
+  el.className = '';
+  el.innerHTML = '<p><b>Week of ' + esc(r.week_of || '') + ':</b> ' + esc(r.headline || '') + '</p>' +
+    ((r.unknown_errors || []).length ? '<div class="log">' + r.unknown_errors.slice(0, 6).map(u => '<div class="log-row"><span class="log-when">' + esc(u.agents) + ' agent(s)</span><span class="log-text">' + esc(u.example || '') + ' <small>(filed under ' + esc(u.filed_under || '') + ')</small></span></div>').join('') + '</div>' : '') +
+    (sug.length ? sug.map((s, i) => '<div class="mr-sug"><p><b>' + esc(s.kind === 'new_situation' ? 'New situation' : 'Better wording') + '</b> · ' + esc(s.agents) + ' agent(s)<br>' + esc(s.line) + '<br><small>' + esc(s.why || '') + (s.example ? ' · e.g. ' + esc(s.example) : '') + '</small></p>' +
+      (s.state === 'waiting' ? '<button type="button" data-mr="' + i + '" data-ok="1">Approve</button> <button type="button" class="alt" data-mr="' + i + '" data-ok="0">Decline</button>' : '<span class="pill">' + esc(s.state === 'approved' ? 'Approved · on Dan’s list' : 'Declined') + '</span>') + '</div>').join('') : '<p class="hint">No suggestions this week.</p>');
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-mr]'); if (!b || !metaReviewRow) return;
+  b.disabled = true;
+  try { const r = await api('/api/admin/meta/weekly-review/' + metaReviewRow.id + '/decide', { method: 'POST', body: { index: Number(b.dataset.mr), approve: b.dataset.ok === '1' } });
+        metaReviewRow = Object.assign({}, metaReviewRow, r); paintMetaReview(); }
+  catch (err) { b.disabled = false; }
+});
+
 async function loadSystemCheck(){
+  loadMetaReview();
   try {
     const body = await api('/api/admin/system-check');
     // The back end answers {checked_at, cached, checks: [...]}; a bare list is the older shape.
@@ -1862,6 +1891,19 @@ function paintConnAttn(){
       btn: '<button class="tk-toggle" data-agent-email="' + esc(r.agent_email) + '">Open agent</button>'};
   }));
 }
+// Engine 1, Part C 5a: how many agents are stuck on each setup item.
+async function loadSetupStuck(){
+  const el = $('connStuck'); if (!el) return;
+  try {
+    const r = await api('/api/admin/connections/setup');
+    const items = r.items || [];
+    el.className = items.length ? '' : 'hint';
+    el.innerHTML = items.length ? '<div class="log">' + items.map(i => '<div class="log-row"><span class="log-when"><b>' + esc(i.agents) + '</b> agent' + (i.agents === 1 ? '' : 's') + '</span><span class="log-text">' + esc(i.line) + '</span></div>').join('') + '</div>' +
+      '<p class="hint">' + esc(r.all_set || 0) + ' agent(s) have nothing left to set up.</p>'
+      : 'No agent is stuck on anything. ' + esc(r.all_set || 0) + ' agent(s) are fully set up.';
+  } catch (err) { el.textContent = 'Could not read the setup counts: ' + err.message; }
+}
+
 async function loadConnections(){
   const el = $('connList'); if (!el) return;
   try {
@@ -2847,8 +2889,9 @@ async function loadMetrics(){
     // Connections is only about the agents' Meta logins: what is broken first, then every
     // connection, then the counts. Ad budget is campaign money, so it is not shown here.
     $('advertisingBody').innerHTML = a.error ? groupError('connections', a.error) :
-      '<div class="br-card" style="margin-top:0"><h3 class="card-title">Every connection</h3><div id="connList" class="hint">Loading…</div></div>';
-    loadConnections();
+      '<div class="br-card" style="margin-top:0"><h3 class="card-title">Where agents are stuck on setup</h3><div id="connStuck" class="hint">Loading…</div></div>' +
+      '<div class="br-card"><h3 class="card-title">Every connection</h3><div id="connList" class="hint">Loading…</div></div>';
+    loadConnections(); loadSetupStuck();
     loadCampaigns(); loadActivity(); loadSystemCheck(); loadMarketing(); loadWebsite(); loadEmail(); loadAds(); loadMarketingCosts(); loadTeam(); loadReleases();
 
     $('activityBody').innerHTML = act.error ? groupError('activity', act.error) :
