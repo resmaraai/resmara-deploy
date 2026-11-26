@@ -215,6 +215,7 @@ function fbLoginPopup() {
  show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>Log in with Facebook</h2>
  <p>Resmara does everything through Facebook: your Page, your Instagram and your ad account. Logging in connects them, so there is nothing else to set up first.</p>
  ${FB_TERMS}
+ <details class="invite-toggle"><summary>Have an invite code?</summary><label class="field">Invite code<input id="fbInvite" maxlength="64" autocomplete="off" spellcheck="false" placeholder="From your invitation"></label></details>
  <p class="fine" id="fbStatus" role="status"></p>
  <div class="modal-actions">
   <button type="button" class="alt" onclick="clientAccessEmail()">Use email and password instead</button>
@@ -231,7 +232,8 @@ async function fbLoginBegin() {
  if (!box || !box.checked) { if (status) status.textContent = 'Tick the box agreeing to the Terms first.'; return; }
  if (go) { go.disabled = true; go.textContent = 'Opening Facebook…'; }
  try {
-  const reply = await RM.facebookStart(RM.termsVersion ? RM.termsVersion() : undefined);
+  const invite = (document.getElementById('fbInvite') || {}).value || '';
+  const reply = await RM.facebookStart(RM.termsVersion ? RM.termsVersion() : undefined, invite);
   if (reply && reply.redirect_url) { location.href = reply.redirect_url; return; }
   throw new Error('Facebook did not answer with a login window.');
  } catch (err) {

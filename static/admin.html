@@ -1862,6 +1862,19 @@ function paintConnAttn(){
       btn: '<button class="tk-toggle" data-agent-email="' + esc(r.agent_email) + '">Open agent</button>'};
   }));
 }
+// Engine 1, Part C 5a: how many agents are stuck on each setup item.
+async function loadSetupStuck(){
+  const el = $('connStuck'); if (!el) return;
+  try {
+    const r = await api('/api/admin/connections/setup');
+    const items = r.items || [];
+    el.className = items.length ? '' : 'hint';
+    el.innerHTML = items.length ? '<div class="log">' + items.map(i => '<div class="log-row"><span class="log-when"><b>' + esc(i.agents) + '</b> agent' + (i.agents === 1 ? '' : 's') + '</span><span class="log-text">' + esc(i.line) + '</span></div>').join('') + '</div>' +
+      '<p class="hint">' + esc(r.all_set || 0) + ' agent(s) have nothing left to set up.</p>'
+      : 'No agent is stuck on anything. ' + esc(r.all_set || 0) + ' agent(s) are fully set up.';
+  } catch (err) { el.textContent = 'Could not read the setup counts: ' + err.message; }
+}
+
 async function loadConnections(){
   const el = $('connList'); if (!el) return;
   try {
@@ -2847,8 +2860,9 @@ async function loadMetrics(){
     // Connections is only about the agents' Meta logins: what is broken first, then every
     // connection, then the counts. Ad budget is campaign money, so it is not shown here.
     $('advertisingBody').innerHTML = a.error ? groupError('connections', a.error) :
-      '<div class="br-card" style="margin-top:0"><h3 class="card-title">Every connection</h3><div id="connList" class="hint">Loading…</div></div>';
-    loadConnections();
+      '<div class="br-card" style="margin-top:0"><h3 class="card-title">Where agents are stuck on setup</h3><div id="connStuck" class="hint">Loading…</div></div>' +
+      '<div class="br-card"><h3 class="card-title">Every connection</h3><div id="connList" class="hint">Loading…</div></div>';
+    loadConnections(); loadSetupStuck();
     loadCampaigns(); loadActivity(); loadSystemCheck(); loadMarketing(); loadWebsite(); loadEmail(); loadAds(); loadMarketingCosts(); loadTeam(); loadReleases();
 
     $('activityBody').innerHTML = act.error ? groupError('activity', act.error) :

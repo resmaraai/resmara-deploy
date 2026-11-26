@@ -44,3 +44,17 @@ def get_admin_user(current_user: User = Depends(get_current_user)):
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
+
+_optional_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+
+async def get_current_user_optional(token: Optional[str] = Depends(_optional_oauth2),
+                                    db: Session = Depends(get_db)) -> Optional[User]:
+    """The signed-in user, or None for a visitor (no token, or a token that no longer works)."""
+    if not token:
+        return None
+    try:
+        return await get_current_user(token=token, db=db)
+    except HTTPException:
+        return None

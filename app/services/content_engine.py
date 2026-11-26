@@ -1351,6 +1351,30 @@ def _repair_video_mix(plan: dict, days: int, per_day: int):
     return plan, repairs
 
 
+def round_price_note(boost, db) -> str:
+    """Engine 8, section 4: a validated price change (Engine 5 checks it on the listing and a second
+    source) lets the next round lead with it, worded only "Improved price" or "Updated pricing".
+    Never a number, never "price reduction" or "price drop", never the old price."""
+    if db is None:
+        return ""
+    try:
+        from app.db.session import Boost  # noqa: PLC0415
+        rows = (db.query(Boost).filter(Boost.user_id == getattr(boost, "user_id", None),
+                                       Boost.address == getattr(boost, "address", None),
+                                       Boost.id != getattr(boost, "id", None))
+                .order_by(Boost.id.desc()).limit(3).all())
+    except Exception:  # noqa: BLE001
+        return ""
+    for prev in rows:
+        update = (getattr(prev, "plan", None) or {}).get("price_update") if isinstance(getattr(prev, "plan", None), dict) else None
+        if update and update.get("validated", True):
+            words = "Improved price" if update.get("lower", True) else "Updated pricing"
+            return ("PRICE UPDATE: the listing's price changed and it was checked on the listing and a second "
+                    f"source. Lead one early post (day 1 or 2) with it, worded ONLY as \"{words}\". Never a "
+                    "number, never the old price, never \"price reduction\" or \"price drop\".")
+    return ""
+
+
 def repeat_note(boost, db) -> str:
     """The plan prompt's line about which campaign this is for this listing.
 
@@ -1641,6 +1665,9 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
         r4_user += "\nCAMPAIGN ROUND: " + repeat_note(boost, db)
         if learning.get("note"):
             r4_user += "\n" + learning["note"]
+        price_note = round_price_note(boost, db)
+        if price_note:
+            r4_user += "\n" + price_note
     try:
         plan = await llm.chat_json(
             prompts.R4_PLAN_SYSTEM,

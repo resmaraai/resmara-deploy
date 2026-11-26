@@ -235,9 +235,14 @@
   // The Terms box is ticked before any of this is called: the server refuses to start the
   // Facebook dialog without it, and the consent it records is what the new account is stamped
   // with. The redirect comes back as a one-time ticket, never as a token in the URL.
-  function facebookStart(termsVersion) {
-    return json('/api/auth/facebook/start', 'POST',
-      { terms_accepted: true, terms_version: termsVersion || TERMS_VERSION });
+  function facebookStart(termsVersion, inviteCode) {
+    // The visit's own tags travel with the Facebook door, so Marketing can credit the ad or
+    // email that brought the agent (Engine 9, section 1a). The invite code is for private beta.
+    var body = { terms_accepted: true, terms_version: termsVersion || TERMS_VERSION };
+    var source = signupSource();
+    if (source && Object.keys(source).length) body.source = source;
+    if (inviteCode) body.invite_code = String(inviteCode).trim().slice(0, 64);
+    return json('/api/auth/facebook/start', 'POST', body);
   }
 
   function facebookExchange(ticket) {
@@ -712,6 +717,10 @@
   }
 
   // ---- export -------------------------------------------------------------
+
+  // Remember the visit's tags on the first page this browser sees, before a click or a redirect
+  // can drop the query string.
+  try { signupSource(); } catch (e) { /* attribution never blocks the page */ }
 
   window.RM = {
     base: BASE,           // the detected mount prefix ('' or '/resmara'); read-only

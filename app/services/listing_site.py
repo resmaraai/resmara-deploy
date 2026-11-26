@@ -551,6 +551,16 @@ def apply_price_readings(db, site: ListingSite, readings: Dict[str, Optional[int
         changed = previous and agreed != previous
         site.price_cents, site.price_hold = agreed, None
         touch(db, site)
+        if changed and len(prices) >= 2:
+            # Validated: the listing and at least one other source agree on the new price (Engine 8,
+            # section 4). The next round can lead with "Improved price" - never the number.
+            boost = db.query(Boost).filter(Boost.id == site.boost_id).first()
+            if boost is not None:
+                plan = dict(boost.plan or {})
+                plan["price_update"] = {"at": _now().isoformat(), "words": "Improved price",
+                                        "lower": bool(agreed < previous), "validated": True}
+                boost.plan = plan
+                db.commit()
         return "price_changed" if changed else "price_shown"
     if prices:   # sources disagree
         return suspect_price_change(db, site, "the listing sites show different prices", send=send)

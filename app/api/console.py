@@ -441,3 +441,14 @@ def activity(limit: int = 60, kind: Optional[str] = None,
             "address": boost.address if boost else None,
         })
     return out
+
+
+@router.get("/admin/connections/setup")
+def setup_stuck(user=Depends(team_access.needs("agents")), db: Session = Depends(get_db)):
+    """Engine 1, Part C 5a: how many agents are stuck on each setup item, most first."""
+    from app.services import meta_engine
+    counts = meta_engine.team_counts(db)
+    rows = [{"key": k, "line": meta_engine.OUTCOMES.get(k, {}).get("line", k), "agents": n}
+            for k, n in counts.items() if k != "ok"]
+    rows.sort(key=lambda r: (-r["agents"], meta_engine.OUTCOMES.get(r["key"], {}).get("rank", 99)))
+    return {"items": rows, "all_set": counts.get("ok", 0)}

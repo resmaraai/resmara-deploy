@@ -308,7 +308,7 @@ async function helpAskAI(q){
   if (panel) { panel.append(wait); panel.scrollTop = panel.scrollHeight; }
   let r = null;
   try {
-    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 9000);
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 12000);
     const headers = { 'Content-Type': 'application/json' };
     try { const tok = localStorage.getItem('resmara_token'); if (tok) headers.Authorization = 'Bearer ' + tok; } catch (x) {}
     const res = await fetch('/api/help/ask', { method: 'POST', credentials: 'include', headers, signal: ctl.signal,
