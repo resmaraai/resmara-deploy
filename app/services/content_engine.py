@@ -160,6 +160,51 @@ def home_file_sources(boost) -> str:
               "listing brokerage and public records, and name each source in brackets as above.")
 
 
+# Engine 3, sections 4 and 7: the home's file. Each fact from the research carries its source; a fact
+# whose value can't be found on the listing page the agent pasted is "found online, please check",
+# decided here in code, and the post writer never states it as fact until the agent leaves it in.
+HOME_FACT_KEYS = {
+    "beds": r"bed(room)?s?", "baths": r"bath(room)?s?", "sqft": r"(living area|square f(ee|oo)t|sq\.? ?ft)",
+    "lot": r"lot( size)?", "year_built": r"year built|built in",
+}
+
+
+def home_file(research: str, listing_page_text: str, link: str = "") -> dict:
+    """Parse the research into facts with sources, and mark which ones need the agent to check."""
+    page = (listing_page_text or "").lower()
+    page_digits = re.sub(r"[^0-9.]", " ", page)
+    facts, please = [], []
+    for raw in (research or "").splitlines():
+        line = raw.strip(" -*\t")
+        if not line or "NOT FOUND" in line.upper():
+            continue
+        src = re.search(r"[\[(]([^\])]{2,80})[\])]\s*$", line)
+        source = src.group(1).strip() if src else ""
+        body = line[:src.start()].strip() if src else line
+        for key, pat in HOME_FACT_KEYS.items():
+            if re.search(pat, body, re.I):
+                nums = re.findall(r"\d[\d,]*(?:\.\d+)?", body)
+                value = nums[0].replace(",", "") if nums else ""
+                if not value or any(f["key"] == key for f in facts):
+                    break
+                on_page = bool(page) and (f" {value} " in f" {page_digits} " or value in page.replace(",", ""))
+                facts.append({"key": key, "value": value, "line": body[:160], "source": source or "research",
+                              "on_listing_page": on_page})
+                if not on_page:
+                    please.append(key)
+                break
+    return {"facts": facts, "please_check": please, "link": link}
+
+
+def please_check_note(hf: dict) -> str:
+    rows = [f for f in (hf or {}).get("facts") or [] if f["key"] in (hf or {}).get("please_check", [])]
+    if not rows:
+        return ""
+    return ("PLEASE CHECK (found online only, not on the listing page): " +
+            "; ".join(f"{r['line']} [{r['source']}]" for r in rows) +
+            ". Never state these as fact in a caption, headline or the ad.")
+
+
 POSITIVE_ONLY_RULE = ("EVERY post, caption and ad is positive and professional: never political, divisive, "
                       "negative or sarcastic, and never about anyone's family, health, faith or politics, "
                       "whatever the voice notes say.")
@@ -1572,6 +1617,7 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
             photo_index = build_photo_index(intact, offset=gallery_offset(round_, len(intact)))
 
     # --- R1: property research (Responses API, web search) ------------------
+    say("searching the listing sites")
     r1_input = prompts.R1_PROPERTY_RESEARCH.format(address=address) + " " + home_file_sources(boost)
     research = await llm.responses_text(
         r1_input,
@@ -1589,6 +1635,18 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
             boost.listing_sources = list(dict.fromkeys(list(boost.listing_sources or []) + found))[:6]
     except Exception:  # noqa: BLE001
         pass
+
+    say("building the home's file")
+    hf = home_file(research, property_page_text, _listing_link(boost))
+    try:
+        plan_now = dict(boost.plan or {}) if isinstance(getattr(boost, "plan", None), dict) else {}
+        plan_now["home_file"] = hf
+        boost.plan = plan_now
+    except Exception:  # noqa: BLE001 - a record, never a blocker
+        pass
+    if hf["please_check"]:
+        engine_notes.append("Found online, please check in review: " + "; ".join(
+            f"{f['line']} ({f['source']})" for f in hf["facts"] if f["key"] in hf["please_check"]))
 
     # --- R2: the agent's brand (Chat Completions -> JSON) -------------------
     website_provided = f"yes - {website}" if website else "no"
@@ -1622,6 +1680,15 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
         phone=phone or "NOT GIVEN",
         license=license_ or "NOT GIVEN",
     )
+    # Engine 4, section 3: the market's trend brief (shared, refreshed weekly) leads the trend part.
+    try:
+        from app.services import learning_library
+        brief = await learning_library.trend_brief(db, address) if db is not None else ""
+    except Exception:  # noqa: BLE001
+        brief = ""
+    if brief:
+        r3_input += ("\nTHIS WEEK'S TREND BRIEF FOR THIS MARKET (already researched; use it for TREND FINDINGS and "
+                     "only search to fill gaps):\n" + brief)
     style = await llm.responses_text(
         r3_input,
         model=settings.research_model,
@@ -1661,6 +1728,8 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
     )
     # The spec prompt is pinned byte-for-byte by tests/test_content_engine.py, so the repeat
     # instruction is appended after it rather than edited into it.
+    if please_check_note(hf):
+        r4_user += "\n" + please_check_note(hf)
     if round_ > 0:
         r4_user += "\nCAMPAIGN ROUND: " + repeat_note(boost, db)
         if learning.get("note"):
@@ -1788,6 +1857,9 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
     missing_info = list(dict.fromkeys(m for m in missing_info if m))
 
     boost.brand_profile = brand
+    if isinstance(plan, dict):
+        plan = dict(plan)
+        plan["home_file"] = hf   # Engine 3, section 7: the facts with their sources, kept on the campaign
     boost.plan = plan
     boost.main_status = "Team Review"
 
@@ -2015,8 +2087,11 @@ async def build_campaign(boost, db, *, force: bool = False, base_url: str = "",
             diffs = []
             if isinstance(plan, dict) and isinstance(plan.get("propertyStory"), dict):
                 diffs = [str(d) for d in plan["propertyStory"].get("differentiators") or []]
+            from app.services import learning_library
+            learned = "\n".join(x for x in (learning_library.hook_library_note(db, address),
+                                            learning_library.lessons_note(db)) if x) if db is not None else ""
             hooks = await ad_hooks.build_hooks(address=address, research=research, differentiators=diffs,
-                                               photo_index=photo_index)
+                                               photo_index=photo_index, learned=learned)
             named = {getattr(a, "filename", ""): a for a in intact}
 
             def _hook_photo(name):

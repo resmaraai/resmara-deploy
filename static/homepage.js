@@ -467,7 +467,7 @@ function brandKitData(){
  const palette=b.palette||(b.colours?String(b.colours).split(/[,\s]+/).filter(x=>/^#?[0-9a-f]{6}$/i.test(x)).map((h,i)=>[['Primary','Accent','Text','Tint','Page'][i]||'Colour',h[0]==='#'?h:'#'+h]):null)||d.palette||[];
  return {demo,agent:b.agent||state.name||d.agent||'',brokerage:b.brokerage||b.company||state.company||d.brokerage||'',license:b.license||d.license||'',website:b.website||d.website||'',market:b.market||d.market||'',brandLink:b.brandLink||d.brandLink||'',
   palette,fonts:b.fonts||d.fonts||['Playfair Display','Jost'],voice:b.voice||d.voice||'',use:b.use||d.use||[],avoid:b.avoid||d.avoid||[],theme:b.theme||d.theme||'Match my brand',legal:b.legal||d.legal||[],sources:b.sources||d.sources||[],researched:b.researched||d.researched||'',
-  ownTag:b.ownTag||'',phone:b.phone||d.phone||'',brokerLicense:b.brokerLicense||d.brokerLicense||'',voiceOfClient:b.voiceOfClient||d.voiceOfClient||'',factSources:b.factSources||{},missing:demo?[]:(b.build?(b.missing||[]):[]),built:!!b.build,
+  ownTag:b.ownTag||'',phone:b.phone||d.phone||'',brokerLicense:b.brokerLicense||d.brokerLicense||'',voiceOfClient:b.voiceOfClient||d.voiceOfClient||'',factSources:b.factSources||{},confidence:b.confidence||{},postingHabits:b.postingHabits||'',missing:demo?[]:(b.build?(b.missing||[]):[]),built:!!b.build,
   logo:state.brandMedia?.[b.logoId]||'',headshot:state.brandMedia?.[b.headshotId]||''};
 }
 function brandKitSections(k){
@@ -487,7 +487,7 @@ function brandKitSections(k){
   <section class="mb-sec"><h4>WHERE RESMARA LOOKED</h4><div class="mb-sources">${k.sources.map(([t,v])=>`<span>✓ <b>${esc(t)}</b> ${esc(v)}</span>`).join('')}</div></section>
   `}
 // Where a fact on My Brand was found (Engine 2: every fact has a source), as a short label.
-function brandSrc(k,key){const src=(k.factSources||{})[key];if(!src)return '';if(/^https?:/.test(src)){try{return 'Found on '+new URL(src).hostname.replace(/^www\./,'')}catch(e){return 'Found'}}return 'Found on '+src.replace(/^Your /,'your ')}
+function brandSrc(k,key){const src=(k.factSources||{})[key];if(!src)return '';const c=(k.confidence||{})[key];const sure=c==='confirmed'?' · confirmed':c==='found once'?' · found once, please check':'';if(/^https?:/.test(src)){try{return 'Found on '+new URL(src).hostname.replace(/^www\./,'')+sure}catch(e){return 'Found'+sure}}return 'Found on '+src.replace(/^Your /,'your ')+sure}
 // Phone, license and brokerage go on every post: missing ones are highlighted, never guessed.
 function brandMissingLine(m){const names={phone:'phone number',license:'license number',brokerage:'brokerage'};const list=m.map(x=>names[x]||x);return 'We couldn’t find your '+(list.length>1?list.slice(0,-1).join(', ')+' and '+list.slice(-1):list[0])+'. '+(list.length>1?'They go':'It goes')+' on every post, so add '+(list.length>1?'them':'it')+' here or when you start your first campaign.'}
 function myBrand(){

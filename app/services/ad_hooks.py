@@ -62,7 +62,7 @@ def _fallback_hooks(differentiators: List[str], address: str) -> List[Dict[str, 
 
 
 async def build_hooks(*, address: str, research: str, differentiators: List[str],
-                      photo_index: str) -> Dict[str, Any]:
+                      photo_index: str, learned: str = "") -> Dict[str, Any]:
     """Up to 3 hook versions that pass the rulebook. Never raises; always returns at least one."""
     raw: List[Dict[str, Any]] = []
     source = "rules"
@@ -72,7 +72,8 @@ async def build_hooks(*, address: str, research: str, differentiators: List[str]
                 "You write true-to-the-house real estate ad hooks. JSON only.",
                 HOOK_PROMPT.format(address=address, research=(research or "")[:4000],
                                    differentiators="; ".join(str(d) for d in differentiators[:6]) or "not given",
-                                   photos=(photo_index or "")[:3000]),
+                                   photos=(photo_index or "")[:3000])
+                + (("\n\n" + learned[:2500]) if learned else ""),
                 model=settings.OPENAI_MODEL_PLAN, max_completion_tokens=900)
             raw = [h for h in (reply or {}).get("hooks") or [] if isinstance(h, dict)]
             source = "model"

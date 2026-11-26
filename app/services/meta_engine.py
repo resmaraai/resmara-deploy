@@ -603,9 +603,38 @@ async def check(db, user: User, source: str = "check_again", *, force: bool = Tr
         log.warning("meta check failed for user %s: %s", user.id, exc)
         return status(db, user, unreachable=True)
     if facts.get("error") and not facts.get("me"):
-        _log_unknown_error(db, user, facts["error"], source)
+        known = [k for k in (decide(facts).get("issues") or []) if k not in SILENT]
+        filed = known[0] if known else await file_unknown_error(facts["error"])
+        if not known:
+            _log_unknown_error(db, user, facts["error"], source, filed)
+        if not known and filed == "meta_unreachable":
+            # Not one of the known situations: shown as "We couldn't check this right now", never a
+            # guess (Part B, section 7).
+            conn.unreachable_since = conn.unreachable_since or _now()
+            db.commit()
+            return status(db, user, unreachable=True)
+    had = (bool(conn.page_id), bool(conn.ig_user_id))
     apply(db, user, conn, facts, source)
+    _rerun_brand_if_newly_business(db, user, conn, had)
     return status(db, user)
+
+
+def _rerun_brand_if_newly_business(db, user: User, conn: MetaConnection, had) -> None:
+    """Engine 2, section 2: once a business Page or Instagram is connected after sign-up, the brand
+    investigation runs again with their own posts, and the kit gets sharper (their edits survive)."""
+    gained = (conn.page_id and not had[0]) or (conn.ig_user_id and not had[1])
+    built = ((user.brand or {}).get("build") or {}).get("finished") if isinstance(user.brand, dict) else None
+    if not gained or not built:
+        return
+    try:
+        import asyncio
+        from app.services import brand_investigator
+        asyncio.get_running_loop().create_task(
+            brand_investigator.build_for_user(user.id, reason="business_connected"))
+        db.add(Event(user_id=user.id, event_type="brand_rerun_queued", payload={"why": "business_connected"}))
+        db.commit()
+    except Exception as exc:  # noqa: BLE001 - the kit they have stays
+        log.info("brand re-run not queued for %s: %s", user.id, exc)
 
 
 def _adopt_legacy(db, user: User) -> Optional[MetaConnection]:
@@ -624,12 +653,137 @@ def _adopt_legacy(db, user: User) -> Optional[MetaConnection]:
     return conn
 
 
-def _log_unknown_error(db, user: User, err: Dict[str, Any], source: str) -> None:
-    """Errors the table doesn't know are kept for the Weekly Meta review (Part B, section 7)."""
+def _log_unknown_error(db, user: User, err: Dict[str, Any], source: str, filed: str = "") -> None:
+    """Errors the table doesn't know are kept for the Weekly Meta review (Part B, section 7), with
+    the situation the AI filed each one under."""
     db.add(Event(user_id=user.id, event_type="meta_unknown_error",
                  payload={"code": err.get("code"), "subcode": err.get("error_subcode"),
-                          "message": str(err.get("message") or "")[:300], "source": source}))
+                          "message": str(err.get("message") or "")[:300], "source": source,
+                          "filed_under": filed or "meta_unreachable"}))
     db.commit()
+
+
+FILE_ERROR_SYSTEM = """You file a Meta (Facebook) API error under the closest known situation.
+Reply with ONE JSON object: {"key": "<one key from the list, or meta_unreachable>", "why": "one short line"}.
+Pick a key only when the error clearly means that situation; otherwise answer meta_unreachable."""
+
+
+async def file_unknown_error(err: Dict[str, Any]) -> str:
+    """Part B, section 7: the closest situation from the fixed list, or "meta_unreachable"."""
+    try:
+        from app.services import llm
+        if not llm.llm_available():
+            return "meta_unreachable"
+        listing = "\n".join(f"{k}: {v['line']}" for k, v in OUTCOMES.items() if k not in SILENT)
+        data = await llm.chat_json(FILE_ERROR_SYSTEM,
+                                   f"ERROR: code {err.get('code')} subcode {err.get('error_subcode')}: "
+                                   f"{str(err.get('message') or '')[:300]}\n\nKNOWN SITUATIONS:\n{listing}",
+                                   model=settings.OPENAI_MODEL, max_completion_tokens=120, timeout=8.0)
+        key = str((data or {}).get("key") or "").strip()
+        return key if key in OUTCOMES else "meta_unreachable"
+    except Exception:  # noqa: BLE001 - an unknown error is never worse than "couldn't check"
+        return "meta_unreachable"
+
+
+# --------------------------------------------------------------------------- the weekly review
+REVIEW_SYSTEM = """You review last week's Meta (Facebook) errors that Resmara's fixed situation list didn't
+recognise, plus setup-call notes, and suggest improvements for the team (Adam and Dan). Nothing you say
+reaches agents. Reply with ONE JSON object:
+{"headline": "one line", "suggestions": [{"kind": "new_situation" | "better_wording", "key": "existing key or a
+new snake_case key", "line": "the plain message an agent would see", "why": "one line", "agents": n, "example": "one raw error"}]}
+At most 5 suggestions, most agents first. No suggestions is a fine answer."""
+
+
+async def weekly_review(db, *, now: Optional[datetime] = None, send: bool = True) -> Dict[str, Any]:
+    """Part B, section 7: each Monday, last week's unknown errors (and setup-call notes) become one
+    saved review with suggestions marked waiting; a card in System check and an email to Adam."""
+    now = now or _now()
+    week_start = (now - timedelta(days=7)).replace(tzinfo=None)
+    existing = (db.query(Event).filter(Event.event_type == "meta_weekly_review",
+                                       Event.created_at >= (now - timedelta(days=6)).replace(tzinfo=None)).first())
+    if existing is not None:
+        return {"status": "already_done", "id": existing.id}
+    errors = db.query(Event).filter(Event.event_type == "meta_unknown_error", Event.created_at >= week_start).all()
+    from app.db.session import SupportTicket
+    notes = [m.get("text", "")[:300] for t in db.query(SupportTicket).filter(SupportTicket.created_at >= week_start).all()
+             for m in (t.messages or [])[:1] if isinstance(m, dict) and "facebook" in str(t.subject or "").lower()][:20]
+    grouped: Dict[str, Dict[str, Any]] = {}
+    for e in errors:
+        p = e.payload or {}
+        k = f"{p.get('code')}/{p.get('subcode')}"
+        g = grouped.setdefault(k, {"code": p.get("code"), "subcode": p.get("subcode"), "agents": set(),
+                                   "example": p.get("message"), "filed_under": p.get("filed_under")})
+        g["agents"].add(e.user_id)
+    rows = [{**{k: v for k, v in g.items() if k != "agents"}, "agents": len(g["agents"])} for g in grouped.values()]
+    rows.sort(key=lambda r: -r["agents"])
+    review = {"week_of": week_start.date().isoformat(), "unknown_errors": rows,
+              "headline": "No new Meta errors last week." if not rows else
+              f"{len(rows)} kind(s) of Meta error the list didn't know, affecting "
+              f"{sum(r['agents'] for r in rows)} agent(s).", "suggestions": []}
+    if rows or notes:
+        try:
+            from app.services import llm
+            if llm.llm_available():
+                data = await llm.chat_json(
+                    REVIEW_SYSTEM,
+                    "KNOWN SITUATIONS:\n" + "\n".join(f"{k}: {v['line']}" for k, v in OUTCOMES.items()) +
+                    "\n\nLAST WEEK'S UNKNOWN ERRORS:\n" + "\n".join(
+                        f"{r['agents']} agent(s): code {r['code']}/{r['subcode']}: {r['example']} (filed under {r['filed_under']})"
+                        for r in rows[:20]) + "\n\nSETUP-CALL NOTES:\n" + "\n".join(notes),
+                    model=settings.OPENAI_MODEL, max_completion_tokens=900, timeout=20.0)
+                review["headline"] = str(data.get("headline") or review["headline"])[:200]
+                for sgg in (data.get("suggestions") or [])[:5]:
+                    if isinstance(sgg, dict) and sgg.get("line"):
+                        review["suggestions"].append({k: str(sgg.get(k) or "")[:300] for k in
+                                                      ("kind", "key", "line", "why", "example")}
+                                                     | {"agents": int(sgg.get("agents") or 0), "state": "waiting"})
+        except Exception as exc:  # noqa: BLE001 - the review still saves the raw errors
+            log.info("weekly Meta review AI step failed: %s", exc)
+    ev = Event(event_type="meta_weekly_review", payload=review)
+    db.add(ev)
+    db.commit()
+    if send:
+        n = len(review["suggestions"])
+        _alert_owner(db, "Weekly Meta review: " + review["headline"],
+                     review["headline"] + ("\n\n%d suggestion(s) waiting for Approve or Decline." % n if n else "") +
+                     "\n\nSee it in the Team room: " + (settings.PUBLIC_BASE_URL or "https://www.resmara.com").rstrip("/") +
+                     "/admin.html#sec-system")
+    return {"status": "saved", "id": ev.id, **review}
+
+
+def decide_suggestion(db, review_id: int, index: int, approve: bool, who: str = "") -> Dict[str, Any]:
+    """Approve puts the suggestion on Dan's list (a Build room task); Decline just marks it."""
+    ev = db.query(Event).filter(Event.id == review_id, Event.event_type == "meta_weekly_review").first()
+    if ev is None:
+        raise ValueError("Review not found")
+    review = dict(ev.payload or {})
+    sugg = [dict(x) for x in review.get("suggestions") or []]
+    if not 0 <= index < len(sugg):
+        raise ValueError("Suggestion not found")
+    if sugg[index].get("state") != "waiting":
+        return review
+    sugg[index]["state"] = "approved" if approve else "declined"
+    sugg[index]["by"] = who
+    review["suggestions"] = sugg
+    ev.payload = review
+    if approve:
+        try:
+            from app.db.session import BuildroomTask
+            s_ = sugg[index]
+            db.add(BuildroomTask(title=f"Meta situation: {s_.get('key') or 'new'}"[:200],
+                                 notes=f"From the Weekly Meta review ({review.get('week_of')}). "
+                                       f"{'New situation' if s_.get('kind') == 'new_situation' else 'Better wording'}: "
+                                       f"\"{s_.get('line')}\". Why: {s_.get('why')}. Example error: {s_.get('example')}",
+                                 area="back_end", status="todo", assigned_to=_dan_email(), created_by=who or "Weekly Meta review"))
+        except Exception as exc:  # noqa: BLE001
+            log.info("could not add the Build room task: %s", exc)
+    db.commit()
+    return review
+
+
+def _dan_email() -> Optional[str]:
+    import os
+    return (os.getenv("RESMARA_DAN_EMAIL") or "resmaraai@gmail.com").strip() or None
 
 
 # --------------------------------------------------------------------------- the Page picker
