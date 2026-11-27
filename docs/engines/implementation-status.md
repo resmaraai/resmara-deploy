@@ -156,7 +156,7 @@ PR #31 (`30496f9`), inside the live build.
 | Card form inside our own pop-up (Stripe Elements), Change/Remove card, Coming up, receipts | **Built** (PR #41) |
 | Stripe Tax | **Built behind `RESMARA_STRIPE_TAX=1`** → blocked on switching Stripe Tax on in the Stripe dashboard (Dan/Adam) and registering in the states that require it |
 | Receipts, refunds, chargebacks, closing an account stops billing | **Built** (PR #41) |
-| Money emails: acknowledgment when Run it until it sells is turned on, yearly reminder, 30-day price notice | **Not built** — Build room #66, #67, #68 |
+| Money emails: acknowledgment when Run it until it sells is turned on, yearly reminder, 30-day price notice | **Built** — `app/services/consent.py`, the clock's daily reminder and `POST /api/admin/price-notice` |
 
 ---
 
@@ -193,7 +193,8 @@ tour itself, then "Let's start your first campaign" — shipped in PR #39 behind
 | 9 | Facebook Page/Instagram/ad permissions in the same login window | 1 | same App Review as #1 (the code already reads `META_SCOPES`; no build needed) | Meta |
 | 10 | Preview environments per PR | - | Render workspace upgrade ($25/mo) - not needed for launch | Dan (spend) |
 
-Nothing else on the list is waiting on anyone: the remaining engine work is the three money emails
-(Build room #66, #67, #68), the terms/renewal-consent records (#61, #62, #64, #65), and the rest of
-the brains' "not built" rows above (Engine 1 Part B/C connection + audit, Engine 2 full kit, Engine 3
-gate, Engine 4 themes/layout library/art director, Engine 8 emails).
+Nothing else on the list is waiting on anyone. The terms and renewal-consent record is built
+(accepted at sign-up, re-asked when the version changes, stored on the campaign with the time, IP
+and browser, and the three money emails: acknowledgment, yearly reminder, 30-day price notice).
+What remains is the brains' "not built" rows above (Engine 1 Part B/C connection + audit, Engine 2
+full kit, Engine 3 gate, Engine 4 themes/layout library/art director, Engine 8's remaining emails).
