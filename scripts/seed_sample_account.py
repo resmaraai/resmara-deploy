@@ -402,12 +402,85 @@ async def import_photos(db, boost: Boost, user: User, listing_url: str,
 
 
 # ------------------------------------------------------------------------------------------ posts
-def caption(room: str, city: str, day: int) -> tuple[str, str, str, str]:
-    title, kicker, overlay, opener, body, cta = ROOMS.get(room, ROOMS["living room"])
-    if day == 1:
-        opener = f"Just listed in {city}. {opener}" if room != "front exterior" else opener.format(city=city)
-    text = f"{opener.format(city=city)} {body}\n\n{cta}\n\n{SIGNATURE}\n\n" + " ".join(
-        HASHTAGS + ["#" + "".join(w.capitalize() for w in room.split())])
+# The 14-day content arc. The copy is keyed to the DAY, not to the room: the gallery's photos are
+# tagged by a vision model that can only say "kitchen" or "living room", and a campaign with four
+# kitchen photos would otherwise publish four identical captions. One arc per campaign means every
+# day reads differently, and the photo on that day is its own.
+DAY_ARC = [
+    ("Just listed", "WELCOME HOME", "The walk up",
+     "Just listed in {city}.",
+     "The front elevation is quiet from the street and opens up as soon as you are through the door. "
+     "Mature trees, a deep porch and a drive that does not crowd the house.",
+     "Message me for a private showing."),
+    ("Property highlights", "WHAT YOU GET", "Worth a second look",
+     "A first walk through the house, room by room.",
+     "Light on two sides, floors that run the length of the plan and a layout that keeps the busy "
+     "parts away from the quiet ones.",
+     "Ask me for a walk-through."),
+    ("Step inside", "THE ENTRY", "Through the door",
+     "The entry tells you how the rest of the house is going to feel.",
+     "Wide enough for a bench and a coat hook, with the light following you into the rooms.",
+     "Message me for a private showing."),
+    ("Room spotlight", "SPOTLIGHT", "This one",
+     "The room people stop in.",
+     "It is the one the photos do not do justice to: the scale only makes sense when you are standing "
+     "in it, with the garden on one side and the rest of the house on the other.",
+     "Call or text me with a time that suits."),
+    ("The details", "THE FINISH", "Done properly",
+     "The parts of a house that age well.",
+     "Solid surfaces, honest materials and joinery done properly the first time - the things that are "
+     "still right in ten years.",
+     "Message me for a private showing."),
+    ("A closer look", "UP CLOSE", "Take your time",
+     "A closer look at the house, photographed the week it was listed.",
+     "The kind of detail that never makes a headline but is the reason people stay once they are inside.",
+     "Ask me for a walk-through."),
+    ("Weekend viewing", "COME SEE IT", "Saturday morning",
+     "Open this weekend, and it is worth the drive.",
+     "Bring your questions - about the roof, the systems, the street - and I will have the answers or "
+     "get them before you leave.",
+     "Message me to book a time."),
+    ("Around town", "THE AREA", "Minutes from here",
+     "The house is one thing; the ten minutes around it is the other half.",
+     "Coffee, groceries, the school run and the trailhead are all a short drive, and the street "
+     "itself stays quiet in the evenings.",
+     "Ask me anything about the area."),
+    ("Design details", "THE LOOK", "Chosen, not defaulted",
+     "The finishes were chosen rather than defaulted.",
+     "Warm floors, neutral walls and lighting that was actually thought about, so the house takes "
+     "your furniture instead of fighting it.",
+     "Message me for a private showing."),
+    ("Living spaces", "ROOM TO LIVE", "Everyday life",
+     "This is what the plan is for: ordinary days.",
+     "Somewhere to work, somewhere to gather and somewhere to be on your own without leaving the house.",
+     "Call or text me anytime."),
+    ("Key features", "WHAT MATTERS", "The list",
+     "The short version, for the people who read the listing twice.",
+     "The layout, the light, the storage and the garden - the four things that come up on every "
+     "second viewing.",
+     "Ask me for the full list."),
+    ("Viewing reminder", "STILL AVAILABLE", "Yes, it is",
+     "Still available, and the sellers are motivated.",
+     "If this one has been sitting in your saved list, this is the week to walk it. Showings are easy "
+     "to arrange.",
+     "Message me for a private showing."),
+    ("Outdoor living", "OUTSIDE", "End of the day",
+     "Out back, the house gives you somewhere to end the day.",
+     "A covered run of the garden, room for a table, and planting that is already grown in rather than "
+     "a lawn waiting to be planted.",
+     "Call or text me with a time that suits."),
+    ("Final spotlight", "LAST LOOK", "One more time",
+     "One more look before the weekend.",
+     "If you have been waiting for a reason to see this house, this is it - the photos are good, but "
+     "the house is better.",
+     "Message me and I will set it up."),
+]
+
+
+def caption(day: int, city: str) -> tuple[str, str, str, str]:
+    """The copy for one day of the arc: title, kicker, overlay, caption."""
+    title, kicker, overlay, opener, body, cta = DAY_ARC[(day - 1) % len(DAY_ARC)]
+    text = (f"{opener.format(city=city)} {body}\n\n{cta}\n\n{SIGNATURE}\n\n" + " ".join(HASHTAGS))
     return title, kicker, overlay, text
 
 
@@ -425,7 +498,7 @@ def build_posts(db, boost: Boost, photos: list[tuple[str, str]], spec: dict) -> 
         day = i + 1
         filename, room = ordered[i] if i < len(ordered) else ("", ROOM_CYCLE[i])
         # Prefer the room of the photo actually shipped on that day.
-        title, kicker, overlay, text = caption(room, spec["city"], day)
+        title, kicker, overlay, text = caption(day, spec["city"])
         when = start + timedelta(days=i)
         posted = day <= spec["published"]
         if not posted and spec.get("shift_days"):
@@ -434,14 +507,14 @@ def build_posts(db, boost: Boost, photos: list[tuple[str, str]], spec: dict) -> 
             when += timedelta(days=int(spec["shift_days"]))
         post = Post(
             boost_id=boost.id, day=day, slot=1,
-            kind="static", caption=text, hashtags="", cta=ROOMS.get(room, ROOMS["living room"])[5],
+            kind="static", caption=text, hashtags="", cta=DAY_ARC[(day - 1) % len(DAY_ARC)][5],
             image_url=f"/uploads/{filename}" if filename else "",
             client_status="approved" if spec.get("approved", True) else "pending",
             publish_at=_publish_at(when, TIMES[(day - 1) % 3]),
             publish_status="posted" if posted else "scheduled",
             publish_target="both",
             title=title, kicker=kicker, overlay_text=overlay,
-            photo_room=room, photo_file=filename, post_type="photo",
+            photo_room="", photo_file=filename, post_type="photo",
             design_style="overlay", details_treatment="agent-card",
             fb_post_id=f"sample_fb_{boost.id}_{day}" if posted else None,
             ig_media_id=f"sample_ig_{boost.id}_{day}" if posted else None,
