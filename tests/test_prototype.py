@@ -38,7 +38,7 @@ def get_token(email, password):
 
 # --- 1. Register + Login ---
 print("=== 1. Register + Login ===")
-resp = client.post("/api/auth/register", json={"email": "agent@resmara.com", "password": "test12345", "name": "Test Agent"})
+resp = client.post("/api/auth/register", json={"terms_accepted": True, "email": "agent@resmara.com", "password": "test12345", "name": "Test Agent"})
 print(f"Register: {resp.status_code}")
 token = get_token("agent@resmara.com", "test12345")
 headers = {"Authorization": f"Bearer {token}"}

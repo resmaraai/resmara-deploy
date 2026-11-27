@@ -390,7 +390,7 @@ def main() -> int:
     client_http = httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=True)
 
     with TestClient(app) as client:
-        reg = client.post("/api/auth/register", json={
+        reg = client.post("/api/auth/register", json={"terms_accepted": True,
             "email": f"photos{abs(hash(db)) % 10**8}@example.com", "password": "photo-pass-12345", "name": "Photos"})
         token = client.post("/api/auth/login", data={
             "username": reg.json()["email"], "password": "photo-pass-12345"}).json()["access_token"]
@@ -460,7 +460,7 @@ def main() -> int:
         check("an unreadable URL answers with a reason, not a 500",
               empty.status_code == 201 and empty.json()["imported"] == 0, str(empty.text[:120]))
 
-        stranger = client.post("/api/auth/register", json={
+        stranger = client.post("/api/auth/register", json={"terms_accepted": True,
             "email": f"stranger{abs(hash(db)) % 10**8}@example.com", "password": "photo-pass-12345", "name": "S"})
         stoken = client.post("/api/auth/login", data={
             "username": stranger.json()["email"], "password": "photo-pass-12345"}).json()["access_token"]

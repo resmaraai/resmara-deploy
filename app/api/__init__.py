@@ -39,6 +39,9 @@ from app.api import leads
 from app.api import facebook_login
 # The four onboarding emails, run by the clock, plus the one-click unsubscribe they carry.
 from app.api import onboarding_emails
+# Terms, renewal consent and the three money emails: /api/admin/consent/reminders (the clock)
+# and /api/admin/price-notice (the operator). The service behind them is app/services/consent.py.
+from app.api import consent
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(resmara.router, prefix="", tags=["resmara"])
@@ -75,3 +78,4 @@ api_router.include_router(public.router, prefix="", tags=["public"])
 api_router.include_router(leads.router, prefix="", tags=["leads"])
 api_router.include_router(facebook_login.router, prefix="/auth", tags=["facebook login"])
 api_router.include_router(onboarding_emails.router, prefix="", tags=["onboarding emails"])
+api_router.include_router(consent.router, prefix="", tags=["consent"])

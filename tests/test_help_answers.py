@@ -52,12 +52,12 @@ def login(email, password):
     return {"Authorization": f"Bearer {token}"}
 
 
-r = client.post("/api/auth/register", json={"email": "agent@example.com", "password": "long enough",
+r = client.post("/api/auth/register", json={"terms_accepted": True, "email": "agent@example.com", "password": "long enough",
                                             "name": "Agent", "invite_code": "beta-code-123"})
 check("an agent can register", r.status_code == 201, r.text)
 agent = login("agent@example.com", "long enough")
 
-r = client.post("/api/auth/register", json={"email": "owner@example.com", "password": "long enough",
+r = client.post("/api/auth/register", json={"terms_accepted": True, "email": "owner@example.com", "password": "long enough",
                                             "name": "Owner"})
 check("the operator can register without an invite", r.status_code == 201, r.text)
 operator = login("owner@example.com", "long enough")
@@ -155,7 +155,7 @@ check("and names why no mail went out",
 db.close()
 
 # Another agent's ticket is not theirs to read, let alone clear.
-client.post("/api/auth/register", json={"email": "other@example.com", "password": "long enough",
+client.post("/api/auth/register", json={"terms_accepted": True, "email": "other@example.com", "password": "long enough",
                                         "name": "Other", "invite_code": "beta-code-123"})
 other = login("other@example.com", "long enough")
 r = client.get("/api/support", headers=other)

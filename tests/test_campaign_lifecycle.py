@@ -44,7 +44,7 @@ client = TestClient(app)
 
 def account(email):
     r = client.post("/api/auth/register",
-                    json={"email": email, "password": "campaigntest123", "name": "Dana"})
+                    json={"terms_accepted": True, "email": email, "password": "campaigntest123", "name": "Dana"})
     if r.status_code == 403:
         # The beta invite gate refuses a second public signup. This test is about ownership,
         # not about the door, so the second account is created the way support would create it.

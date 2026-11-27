@@ -44,7 +44,7 @@ def check(name, ok):
         FAILS.append(name)
 
 
-client.post("/api/auth/register", json={"email": "agent@example.com", "password": "long enough",
+client.post("/api/auth/register", json={"terms_accepted": True, "email": "agent@example.com", "password": "long enough",
                                        "name": "Dana Agent", "invite_code": "beta-code-123"})
 token = client.post("/api/auth/login", data={"username": "agent@example.com",
                                             "password": "long enough"}).json()["access_token"]

@@ -169,6 +169,12 @@ def main():
                      name="Owner", is_active=True, is_admin=True)
         db.add_all([buyer, admin])
         db.commit()
+        # Engine 10 §1: Checkout refuses an account that has not accepted the current Terms, so
+        # these two are seeded the way the sign-up screen seeds them.
+        from app.services.consent import current_terms
+        for _u in (buyer, admin):
+            _u.terms_version = current_terms()
+        db.commit()
         # SQLite hands a deleted user's id to the next one: drop campaigns another test left on it.
         db.query(Boost).filter(Boost.user_id == buyer.id).delete()
         db.commit()

@@ -47,7 +47,7 @@ def step(name, ok, detail=""):
 def main():
     c = httpx.Client(base_url=B, timeout=float(os.environ.get("SMOKE_TIMEOUT", "120")))
 
-    r = c.post("/api/auth/register", json={"email": EMAIL, "password": PW, "name": "Smoke Tester"})
+    r = c.post("/api/auth/register", json={"terms_accepted": True, "email": EMAIL, "password": PW, "name": "Smoke Tester"})
     step("register", r.status_code == 201, f"{r.status_code}")
 
     r = c.post("/api/auth/login", data={"username": EMAIL, "password": PW})
@@ -222,7 +222,7 @@ def main():
     # An operator account is the only thing the console adds; mint one the way an operator
     # would be minted (the flag), not by weakening the admin check.
     admin_email = f"smokeadmin{stamp}@example.com"
-    c.post("/api/auth/register", json={"email": admin_email, "password": PW, "name": "Smoke Operator"})
+    c.post("/api/auth/register", json={"terms_accepted": True, "email": admin_email, "password": PW, "name": "Smoke Operator"})
     con = sqlite3.connect("/Users/dan/resmara/resmara.db")
     con.execute("update users set is_admin=1, subscription_status='active' where email=?", (admin_email,))
     con.commit()
@@ -291,7 +291,7 @@ def main():
 
     # --- per-user isolation ---
     other = f"smokeother{stamp}@example.com"
-    c.post("/api/auth/register", json={"email": other, "password": PW, "name": "Other"})
+    c.post("/api/auth/register", json={"terms_accepted": True, "email": other, "password": PW, "name": "Other"})
     r2 = c.post("/api/auth/login", data={"username": other, "password": PW})
     H2 = {"Authorization": f"Bearer {r2.json()['access_token']}"}
     r = c.get(f"/api/boosts/{boost_id}", headers=H2)

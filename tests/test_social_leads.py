@@ -121,11 +121,11 @@ def check(name, ok, detail=""):
 
 
 # --------------------------------------------------------------------------- accounts
-client.post("/api/auth/register", json={"email": "agent@example.com", "password": "long enough",
+client.post("/api/auth/register", json={"terms_accepted": True, "email": "agent@example.com", "password": "long enough",
                                        "name": "Dana Agent", "invite_code": "beta-code-123"})
-client.post("/api/auth/register", json={"email": "owner@example.com", "password": "long enough",
+client.post("/api/auth/register", json={"terms_accepted": True, "email": "owner@example.com", "password": "long enough",
                                        "name": "Owner"})
-client.post("/api/auth/register", json={"email": "other@example.com", "password": "long enough",
+client.post("/api/auth/register", json={"terms_accepted": True, "email": "other@example.com", "password": "long enough",
                                        "name": "Other", "invite_code": "beta-code-123"})
 
 

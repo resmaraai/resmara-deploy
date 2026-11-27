@@ -194,7 +194,7 @@ def sign_up(email):
     """A signed-up customer with a live subscription, so the launch gate is exercised on the
     connection health it is testing and not stopped earlier by a budget/credit refusal."""
     pw = "health-pass-12345"
-    client.post("/api/auth/register", json={"email": email, "password": pw, "name": "Health Check"})
+    client.post("/api/auth/register", json={"terms_accepted": True, "email": email, "password": pw, "name": "Health Check"})
     token = client.post("/api/auth/login", data={"username": email, "password": pw}).json()["access_token"]
     session = SessionLocal()
     from app.db.session import User

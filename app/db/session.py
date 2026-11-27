@@ -301,6 +301,16 @@ class Boost(Base):
     # could build the next round or stop it. This is the record it needed.
     until_sold = Column(Boolean, default=False)
     until_sold_at = Column(DateTime(timezone=True), nullable=True)
+    # Engine 10 §8: the agreement behind an automatic renewal — Terms version, when it was
+    # accepted, and from which IP and browser. Kept when the switch is turned off (three years,
+    # or one year after it is turned off), which is why the off switch stamps a date instead of
+    # nulling these: a recurring charge with no record of the agreement is the one audit an
+    # agent would win.
+    renewal_consent_at = Column(DateTime(timezone=True), nullable=True)
+    renewal_consent_version = Column(String, nullable=True)
+    renewal_consent_ip = Column(String, nullable=True)
+    renewal_consent_ua = Column(String, nullable=True)
+    renewal_consent_off_at = Column(DateTime(timezone=True), nullable=True)
     # A campaign is bought, not credited: $49 at checkout sets these, and the build/launch
     # gates read them. Both null = nobody has paid for this campaign yet.
     paid_at = Column(DateTime(timezone=True), nullable=True)

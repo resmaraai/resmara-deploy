@@ -109,7 +109,7 @@ def ok(name, cond, extra=""):
 # --- a customer signs up ---
 email = "oauth-browser@example.com"
 pw = "oauth-pass-12345"
-client.post("/api/auth/register", json={"email": email, "password": pw, "name": "OAuth Check"})
+client.post("/api/auth/register", json={"terms_accepted": True, "email": email, "password": pw, "name": "OAuth Check"})
 token = client.post("/api/auth/login", data={"username": email, "password": pw}).json()["access_token"]
 H = {"Authorization": f"Bearer {token}"}
 db = SessionLocal()

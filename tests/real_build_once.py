@@ -22,7 +22,7 @@ EMAIL = f"realbuild{stamp}@example.com"
 PW = "realbuild-pass-12345"
 
 c = httpx.Client(base_url=B, timeout=900)
-c.post("/api/auth/register", json={"email": EMAIL, "password": PW, "name": "Real Build"})
+c.post("/api/auth/register", json={"terms_accepted": True, "email": EMAIL, "password": PW, "name": "Real Build"})
 r = c.post("/api/auth/login", data={"username": EMAIL, "password": PW})
 H = {"Authorization": f"Bearer {r.json()['access_token']}"}
 print("login:", r.status_code)

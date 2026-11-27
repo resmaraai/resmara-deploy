@@ -71,8 +71,11 @@ def main():
     try:
         db.query(User).filter(User.email == EMAIL).delete()
         db.commit()
+        # Engine 10 §1: Checkout refuses an account that has not accepted the current Terms.
+        from app.services.consent import current_terms
         user = User(email=EMAIL, hashed_password=get_password_hash("Hunter2Hunter2"), name="Card",
-                    is_active=True, is_admin=False, stripe_customer_id="cus_test")
+                    is_active=True, is_admin=False, stripe_customer_id="cus_test",
+                    terms_version=current_terms())
         db.add(user)
         db.commit()
         b1 = Boost(user_id=user.id, address="1 Card Way")

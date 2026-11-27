@@ -266,6 +266,10 @@ async def create_checkout(body: CheckoutRequest, current_user: User = Depends(ge
             "on the service."))
     if boost_is_paid(boost, db) and not current_user.is_admin:
         return {"status": "already_paid", "boost_id": boost.id}
+    # A price is only charged to an account that has accepted the Terms now presented (Engine
+    # 10 §1). 409 + a machine-readable code, so the page can ask instead of dying on a sentence.
+    from app.services import consent
+    consent.require_current_terms(current_user)
 
     existing = (db.query(Order)
                 .filter(Order.boost_id == boost.id, Order.status == "pending",

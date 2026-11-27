@@ -167,6 +167,15 @@ ADDITIONS = {
         # Engine 9 (Marketing): the channel credited with each purchase, decided once at payment.
         ("paid_source", "VARCHAR"),
         ("paid_source_detail", "JSON"),
+        # Engine 10 §8: the agreement behind an automatic renewal — version, when, and who
+        # accepted it from where. Kept when the switch goes off (three years, or one year after
+        # it is turned off), so turning it off stamps renewal_consent_off_at instead of nulling
+        # these. Every one is NULL on an established database.
+        ("renewal_consent_at", "TIMESTAMP"),
+        ("renewal_consent_version", "VARCHAR"),
+        ("renewal_consent_ip", "VARCHAR"),
+        ("renewal_consent_ua", "VARCHAR"),
+        ("renewal_consent_off_at", "TIMESTAMP"),
     ],
     # The agent's note on a lead (added 21 Nov 2026).
     "leads": [

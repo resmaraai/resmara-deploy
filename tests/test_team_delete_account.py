@@ -52,12 +52,12 @@ def login(email):
     return {"Authorization": "Bearer " + r.json()["access_token"]}
 
 
-r = client.post("/api/auth/register", json={"email": "owner@example.com", "password": PASSWORD,
+r = client.post("/api/auth/register", json={"terms_accepted": True, "email": "owner@example.com", "password": PASSWORD,
                                             "name": "Owner"})
 check("the operator can register", r.status_code == 201, r.text[:200])
 operator = login("owner@example.com")
 
-r = client.post("/api/auth/register", json={"email": "temp@example.com", "password": PASSWORD,
+r = client.post("/api/auth/register", json={"terms_accepted": True, "email": "temp@example.com", "password": PASSWORD,
                                             "name": "Temp Agent", "invite_code": "beta-code-123"})
 check("a member can register", r.status_code == 201, r.text[:200])
 member_id = r.json().get("id")

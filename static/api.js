@@ -169,6 +169,9 @@
       var err = new Error(message);
       err.status = res.status;
       err.detail = detail;
+      // A machine-readable code when the server sent one ({error: 'terms_stale', ...}), so the
+      // page can react to a refusal without matching on prose.
+      err.code = (detail && typeof detail === 'object' && detail.error) || undefined;
       err.body = body;
       throw err;
     }
@@ -181,6 +184,21 @@
   // asks the app for the app and not the router for '/'.
   function home() {
     return BASE + '/';
+  }
+
+  // ---- terms ---------------------------------------------------------------
+
+  // "The Terms changed, accept them to continue." The server refuses money-moving calls with
+  // 409 {error:'terms_stale'}; the page registers a handler here (onTermsStale) and this file
+  // stays transport-only — no DOM, no dialogs of its own.
+  var termsHook = null;
+
+  function onTermsStale(fn) { termsHook = typeof fn === 'function' ? fn : null; }
+
+  function termsState() { return request('/api/auth/terms'); }
+
+  function acceptTerms(version) {
+    return json('/api/auth/me/terms', 'POST', { version: version || TERMS_VERSION });
   }
 
   function request(path, opts) {
@@ -199,6 +217,10 @@
         // the customer had done something wrong.
         endSession();
         err.message = 'Your session ended — sign in again.';
+      }
+      if (err && err.code === 'terms_stale' && termsHook) {
+        // The page decides how to ask; a hook that throws must not swallow the refusal.
+        try { termsHook(err); } catch (e) { /* the caller still sees err */ }
       }
       throw err;
     });
@@ -733,6 +755,9 @@
     setEmail: setEmail,
     closeAccount: closeAccount,
     termsVersion: function () { return TERMS_VERSION; },
+    termsState: termsState,
+    acceptTerms: acceptTerms,
+    onTermsStale: onTermsStale,
     me: me,
     requestPasswordReset: requestPasswordReset,
     confirmPasswordReset: confirmPasswordReset,

@@ -100,6 +100,16 @@ if [ "$(date -u +%H%M)" -ge 1400 ] && [ "$(date -u +%H%M)" -lt 1410 ]; then
   body=$(head -c 300 /tmp/resmara-sched-body.$$ 2>/dev/null)
   rm -f /tmp/resmara-sched-body.$$
   say "meta token health: $code $body"
+  # The yearly reminder while "Run it until it sells" stays on (Engine 10 §8). The endpoint marks
+  # each send with an event, so the once-a-day call cannot send the same reminder twice; it stays
+  # quiet when nothing is due, and says so only when it actually emailed somebody.
+  code=$(post "/api/admin/consent/reminders" 180)
+  body=$(head -c 400 /tmp/resmara-sched-body.$$ 2>/dev/null)
+  rm -f /tmp/resmara-sched-body.$$
+  case "$code" in
+    200) case "$body" in *'"due": 0'*|*'"due":0'*) ;; *) say "renewal reminders: $body" ;; esac ;;
+    *) say "consent/reminders returned $code: $body" ;;
+  esac
 fi
 
 exit 0

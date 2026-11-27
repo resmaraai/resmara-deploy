@@ -300,7 +300,8 @@ def hide_boost(boost_id: int, hidden: bool = True,
 
 
 @router.post("/boosts/{boost_id}/until-sold", response_model=BoostOut)
-def set_until_sold(boost_id: int, until_sold: bool = True,
+def set_until_sold(boost_id: int, request: Request, until_sold: bool = True,
+                   renewal_consent: str = "",
                    current_user=Depends(get_current_user), db: Session = Depends(get_db)):
     """Turn "run it until it sells" on or off for this campaign.
 
@@ -308,7 +309,13 @@ def set_until_sold(boost_id: int, until_sold: bool = True,
     14-day round and charges the $39 has to be able to read it, and a browser that is closed must
     not be the reason a paid-for renewal never happens. Turning it on is refused once the listing
     is pending or sold, because the whole point is that it stops by itself at that moment.
+
+    Turning it **on** carries the agreement (Engine 10 §8): the account has to be current on the
+    Terms, and it sends the version the page showed, which is stored with the time, IP and
+    browser. Turning it **off** keeps that record and stamps when it ended — a recurring charge
+    that stops with no record of why it started is the audit an agent would win.
     """
+    from app.services import consent
     b = db.query(Boost).filter(Boost.id == boost_id, Boost.user_id == current_user.id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Boost not found")
@@ -317,10 +324,41 @@ def set_until_sold(boost_id: int, until_sold: bool = True,
         raise HTTPException(
             status_code=409,
             detail="This listing is already %s, so there is nothing left to run until." % status)
-    b.until_sold = bool(until_sold)
-    b.until_sold_at = datetime.now(timezone.utc) if until_sold else None
+    if until_sold:
+        consent.require_current_terms(current_user)
+        given = (renewal_consent or "").strip()
+        if not given:
+            raise HTTPException(status_code=400, detail={
+                "error": "renewal_consent_required",
+                "current": consent.current_terms(),
+                "why": "Automatic renewal needs the agreement: it charges the card on file every "
+                       "14 days until the listing is pending or sold.",
+            })
+        if given != consent.current_terms():
+            raise HTTPException(status_code=400, detail={
+                "error": "renewal_consent_stale",
+                "current": consent.current_terms(),
+                "why": "The Terms changed since this page was opened. Reload, then turn it on.",
+            })
+    if until_sold:
+        b.until_sold = True
+        b.until_sold_at = datetime.now(timezone.utc)
+        consent.record_renewal_consent(db, b, renewal_consent, request)
+    else:
+        if b.until_sold:
+            consent.end_renewal_consent(db, b, request)
+        b.until_sold = False
+        b.until_sold_at = None
     db.commit()
     db.refresh(b)
+    if until_sold:
+        # The email the Terms promise. A failure does not undo the agreement that was just
+        # stored; it is recorded so the console can show that the customer was not told.
+        state = consent.send_renewal_acknowledgment(current_user, b)
+        from app.db.session import Event
+        db.add(Event(user_id=current_user.id, boost_id=b.id, event_type="renewal_acknowledgment",
+                     payload={"mail": state, "version": b.renewal_consent_version}))
+        db.commit()
     return b
 
 

@@ -46,7 +46,7 @@ def main() -> int:
     settings.OPENAI_API_KEY = ""
 
     with TestClient(app) as client:
-        reg = client.post("/api/auth/register", json={
+        reg = client.post("/api/auth/register", json={"terms_accepted": True,
             "email": f"async{int(time.time())}@example.com", "password": "async-pass-12345", "name": "Async"})
         check("register", reg.status_code in (200, 201), str(reg.status_code))
         login = client.post("/api/auth/login", data={

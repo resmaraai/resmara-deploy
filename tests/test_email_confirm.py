@@ -34,7 +34,7 @@ def check(name, ok, detail=""):
 
 
 def register(client, email, name="Agent"):
-    return client.post("/api/auth/register", json={"email": email, "password": "long enough",
+    return client.post("/api/auth/register", json={"terms_accepted": True, "email": email, "password": "long enough",
                                                    "name": name, "invite_code": "beta-code-123"})
 
 

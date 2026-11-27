@@ -33,7 +33,7 @@ from app.main import app  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 with TestClient(app) as client:
-    client.post("/api/auth/register", json={"email": "pay@example.com", "password": "long enough",
+    client.post("/api/auth/register", json={"terms_accepted": True, "email": "pay@example.com", "password": "long enough",
                                             "name": "Payer"})
     db = SessionLocal()
     user = db.query(User).filter(User.email == "pay@example.com").first()

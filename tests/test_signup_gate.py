@@ -64,30 +64,30 @@ try:
     settings.SIGNUP_CODE = "beta-code-123"
     settings.ADMIN_EMAILS = "second.owner@example.com"
 
-    blocked = client.post("/api/auth/register", json={
+    blocked = client.post("/api/auth/register", json={"terms_accepted": True,
         "email": "stranger@example.com", "password": "Hunter2Hunter2", "name": "Stranger"})
     check("register is refused without an invite", blocked.status_code == 403, str(blocked.status_code))
     check("and the reason is readable", "private beta" in blocked.text.lower(), blocked.text[:120])
 
-    wrong = client.post("/api/auth/register", json={
+    wrong = client.post("/api/auth/register", json={"terms_accepted": True,
         "email": "stranger@example.com", "password": "Hunter2Hunter2", "invite_code": "guess"})
     check("a wrong invite code is refused", wrong.status_code == 403, str(wrong.status_code))
 
-    invited = client.post("/api/auth/register", json={
+    invited = client.post("/api/auth/register", json={"terms_accepted": True,
         "email": "partner@example.com", "password": "Hunter2Hunter2", "invite_code": "beta-code-123"})
     check("the right invite code creates the account", invited.status_code == 201, invited.text[:120])
 
-    owner = client.post("/api/auth/register", json={
+    owner = client.post("/api/auth/register", json={"terms_accepted": True,
         "email": "owner@example.com", "password": "Hunter2Hunter2"})
     check("an allowlisted owner needs no code", owner.status_code == 201, owner.text[:120])
 
     # A second operator is an env-var edit, not a database script: the address signs up
     # without an invite code and comes out of registration already an operator.
-    second = client.post("/api/auth/register", json={
+    second = client.post("/api/auth/register", json={"terms_accepted": True,
         "email": "second.owner@example.com", "password": "Hunter2Hunter2", "name": "Second"})
     check("a listed operator signs up without an invite", second.status_code == 201, second.text[:160])
     check("and is an operator immediately", second.json().get("is_admin") is True, str(second.json()))
-    first = client.post("/api/auth/register", json={
+    first = client.post("/api/auth/register", json={"terms_accepted": True,
         "email": "plain@example.com", "password": "Hunter2Hunter2", "invite_code": "beta-code-123"})
     check("an ordinary invited account is not an operator",
           first.status_code == 201 and first.json().get("is_admin") is False, str(first.json())[:160])

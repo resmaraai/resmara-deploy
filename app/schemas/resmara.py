@@ -13,6 +13,11 @@ class UserCreate(BaseModel):
     # utm_source / utm_medium / utm_campaign, fbclid, the ad or campaign id, the referrer. It
     # is stamped on the account at creation and never changed afterwards.
     source: Optional[Dict[str, Any]] = None
+    # Terms (Engine 1 §1): the box the agent ticked, and which version of the Terms that was.
+    # Required — an account created without it is refused 400, and the acceptance is stored with
+    # the time, IP and browser, which is what the Facebook door already does.
+    terms_accepted: bool = False
+    terms_version: Optional[str] = None
 
 class UserOut(BaseModel):
     id: int
@@ -26,8 +31,19 @@ class UserOut(BaseModel):
     # console reads these to draw its sidebar; the server checks them again on every call.
     team_access: Optional[list[str]] = None
     team_super_admin: bool = False
+    # Terms (Engine 1 §1): the version this account last accepted. The page compares it with
+    # GET /api/auth/terms to decide whether to ask again — the server refuses money-moving
+    # calls until it matches, so this is a courtesy that saves a failed attempt.
+    terms_version: Optional[str] = None
+    terms_accepted_at: Optional[datetime] = None
     class Config:
         from_attributes = True
+
+
+class TermsIn(BaseModel):
+    """Accepting the Terms: the version the page is showing, so a stale tab cannot accept a
+    version that no longer exists."""
+    version: Optional[str] = None
 
 class Token(BaseModel):
     access_token: str

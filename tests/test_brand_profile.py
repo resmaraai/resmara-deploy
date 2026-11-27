@@ -37,7 +37,7 @@ client = TestClient(app)
 
 # --- an account ------------------------------------------------------------------
 r = client.post("/api/auth/register",
-                json={"email": "owner@example.com", "password": "brandtest123", "name": "Dana Agent"})
+                json={"terms_accepted": True, "email": "owner@example.com", "password": "brandtest123", "name": "Dana Agent"})
 check("an admin-allowlisted account can be created", r.status_code == 201, f"{r.status_code} {r.text[:120]}")
 
 r = client.post("/api/auth/login", data={"username": "owner@example.com", "password": "brandtest123"})
@@ -84,7 +84,7 @@ check("a refused write leaves the stored profile alone", after == profile, f"{li
 
 # --- a second account cannot see the first account's profile ----------------------
 r = client.post("/api/auth/register",
-                json={"email": "second@example.com", "password": "brandtest123", "name": "Other"})
+                json={"terms_accepted": True, "email": "second@example.com", "password": "brandtest123", "name": "Other"})
 if r.status_code in (201, 403):
     # 403 is the beta gate — that is the door working, so the isolation check is skipped
     # rather than asserted against an unauthenticated 401.

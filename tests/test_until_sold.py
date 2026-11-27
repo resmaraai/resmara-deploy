@@ -57,6 +57,11 @@ def main() -> int:
         other = User(email="other@example.com", name="Other", is_active=True, is_admin=False,
                      hashed_password=get_password_hash("otherpass123"))
         db.add_all([owner, other]); db.commit(); db.refresh(owner); db.refresh(other)
+        # Engine 10 §8: turning it on carries a Terms agreement, so both accounts are seeded the
+        # way sign-up seeds them (the refusal of a stale/missing agreement is pinned separately).
+        from app.services.consent import current_terms
+        owner.terms_version = other.terms_version = current_terms()
+        db.commit()
         b = Boost(user_id=owner.id, address="12 Until Sold Lane", main_status="Live", stage="LAUNCHED",
                   hidden=False)
         db.add(b); db.commit(); db.refresh(b)
@@ -71,7 +76,8 @@ def main() -> int:
     H = {"Authorization": "Bearer " + (tok.json().get("access_token") or "")}
 
     # ---------------------------------------------------------------- turn it on
-    on = client.post("/api/boosts/%d/until-sold" % boost_id, params={"until_sold": True}, headers=H)
+    on = client.post("/api/boosts/%d/until-sold" % boost_id,
+                     params={"until_sold": True, "renewal_consent": current_terms()}, headers=H)
     check("turning it on answers 200", on.status_code == 200, on.text[:160])
     body = on.json()
     check("the campaign reports until_sold true", body.get("until_sold") is True, str(body.get("until_sold")))
@@ -115,7 +121,8 @@ def main() -> int:
         db.commit()
     finally:
         db.close()
-    client.post("/api/boosts/%d/until-sold" % boost_id, params={"until_sold": True}, headers=H)
+    client.post("/api/boosts/%d/until-sold" % boost_id,
+                params={"until_sold": True, "renewal_consent": current_terms()}, headers=H)
     off = client.post("/api/boosts/%d/until-sold" % boost_id, params={"until_sold": False}, headers=H)
     check("turning it off answers 200", off.status_code == 200, off.text[:120])
     check("off clears the flag", off.json().get("until_sold") is False)

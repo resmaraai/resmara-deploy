@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db, User, PasswordReset, Event
 from app.core.security import get_password_hash, verify_password, create_access_token, get_current_user
-from app.schemas.resmara import UserCreate, UserOut, Token
+from app.schemas.resmara import UserCreate, UserOut, Token, TermsIn
 from app.services import mail
 from app.services.access import signup_block_reason, parse_allowlist
 
@@ -55,8 +55,14 @@ def _send_confirmation(user: User, db: Session) -> str:
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
+def register(user_in: UserCreate, request: Request, db: Session = Depends(get_db)):
     email = user_in.email.strip().lower()
+    # Terms first (Engine 1 §1): an account created without the box ticked is not an account
+    # we can charge or publish for, and the Facebook door already refuses the same way.
+    if not user_in.terms_accepted:
+        raise HTTPException(
+            status_code=400,
+            detail="Tick the box to accept the Terms of Service and Privacy Policy.")
     # Same rule the reset and change-password screens enforce, checked here too: an account
     # created over the API with a one-character password is a support ticket waiting to happen.
     if len(user_in.password or "") < 8:
@@ -74,8 +80,12 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     db.flush()
     # Engine 9, section 1a: stamp where this sign-up came from, once, before anything else reads
     # the account. The stamp is what Marketing's channel rows are built on.
-    from app.services import attribution
+    from app.services import attribution, consent
     attribution.stamp_signup(db, user, getattr(user_in, "source", None))
+    # Engine 1 §1: the agreement, with the time, IP and browser it was given from. The account
+    # columns answer "current?" cheaply; the Event is the audit row a dispute would ask for.
+    consent.record_terms(db, user, user_in.terms_version or consent.current_terms(), request,
+                         source="password")
     # The activity log is what the operator console charts; a new account is the first
     # thing it should be able to show.
     # Email confirmation before first sign-in (item 8). When no provider is configured the
@@ -148,6 +158,44 @@ def resend_confirmation(email: str, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.get("/terms")
+def terms_state(current_user: User = Depends(get_current_user)):
+    """What the page asks before it lets an account spend money.
+
+    ``stale`` is the whole point: the server already refuses a stale account, this only lets the
+    page ask before the attempt fails.
+    """
+    from app.services import consent
+    return {"current": consent.current_terms(),
+            "accepted": getattr(current_user, "terms_version", None),
+            "accepted_at": (current_user.terms_accepted_at.isoformat()
+                            if getattr(current_user, "terms_accepted_at", None) else None),
+            "stale": consent.terms_stale(current_user)}
+
+
+@router.post("/me/terms")
+def accept_terms(body: TermsIn, request: Request,
+                 current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Record the acceptance of the current Terms, and say when and from where.
+
+    A stale tab that offers an older version is refused: accepting a version that is no longer
+    presented is not an agreement to the one that is.
+    """
+    from app.services import consent
+    version = (body.version or "").strip()
+    if version and version != consent.current_terms():
+        raise HTTPException(status_code=400, detail={
+            "error": "terms_version_mismatch",
+            "current": consent.current_terms(),
+            "why": "The Terms changed while this page was open. Reload, then accept again.",
+        })
+    record = consent.record_terms(db, current_user, consent.current_terms(), request,
+                                  source="re-accept")
+    db.commit()
+    db.refresh(current_user)
+    return {"status": "accepted", **record}
 
 
 @router.patch("/me", response_model=UserOut)

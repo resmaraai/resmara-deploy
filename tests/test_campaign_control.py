@@ -90,9 +90,9 @@ def check(name, ok, detail=""):
 
 
 # --------------------------------------------------------------------------- setup
-client.post("/api/auth/register", json={"email": "agent@example.com", "password": "long enough",
+client.post("/api/auth/register", json={"terms_accepted": True, "email": "agent@example.com", "password": "long enough",
                                        "name": "Agent", "invite_code": "beta-code-123"})
-client.post("/api/auth/register", json={"email": "owner@example.com", "password": "long enough",
+client.post("/api/auth/register", json={"terms_accepted": True, "email": "owner@example.com", "password": "long enough",
                                         "name": "Owner"})
 def connect_meta(email):
     """Mark the account as Meta-connected: + Campaign is closed until it is (item 8)."""

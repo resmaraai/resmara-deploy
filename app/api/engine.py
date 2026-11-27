@@ -453,9 +453,13 @@ async def launch(boost_id: int, body: dict = None,
     approved by a human. Objects are created ACTIVE against the ad set's go-live time, so an
     approved campaign actually delivers (Ad Engine §4.4).
     """
+    from app.services import consent
     from app.services.launch import launch_boost
     boost = _owned_boost(boost_id, current_user, db)
     require_paid(boost, current_user, db)
+    # Going live in public is a money-moving, terms-bearing call: an account that has not
+    # accepted the Terms now presented is asked first (Engine 10 §1).
+    consent.require_current_terms(current_user)
     body = body or {}
     # There is no auto-approve path any more, for a launch or a re-run: approval is a human
     # reading the posts, and an API flag that skips it is the same "go live without review"

@@ -48,12 +48,12 @@ client = TestClient(app)
 PASSWORD = "correct horse battery"
 NEW_PASSWORD = "another long password"
 
-r = client.post("/api/auth/register", json={"email": "agent@example.com", "password": PASSWORD,
+r = client.post("/api/auth/register", json={"terms_accepted": True, "email": "agent@example.com", "password": PASSWORD,
                                             "name": "Agent", "invite_code": "beta-code-123"})
 check("an agent can register", r.status_code == 201, r.text)
 agent = r.json()
 
-r = client.post("/api/auth/register", json={"email": "owner@example.com", "password": PASSWORD,
+r = client.post("/api/auth/register", json={"terms_accepted": True, "email": "owner@example.com", "password": PASSWORD,
                                             "name": "Owner"})
 check("the operator can register", r.status_code == 201, r.text)
 check("an allowlisted owner is an admin", r.json().get("is_admin") is True, r.text)
@@ -62,7 +62,7 @@ admin_token = client.post("/api/auth/login",
 admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
 # ---- a short password is refused, not stored -----------------------------------------
-r = client.post("/api/auth/register", json={"email": "short@example.com", "password": "abc",
+r = client.post("/api/auth/register", json={"terms_accepted": True, "email": "short@example.com", "password": "abc",
                                             "invite_code": "beta-code-123"})
 check("a 3-character password is refused", r.status_code == 400, r.text)
 

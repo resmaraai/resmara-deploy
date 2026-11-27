@@ -53,7 +53,7 @@ def main() -> int:
 
     email = "media-check@example.com"
     password = "media-pass-123"
-    r = client.post("/api/auth/register", json={"email": email, "password": password, "name": "Media"})
+    r = client.post("/api/auth/register", json={"terms_accepted": True, "email": email, "password": password, "name": "Media"})
     if r.status_code not in (200, 201):
         check("register", False, r.text[:200])
         return 1

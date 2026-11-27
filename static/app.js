@@ -779,3 +779,12 @@ function openPageChooser(){
  S.metaStatus(false).then(pick).catch(()=>{});
 }
 window.addEventListener('load',()=>{try{if(typeof fbReturn==='function')fbReturn();}catch(e){}try{metaReturnNotice();}catch(e){}});
+// Terms changed: the server refuses a campaign purchase, a launch and automatic renewal until
+// the account accepts the version now presented (app/services/consent.py). Ask once, record it,
+// and let the person repeat what they were doing — a refusal with no way forward is a dead end.
+if(window.RM&&RM.onTermsStale){RM.onTermsStale(function(err){
+ const v=(err&&err.detail&&err.detail.current)||RM.termsVersion();
+ if(!window.confirm('Our Terms of Service and Privacy Policy changed. Accept the updated version to continue?'))return;
+ RM.acceptTerms(v).then(function(){toast('Terms accepted — try that again.');})
+  .catch(function(e){toast('Could not record the acceptance: '+(e&&e.message?e.message:'unknown error'));});
+});}

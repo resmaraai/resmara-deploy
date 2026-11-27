@@ -62,9 +62,13 @@ def main() -> int:
     def account(email: str) -> tuple[dict, int]:
         with SessionLocal() as db:
             if not db.query(User).filter(User.email == email).first():
+                # Engine 10 §1: a repeat round charges a card, so the account is seeded with the
+                # Terms acceptance the sign-up screen would have written.
+                from app.services.consent import current_terms
                 db.add(User(email=email, name=email,
                             hashed_password=get_password_hash("repeat-pass-123"),
-                            is_active=True, subscription_status="active"))
+                            is_active=True, subscription_status="active",
+                            terms_version=current_terms()))
                 db.commit()
             uid = db.query(User).filter(User.email == email).first().id
         r = client.post("/api/auth/login", data={"username": email, "password": "repeat-pass-123"})

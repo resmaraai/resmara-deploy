@@ -73,7 +73,7 @@ def check(name, ok, detail=""):
 
 
 def account(client, email, token="page-token"):
-    client.post("/api/auth/register", json={"email": email, "password": "long enough",
+    client.post("/api/auth/register", json={"terms_accepted": True, "email": email, "password": "long enough",
                                             "name": "Agent"})
     tok = client.post("/api/auth/login", data={"username": email, "password": "long enough"}
                       ).json()["access_token"]
@@ -88,7 +88,7 @@ def account(client, email, token="page-token"):
 
 with TestClient(app) as client:
     print("=== an agent with no Facebook connection is told so ===")
-    client.post("/api/auth/register", json={"email": "nometa@example.com",
+    client.post("/api/auth/register", json={"terms_accepted": True, "email": "nometa@example.com",
                                             "password": "long enough", "name": "Agent"})
     tok = client.post("/api/auth/login", data={"username": "nometa@example.com",
                                                "password": "long enough"}).json()["access_token"]

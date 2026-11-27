@@ -46,7 +46,7 @@ def check(name, ok, detail=""):
 
 client = TestClient(app)
 
-r = client.post("/api/auth/register", json={"email": "client@example.com", "password": "long enough",
+r = client.post("/api/auth/register", json={"terms_accepted": True, "email": "client@example.com", "password": "long enough",
                                             "name": "Client", "invite_code": "beta-code-123"})
 check("a client can register", r.status_code == 201, r.text)
 token = client.post("/api/auth/login", data={"username": "client@example.com",

@@ -85,7 +85,7 @@ check("  ...and the address survives", "O'Neil (Back)" in text_of(pdf3), text_of
 
 print("\n=== the route serves it as a download ===")
 with TestClient(app) as client:
-    client.post("/api/auth/register", json={"email": "rep@example.com", "password": "long enough",
+    client.post("/api/auth/register", json={"terms_accepted": True, "email": "rep@example.com", "password": "long enough",
                                             "name": "Reporter"})
     token = client.post("/api/auth/login",
                         data={"username": "rep@example.com", "password": "long enough"}

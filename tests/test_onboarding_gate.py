@@ -35,7 +35,7 @@ def check(name, ok, detail=""):
 
 
 with TestClient(app) as client:
-    client.post("/api/auth/register", json={"email": "new@example.com", "password": "long enough",
+    client.post("/api/auth/register", json={"terms_accepted": True, "email": "new@example.com", "password": "long enough",
                                             "name": "New Agent", "invite_code": "beta-code-123"})
     token = client.post("/api/auth/login",
                         data={"username": "new@example.com", "password": "long enough"}

@@ -180,7 +180,7 @@ ok("there are exactly three kinds", post_retry.KINDS == ("our_fault", "connectio
 
 # --------------------------------------------------------------------------- fixtures
 pw = "retry-pass-12345"
-SITE.post("/api/auth/register", json={"email": "retry@example.com", "password": pw, "name": "Retry"})
+SITE.post("/api/auth/register", json={"terms_accepted": True, "email": "retry@example.com", "password": pw, "name": "Retry"})
 tok = SITE.post("/api/auth/login", data={"username": "retry@example.com", "password": pw}).json()["access_token"]
 H = {"Authorization": f"Bearer {tok}"}
 
