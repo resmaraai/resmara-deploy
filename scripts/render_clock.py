@@ -136,6 +136,9 @@ def main() -> int:
         # Engine 4, 9b: the platform rules (banned hashtags, Meta's housing ad rules), monthly.
         if now.day == 1:
             run_step("platform rules", "/api/admin/platform-rules/refresh", 300, quiet_when='"fresh"')
+        # Engine 9: the Mailchimp list, daily, so tags (has run a campaign, past client) switch the
+        # right series on and the wrong one off. Says nothing until Mailchimp is connected.
+        run_step("mailchimp sync", "/api/admin/email-campaigns/sync/run", 300, quiet_when='"synced":false')
         # Engine 1 §6: welcome / day 3 / day 7 / day 14, once each, stopping at the first
         # launched campaign. Idempotent server-side, so a doubled tick sends nothing twice.
         status, body = post_body("/api/admin/onboarding/emails/run", 180)

@@ -1,6 +1,6 @@
 """Engine 1 Part A §6-7: the four onboarding emails, and what makes each one honest.
 
-Adam's spec: from support@resmara.com, written as Adam, personal, short, one clear next step,
+Adam's spec: from support@resmara.com, signed by the Resmara team (Adam, 25 Nov: never by name), personal, short, one clear next step,
 AI-written from the agent's *real* account facts - never a guess, never a promise. Four emails at
 most (welcome, day 3, day 7, day 14), and they stop the moment a campaign launches, because from
 then on the campaign itself is the relationship.
@@ -14,8 +14,14 @@ What is code here, on purpose:
   * "never twice", recorded as one event per step on the account.
 
 The wording comes from templates that carry the facts. When a model is configured it rewrites the
-template in Adam's voice; if the model is unavailable or returns nothing, the template is what the
+template in the team's voice; if the model is unavailable or returns nothing, the template is what the
 agent reads - a real email, not silence.
+
+Since 25 Nov (Adam): once Mailchimp is connected, every follow-up email is a Mailchimp series, so
+each one is tracked (sent, opened, clicked, bounced, unsubscribed). From then on this module sends
+nothing: a new account goes onto the Mailchimp list at sign-up, tagged "signed up, no campaign yet",
+and the "Welcome and check-ins" series (day 0, 3, 7, 14) runs there. Until Mailchimp is connected,
+the emails below keep going out, so no new agent is ever left without them.
 """
 import hashlib
 import hmac
@@ -26,7 +32,7 @@ from app.db.session import Boost, Event, Lead, User
 from app.services import mail
 
 STEPS = (("welcome", 0), ("day3", 3), ("day7", 7), ("day14", 14))
-FROM_NAME = "Adam, Resmara support"
+FROM_NAME = "The Resmara team"
 
 SITUATIONS = {
     "not_back": "Looks like you haven't been back yet. Need a hand getting started?",
@@ -138,7 +144,7 @@ def compose(step: str, user: User, f: dict) -> tuple[str, str]:
     if step == "welcome":
         subject = "Welcome to Resmara"
         body = (f"{hi}\n\n"
-                f"I'm Adam - I look after support at Resmara. Thanks for joining.\n\n"
+                f"Thanks for joining Resmara. We're glad you're here.\n\n"
                 f"The first thing to do is connect your Facebook Page, Instagram and ad account, "
                 f"because that's what lets Resmara post and run ads for you. "
                 f"{'You already have that done - nice.' if f['meta_connected'] else 'It takes about two minutes.'}\n\n"
@@ -186,8 +192,18 @@ def _send(db, user: User, step: str, f: dict) -> dict:
     return {"step": step, "to": user.email, "sent": bool(ok), "subject": subject}
 
 
+def mailchimp_owns() -> bool:
+    """Mailchimp sends the follow-ups once it is connected (Adam, 25 Nov)."""
+    from app.services import mailchimp
+    return mailchimp.configured()
+
+
 def send_welcome(user: User, db) -> dict:
-    """The first email, at the moment the account exists. Never to a test or closed account."""
+    """The first email, at the moment the account exists. Never to a test or closed account.
+    With Mailchimp connected, the account goes onto the list instead and its series sends it."""
+    if mailchimp_owns():
+        from app.services import mailchimp
+        return {"step": "welcome", "sent": False, "reason": "mailchimp", "list": mailchimp.add_signup(db, user)}
     f = account_facts(db, user)
     if f["test"] or f["closed"] or not f["opted_in"] or _already_sent(db, user, "welcome"):
         return {"step": "welcome", "sent": False, "reason": "not eligible"}
@@ -196,6 +212,8 @@ def send_welcome(user: User, db) -> dict:
 
 def run_due(db, now: datetime | None = None) -> dict:
     """Send every onboarding email whose day has come. Idempotent: one email per step, ever."""
+    if mailchimp_owns():
+        return {"sent": [], "skipped": 0, "stopped_after_launch": 0, "owner": "mailchimp"}
     now = now or datetime.now(timezone.utc)
     sent, skipped, stopped = [], 0, []
     users = db.query(User).all()

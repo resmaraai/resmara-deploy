@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -50,14 +50,17 @@ MISSING = {
 # The three series (Engine 9, section 2). The emails are built in Mailchimp in Resmara's look and
 # approved by Adam; these names are how their reports are matched back to a series.
 SERIES: List[Dict[str, Any]] = [
-    {"key": "welcome", "name": "Welcome", "audience": "everyone who signs up",
-     "when": "day 0, 3, 7 and 14",
+    # Every follow-up email is a Mailchimp series so each one is tracked (Adam, 25 Nov). The
+    # emails are named in Mailchimp exactly as below; that name is how their numbers are found.
+    {"key": "welcome", "name": "Welcome and check-ins", "audience": "signed up, no campaign yet",
+     "when": "day 0, 3, 7 and 14; stops when they launch a campaign",
      "emails": ["Welcome — day 0", "Welcome — day 3", "Welcome — day 7", "Welcome — day 14"]},
-    {"key": "first_campaign", "name": "Start your first campaign",
-     "audience": "signed up, no campaign yet", "when": "day 2, 5 and 10",
-     "emails": ["First campaign — day 2", "First campaign — day 5", "First campaign — day 10"]},
-    {"key": "tips", "name": "Tips and updates", "audience": "current clients",
-     "when": "every 2 weeks", "emails": ["Tips and updates"]},
+    {"key": "tips", "name": "Tips and updates", "audience": "has run a campaign",
+     "when": "a week after their first campaign, then every 2 weeks while they're a client",
+     "emails": ["Tips and updates — 1", "Tips and updates — 2", "Tips and updates — 3",
+                "Tips and updates — 4"]},
+    {"key": "past", "name": "Got a new listing?", "audience": "past client",
+     "when": "60 days after their last campaign", "emails": ["Got a new listing?"]},
 ]
 
 COST_KEYS = ("mailchimp_monthly_usd", "hosting_monthly_usd")
@@ -559,6 +562,14 @@ def digital_ads_status(object_id: str, payload: Dict[str, Any],
 
 
 # --------------------------------------------------------------------------- Email campaigns
+def _in_window(stamp: Any, start: datetime, end: datetime) -> bool:
+    try:
+        seen = datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).replace(tzinfo=None)
+    except Exception:                                            # noqa: BLE001
+        return False
+    return start <= seen <= end
+
+
 def _series_state(db: Session) -> Dict[str, bool]:
     stored = ((_settings(db).payload or {}).get("series") or {})
     return {s["key"]: bool(stored.get(s["key"], True)) for s in SERIES}
@@ -572,7 +583,9 @@ def _series_with_reports(db: Session) -> Dict[str, Any]:
         return {"connected": False, "why": why,
                 "series": [{**s, "on": on[s["key"]],
                             "emails": [{"name": e, "sent": None, "opened": None,
-                                        "clicked": None, "sent_at": None, "in_mailchimp": False}
+                                        "clicked": None, "bounced": None, "unsubscribed": None,
+                                        "open_rate": None, "click_rate": None, "bounce_rate": None,
+                                        "sent_at": None, "in_mailchimp": False}
                                        for e in s["emails"]]}
                            for s in SERIES]}
 
@@ -591,11 +604,13 @@ def _series_with_reports(db: Session) -> Dict[str, Any]:
         emails = []
         for name in definition["emails"]:
             hits = _match(name)
+            numbers = mailchimp.rates(hits)
             emails.append({
                 "name": name,
-                "sent": sum(int(h.get("sent") or 0) for h in hits) if hits else 0,
-                "opened": sum(int(h.get("opened") or 0) for h in hits) if hits else 0,
-                "clicked": sum(int(h.get("clicked") or 0) for h in hits) if hits else 0,
+                "sent": numbers["sent"], "opened": numbers["opened"], "clicked": numbers["clicked"],
+                "bounced": numbers["bounced"], "unsubscribed": numbers["unsubscribed"],
+                "open_rate": numbers["open_rate"], "click_rate": numbers["click_rate"],
+                "bounce_rate": numbers["bounce_rate"],
                 "sent_at": max((h.get("sent_at") or "" for h in hits), default="") or None,
                 "in_mailchimp": bool(hits),
             })
@@ -677,8 +692,11 @@ def email_campaigns(days: int = Query(30, ge=1, le=180),
                             else (None, mailchimp.why_not()))
     brought_in = _email_brought_in(db, agents)
 
-    opened = sum(int(r.get("opened") or 0) for r in (reports or [])) if reports else None
-    clicked = sum(int(r.get("clicked") or 0) for r in (reports or [])) if reports else None
+    # The top band covers the emails sent in the window, the way the rest of the page does.
+    in_window = [r for r in (reports or []) if _in_window(r.get("sent_at"), start, end)]
+    totals = mailchimp.rates(in_window) if reports is not None else None
+    opened = totals["opened"] if totals else None
+    clicked = totals["clicked"] if totals else None
     tags = mailchimp.tag_counts(members) if members is not None else []
 
     # Consent: our own column is the record; Mailchimp's unsubscribe is the final word.
@@ -718,8 +736,13 @@ def email_campaigns(days: int = Query(30, ge=1, le=180),
         "days": window_days,
         "list_size": audience.get("contacts"),
         "audience": audience,
+        "sent": totals["sent"] if totals else None,
         "opened": opened,
         "clicked": clicked,
+        "bounced": totals["bounced"] if totals else None,
+        "open_rate": totals["open_rate"] if totals else None,
+        "click_rate": totals["click_rate"] if totals else None,
+        "bounce_rate": totals["bounce_rate"] if totals else None,
         "paying": brought_in["paying"],
         "campaigns": brought_in["campaigns"],
         "money_back_usd": brought_in["money_back_usd"],
@@ -748,6 +771,19 @@ def sync_email_audience(user=Depends(team_access.needs("business")),
     if not result.get("synced"):
         return {"synced": False, "why": result.get("why") or mailchimp.why_not()}
     return result
+
+
+@router.post("/admin/email-campaigns/sync/run")
+def sync_email_audience_clock(x_resmara_token: str = Header(default=""), db: Session = Depends(get_db)):
+    """The Render clock's daily sync: new tags (has run a campaign, past client) reach Mailchimp
+    the same day, so the right series starts and the wrong one stops. Machine token only."""
+    import hmac
+    expected = (getattr(settings, "PUBLISH_TOKEN", "") or "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="RESMARA_PUBLISH_TOKEN is not configured")
+    if not hmac.compare_digest(x_resmara_token or "", expected):
+        raise HTTPException(status_code=403, detail="Bad machine token")
+    return mailchimp.sync(db)
 
 
 @router.put("/admin/email-campaigns/series/{key}")

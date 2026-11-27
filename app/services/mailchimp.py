@@ -1,9 +1,11 @@
 """Mailchimp, through its API (Engine 9, section 2).
 
-Resmara's own Mailchimp account holds one audience, "Resmara clients", built from *our*
-accounts - there are no bought lists. Every client's address is a contact, tagged with what
-they are doing (signed up, no campaign yet / has run a campaign / Run it until it sells), and
-the series are approved emails Adam wrote, started from those tags.
+Resmara's own Mailchimp account holds one audience, "Resmara", built from *our* accounts - there
+are no bought lists. Every client's address is a contact, tagged with what they are doing
+(signed up, no campaign yet / has run a campaign / past client / Run it until it sells), and the
+series are approved emails Adam wrote, started from those tags. Since 25 Nov every follow-up
+email (the welcome and check-ins included) is a Mailchimp series, so each one is tracked: sent,
+opened, clicked, bounced, unsubscribed (Adam).
 
 Two rules this module follows:
 
@@ -39,7 +41,11 @@ TAGS = {
     "new": "signed up, no campaign yet",
     "campaign": "has run a campaign",
     "until_sold": "Run it until it sells",
+    "past": "past client",
 }
+# A client whose last paid campaign is older than this, with nothing running, is a past client:
+# the "Got a new listing?" series starts from that tag (Adam, 25 Nov).
+PAST_CLIENT_DAYS = 60
 
 
 def _env(name: str) -> str:
@@ -174,28 +180,57 @@ def tag_counts(rows: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, An
             + [{"name": "unsubscribed", "count": sum(1 for r in rows if r.get("status") == "unsubscribed")}])
 
 
-def reports(count: int = 50) -> tuple[Optional[List[Dict[str, Any]]], str]:
-    """Sent campaigns and their opens/clicks, newest first (Mailchimp's own reports)."""
-    data, why = _request("/reports", {"count": count, "sort_field": "send_time",
-                                      "sort_dir": "DESC",
-                                      "fields": "reports.id,reports.campaign_title,"
+def reports(count: int = 200) -> tuple[Optional[List[Dict[str, Any]]], str]:
+    """Every sent email and its numbers, newest first (Mailchimp's own reports): sent, opens and
+    open rate, clicks and click rate, bounces and unsubscribes. Automation (series) emails are
+    included; Mailchimp files them in the same reports list."""
+    data, why = _request("/reports", {"count": count,
+                                      "fields": "reports.id,reports.campaign_title,reports.type,"
                                                 "reports.emails_sent,reports.send_time,"
-                                                "reports.opens.unique_opens,"
+                                                "reports.unsubscribed,"
+                                                "reports.opens.unique_opens,reports.opens.open_rate,"
                                                 "reports.clicks.unique_clicks,"
-                                                "reports.clicks.click_rate"})
+                                                "reports.clicks.click_rate,"
+                                                "reports.bounces.hard_bounces,"
+                                                "reports.bounces.soft_bounces,"
+                                                "reports.bounces.syntax_errors"})
     if data is None:
         return None, why
     out = []
     for row in data.get("reports") or []:
+        bounces = row.get("bounces") or {}
         out.append({
             "id": row.get("id"),
             "name": row.get("campaign_title") or "Untitled",
+            "type": row.get("type") or "",
             "sent": int(row.get("emails_sent") or 0),
             "opened": int(((row.get("opens") or {}).get("unique_opens")) or 0),
             "clicked": int(((row.get("clicks") or {}).get("unique_clicks")) or 0),
+            "bounced": int(bounces.get("hard_bounces") or 0) + int(bounces.get("soft_bounces") or 0)
+                       + int(bounces.get("syntax_errors") or 0),
+            "unsubscribed": int(row.get("unsubscribed") or 0),
             "sent_at": row.get("send_time"),
         })
+    out.sort(key=lambda r: r.get("sent_at") or "", reverse=True)
     return out, ""
+
+
+def rates(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Totals and the three rates over any set of sent emails. Rates are of emails delivered
+    (sent minus bounced), the way Mailchimp counts them; None when nothing was sent."""
+    sent = sum(int(r.get("sent") or 0) for r in rows)
+    bounced = sum(int(r.get("bounced") or 0) for r in rows)
+    opened = sum(int(r.get("opened") or 0) for r in rows)
+    clicked = sum(int(r.get("clicked") or 0) for r in rows)
+    unsub = sum(int(r.get("unsubscribed") or 0) for r in rows)
+    delivered = max(sent - bounced, 0)
+
+    def pct(n: int, d: int) -> Optional[float]:
+        return round(100.0 * n / d, 1) if d else None
+
+    return {"sent": sent, "opened": opened, "clicked": clicked, "bounced": bounced,
+            "unsubscribed": unsub, "open_rate": pct(opened, delivered),
+            "click_rate": pct(clicked, delivered), "bounce_rate": pct(bounced, sent)}
 
 
 def clicked_since(email: str, since: datetime) -> bool:
@@ -204,7 +239,8 @@ def clicked_since(email: str, since: datetime) -> bool:
     Only asked for an address that is about to buy, so the extra round trip is rare. Any error
     answers "no", which falls back to the sign-up stamp - a real observation, not a guess.
     """
-    return bool(click_events(email, since))
+    clicks, _why = click_events(email, since)
+    return bool(clicks)
 
 
 def click_events(email: str, since: datetime) -> tuple[List[Dict[str, Any]], str]:
@@ -237,25 +273,88 @@ def click_events(email: str, since: datetime) -> tuple[List[Dict[str, Any]], str
     return out, ""
 
 
-def sync(db) -> Dict[str, Any]:
-    """Put every real client account in the audience, with the tag that describes them.
+def tags_for(db, user) -> List[str]:
+    """The tags that describe this account today. Exactly one of new / has run a campaign /
+    past client, plus Run it until it sells when it's on."""
+    from datetime import timedelta
+    from app.db.session import Boost
+    paid = (db.query(Boost).filter(Boost.user_id == user.id, Boost.paid_at.isnot(None))
+            .order_by(Boost.paid_at.desc()).all())
+    until_sold = any(bool(getattr(b, "until_sold", False)) for b in paid)
+    if not paid:
+        return [TAGS["new"]]
+    last = paid[0].paid_at
+    if last is not None and getattr(last, "tzinfo", None) is not None:
+        last = last.replace(tzinfo=None)
+    past = (not until_sold and last is not None
+            and last < datetime.utcnow() - timedelta(days=PAST_CLIENT_DAYS))
+    tags = [TAGS["past"] if past else TAGS["campaign"]]
+    if until_sold:
+        tags.append(TAGS["until_sold"])
+    return tags
 
-    Test accounts and closed accounts come off the list. The tags are the whole targeting
-    mechanism for the three series, so they are rewritten on every sync rather than merged.
-    """
+
+def _push(user, tags: List[str], known: Optional[Dict[str, Any]], audience: str) -> str:
+    """One account into the audience. Returns added / updated / unsubscribed / skipped.
+
+    The agent's own choice decides: unticked at sign-up (or switched off later) means they are
+    marked unsubscribed here and never get a marketing or follow-up email. Mailchimp's own
+    unsubscribe is never undone by a sync."""
+    email = (user.email or "").strip().lower()
+    h = member_hash(email)
+    if getattr(user, "marketing_optin", True) is False:
+        if known and known.get("status") == "subscribed":
+            _request(f"/lists/{audience}/members/{h}", method="PATCH", json={"status": "unsubscribed"})
+            return "unsubscribed"
+        return "skipped"
+    body = {"email_address": email, "status_if_new": "subscribed",
+            "merge_fields": {"FNAME": (user.name or "").split(" ")[0][:60]}}
+    if known and known.get("status") in ("unsubscribed", "cleaned", "archived"):
+        body.pop("status_if_new")
+        body["status"] = known["status"]
+    _request(f"/lists/{audience}/members/{h}", method="PUT", json=body)
+    # Tags are switched, not added: a tag that no longer fits is turned off, so a series that
+    # starts from "signed up, no campaign yet" stops once the agent has run a campaign.
+    _request(f"/lists/{audience}/members/{h}/tags", method="POST",
+             json={"tags": [{"name": t, "status": "active" if t in tags else "inactive"}
+                            for t in TAGS.values()]})
+    return "updated" if known else "added"
+
+
+def add_signup(db, user) -> str:
+    """A new account goes on the list straight away, so the Welcome series starts on day 0."""
     from app.core.testdata import is_test_email
-    from app.db.session import Boost, User
+    if not configured() or not user or not (user.email or "").strip():
+        return "skipped"
+    if bool(getattr(user, "is_test", False)) or is_test_email(user.email):
+        return "skipped"
+    _key, _dc, audience_id = credentials()
+    try:
+        return _push(user, tags_for(db, user), None, audience_id)
+    except Exception as exc:                                     # noqa: BLE001 - never blocks a sign-up
+        log.info("mailchimp add_signup failed: %s", exc)
+        return "skipped"
+
+
+def sync(db) -> Dict[str, Any]:
+    """Put every real client account in the audience, with the tags that describe them today.
+
+    Test accounts and closed accounts come off the list. Run daily by the Render clock and from
+    the Team room's Sync button."""
+    from app.core.testdata import is_test_email
+    from app.db.session import User
 
     if not configured():
-        return {"synced": False, "why": why_not(), "added": 0, "updated": 0, "removed": 0}
+        return {"synced": False, "why": why_not(), "added": 0, "updated": 0, "removed": 0,
+                "unsubscribed": 0}
 
     _key, _dc, audience = credentials()
     have, why = members(force=True)
     if have is None:
-        return {"synced": False, "why": why, "added": 0, "updated": 0, "removed": 0}
+        return {"synced": False, "why": why, "added": 0, "updated": 0, "removed": 0, "unsubscribed": 0}
     known = {row["email"]: row for row in have}
 
-    added = updated = removed = 0
+    counts = {"added": 0, "updated": 0, "removed": 0, "unsubscribed": 0}
     for user in db.query(User).all():
         email = (user.email or "").strip().lower()
         if not email:
@@ -264,33 +363,14 @@ def sync(db) -> Dict[str, Any]:
         if test or not getattr(user, "is_active", True):
             if email in known:
                 _request(f"/lists/{audience}/members/{member_hash(email)}", method="DELETE")
-                removed += 1
+                counts["removed"] += 1
             continue
-
-        paid = (db.query(Boost).filter(Boost.user_id == user.id,
-                                       Boost.paid_at.isnot(None)).count())
-        until_sold = bool(db.query(Boost).filter(Boost.user_id == user.id,
-                                                 Boost.until_sold.is_(True)).count())
-        tags = [TAGS["campaign"] if paid else TAGS["new"]]
-        if until_sold:
-            tags.append(TAGS["until_sold"])
-
-        body = {"email_address": email, "status_if_new": "subscribed",
-                "merge_fields": {"FNAME": (user.name or "").split(" ")[0][:60]}}
-        if email in known and (known[email].get("status") in ("unsubscribed", "cleaned", "archived")):
-            # Never re-subscribe somebody who left: Mailchimp's own unsubscribe has to win.
-            body.pop("status_if_new")
-            body["status"] = known[email]["status"]
-        _request(f"/lists/{audience}/members/{member_hash(email)}", method="PUT", json=body)
-        _request(f"/lists/{audience}/members/{member_hash(email)}/tags", method="POST",
-                 json={"tags": [{"name": t, "status": "active"} for t in tags]})
-        if email in known:
-            updated += 1
-        else:
-            added += 1
+        result = _push(user, tags_for(db, user), known.get(email), audience)
+        if result in counts:
+            counts[result] += 1
 
     _CACHE["members"] = None
-    return {"synced": True, "why": "", "added": added, "updated": updated, "removed": removed}
+    return {"synced": True, "why": "", **counts}
 
 
 def csv_text(db) -> str:
@@ -303,7 +383,7 @@ def csv_text(db) -> str:
     import io
 
     from app.core.testdata import is_test_email
-    from app.db.session import Boost, User
+    from app.db.session import User
 
     rows = members(force=False)[0]
     unsubscribed = {row["email"] for row in (rows or []) if row.get("status") == "unsubscribed"}
@@ -318,8 +398,7 @@ def csv_text(db) -> str:
             continue
         if not getattr(user, "is_active", True):
             continue
-        paid = db.query(Boost).filter(Boost.user_id == user.id, Boost.paid_at.isnot(None)).count()
-        tag = TAGS["campaign"] if paid else TAGS["new"]
+        tag = ", ".join(tags_for(db, user))
         created = user.created_at
         when = created.replace(tzinfo=None).date().isoformat() if isinstance(created, datetime) else ""
         writer.writerow([email, user.name or "", when, user.signup_source or "",

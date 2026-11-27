@@ -211,10 +211,16 @@ const FB_TERMS = '<label class="terms-agree" style="display:flex;gap:10px;align-
  + '<a href="privacy.html" target="_blank" rel="noopener" style="color:#12354d;font-weight:700;text-decoration:underline">Privacy Policy</a>, including the '
  + '<b>arbitration agreement and class action waiver</b> in section 17 of the Terms.</span></label>';
 
+// Marketing tips: ticked by default, untick to say no (Adam, 25 Nov). Account emails always go.
+const FB_TIPS = '<label class="terms-agree" style="display:flex;gap:10px;align-items:flex-start;margin:10px 0 4px;font-size:14px;line-height:1.45;color:#12354d;cursor:pointer">'
+ + '<input type="checkbox" id="fbTips" checked style="margin-top:3px;width:18px;height:18px;flex:0 0 18px">'
+ + '<span>Send me marketing tips for my listings. Unsubscribe any time.</span></label>';
+
 function fbLoginPopup() {
  show(`<span class="eyebrow">RESMARA CLIENT AREA</span><h2>Log in with Facebook</h2>
  <p>Resmara does everything through Facebook: your Page, your Instagram and your ad account. Logging in connects them, so there is nothing else to set up first.</p>
  ${FB_TERMS}
+ ${FB_TIPS}
  <details class="invite-toggle"><summary>Have an invite code?</summary><label class="field">Invite code<input id="fbInvite" maxlength="64" autocomplete="off" spellcheck="false" placeholder="From your invitation"></label></details>
  <p class="fine" id="fbStatus" role="status"></p>
  <div class="modal-actions">
@@ -233,7 +239,8 @@ async function fbLoginBegin() {
  if (go) { go.disabled = true; go.textContent = 'Opening Facebook…'; }
  try {
   const invite = (document.getElementById('fbInvite') || {}).value || '';
-  const reply = await RM.facebookStart(RM.termsVersion ? RM.termsVersion() : undefined, invite);
+  const tips = document.getElementById('fbTips');
+  const reply = await RM.facebookStart(RM.termsVersion ? RM.termsVersion() : undefined, invite, tips ? tips.checked : true);
   if (reply && reply.redirect_url) { location.href = reply.redirect_url; return; }
   throw new Error('Facebook did not answer with a login window.');
  } catch (err) {
@@ -692,7 +699,7 @@ function showMetaResult(){
  if(ready){
  show(`<span class="robot-avatar" aria-hidden="true"></span><span class="eyebrow">DEMO CHECK COMPLETE</span><h2>Congratulations, you’re ready to run your first campaign.</h2><p>In this scenario your Business Portfolio, Page access and ad account passed the check.</p><div class="check">1. Add your listing and media, then start the campaign for $49.</div><div class="check">2. Review the branded draft and approve it.</div><div class="check">3. Approve your campaign when you’re ready to launch.</div><div class="modal-actions"><button class="alt" onclick="finishWorkspaceTour()">Skip for now</button><button onclick="workspaceTour(0)">Show me my dashboard</button></div>`);return
  }
- show(`<span class="eyebrow">DEMO CHECK · ACTION NEEDED</span><h2>Your ad account needs attention.</h2><p>You can still build a draft. Launch stays on hold until the account passes the check.</p><div class="check">✓ Business Portfolio and Facebook Page found in this scenario.</div><div class="notice"><strong>Ad account access needs to be granted.</strong><br>In Meta Business Settings, select the ad account and confirm your profile has permission to manage campaigns. Then reconnect and check again.</div><p>Want a hand? Try booking a setup session with Adam. No meeting or invitation will be created.</p><div class="modal-actions"><button class="alt" onclick="onboard(1)">Reconnect and recheck</button><button class="alt" onclick="mockHelpBooking()">Try booking help</button><button onclick="newCampaign()">Build a draft anyway</button></div>`);
+ show(`<span class="eyebrow">DEMO CHECK · ACTION NEEDED</span><h2>Your ad account needs attention.</h2><p>You can still build a draft. Launch stays on hold until the account passes the check.</p><div class="check">✓ Business Portfolio and Facebook Page found in this scenario.</div><div class="notice"><strong>Ad account access needs to be granted.</strong><br>In Meta Business Settings, select the ad account and confirm your profile has permission to manage campaigns. Then reconnect and check again.</div><p>Want a hand? Try booking a setup session with our team. No meeting or invitation will be created.</p><div class="modal-actions"><button class="alt" onclick="onboard(1)">Reconnect and recheck</button><button class="alt" onclick="mockHelpBooking()">Try booking help</button><button onclick="newCampaign()">Build a draft anyway</button></div>`);
 }
 function campaignSampleCaption(c,i){
  const agent=state.company||state.name||'your local real estate team';
@@ -710,11 +717,11 @@ function launchOrder(){
 }
 
 function mockHelpBooking(){
- show(`<span class="eyebrow">DEMO HELP BOOKING</span><h2>Meta setup with Adam</h2><p>We’ll review the ad account permissions and help you reconnect. These are example appointments.</p><form onsubmit="event.preventDefault();confirmMockHelp(this.slot.value)"><label class="field">Choose an example time<select name="slot"><option>Tuesday · 10:00 AM Pacific</option><option>Thursday · 2:00 PM Pacific</option></select></label><div class="modal-actions"><button type="button" class="alt" onclick="showMetaResult()">Back</button><button>Confirm demo booking</button></div></form>`);
+ show(`<span class="eyebrow">DEMO HELP BOOKING</span><h2>Meta setup with our team</h2><p>We’ll review the ad account permissions and help you reconnect. These are example appointments.</p><form onsubmit="event.preventDefault();confirmMockHelp(this.slot.value)"><label class="field">Choose an example time<select name="slot"><option>Tuesday · 10:00 AM Pacific</option><option>Thursday · 2:00 PM Pacific</option></select></label><div class="modal-actions"><button type="button" class="alt" onclick="showMetaResult()">Back</button><button>Confirm demo booking</button></div></form>`);
 }
 function confirmMockHelp(slot){
  state.mockHelpSlot=slot;persist();
- show(`<span class="eyebrow">DEMO BOOKING CONFIRMED</span><h2>Your setup session preview</h2><div class="check">${esc(slot)} · Adam · Meta setup</div><p>No real meeting was booked. After the permissions are fixed, return here to reconnect and check again.</p><div class="modal-actions"><button class="alt" onclick="modal.close()">Close</button><button onclick="onboard(1)">Reconnect and recheck</button></div>`);
+ show(`<span class="eyebrow">DEMO BOOKING CONFIRMED</span><h2>Your setup session preview</h2><div class="check">${esc(slot)} · Resmara team · Meta setup</div><p>No real meeting was booked. After the permissions are fixed, return here to reconnect and check again.</p><div class="modal-actions"><button class="alt" onclick="modal.close()">Close</button><button onclick="onboard(1)">Reconnect and recheck</button></div>`);
 }
 
 function pricing(){

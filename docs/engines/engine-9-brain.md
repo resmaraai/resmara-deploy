@@ -57,15 +57,20 @@ These are **Resmara's own** marketing, not the agents' campaigns.
   Each contact is tagged: *signed up, no campaign yet* · *has run a campaign* · *Run it until it sells
   on*. **Export emails (CSV)** stays as a backup button (test and closed accounts left out,
   unsubscribes marked).
-- **The series** (each written once and approved by Adam; each starts on its own from the contact's tag):
-  1. **Welcome**, everyone who signs up: day 0, 3, 7, 14.
-  2. **Start your first campaign**, signed up but no campaign yet: day 2, 5, 10. (No outside lists:
-     the people who haven't bought yet are already Resmara accounts.)
-  3. **Tips and updates**, current clients: every 2 weeks.
+- **The series** (each written once and approved by Adam; each starts on its own from the contact's tag).
+  **Changed 25 Nov (Adam): every follow-up email is a Mailchimp series, so each one is tracked**
+  (sent, open rate, click rate, bounces, unsubscribes). The app's own welcome and day 3/7/14 emails
+  (Engine 1, section 6) stop once Mailchimp is connected; until then they keep going out.
+  1. **Welcome and check-ins**, tag *signed up, no campaign yet*: day 0, 3, 7, 14; stops when they
+     run a campaign (the tag switches to *has run a campaign*).
+  2. **Tips and updates**, tag *has run a campaign*: every 2 weeks.
+  3. **Got a new listing?**, tag *past client* (no campaign for 60 days, Run it until it sells off).
+  Tags are switched on and off by a daily sync (Render clock) and at sign-up, never just added.
 - **Campaign emails stay in the app** (leads, renewals, reports, pending, price changes: Engines 6 and
   8), sent by Resmara itself through Resend. They're not marketing and always go out.
-- **Consent:** one line at sign-up ("Resmara will send you tips and updates now and then. Unsubscribe
-  any time."), an on/off setting on each account that syncs to Mailchimp, and Mailchimp's unsubscribe
+- **Consent:** a box at Facebook sign-up, **ticked by default**: "Send me marketing tips for my
+  listings. Unsubscribe any time." (Adam, 25 Nov; fine for US agents under CAN-SPAM). Unticked means
+  never on the marketing list. Plus an on/off setting on each account that syncs to Mailchimp, and Mailchimp's unsubscribe
   link in every marketing email. Someone who unsubscribes is never emailed marketing again.
 
 **The page tracks:**
