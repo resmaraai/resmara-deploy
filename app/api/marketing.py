@@ -56,7 +56,9 @@ SERIES: List[Dict[str, Any]] = [
      "when": "day 0, 3, 7 and 14; stops when they launch a campaign",
      "emails": ["Welcome — day 0", "Welcome — day 3", "Welcome — day 7", "Welcome — day 14"]},
     {"key": "tips", "name": "Tips and updates", "audience": "has run a campaign",
-     "when": "every 2 weeks", "emails": ["Tips and updates"]},
+     "when": "a week after their first campaign, then every 2 weeks while they're a client",
+     "emails": ["Tips and updates — 1", "Tips and updates — 2", "Tips and updates — 3",
+                "Tips and updates — 4"]},
     {"key": "past", "name": "Got a new listing?", "audience": "past client",
      "when": "60 days after their last campaign", "emails": ["Got a new listing?"]},
 ]
