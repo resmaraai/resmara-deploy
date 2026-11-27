@@ -142,7 +142,7 @@ print("Stripe's form, embedded")
 pairs = billing.checkout_payload(7, 1, "905 Laurel Bend", "https://www.resmara.com", 4900,
                                  customer_id="cus_x", save_card=True, embedded=True)
 keys = dict(pairs)
-ok("ui_mode=embedded with a return_url, no success page", keys.get("ui_mode") == "embedded"
+ok("ui_mode=embedded_page with a return_url, no success page", keys.get("ui_mode") == "embedded_page"
    and "return_url" in keys and "success_url" not in keys, keys)
 ok("Save this card sets setup_future_usage", keys.get("payment_intent_data[setup_future_usage]") == "off_session")
 no_save = dict(billing.checkout_payload(7, 1, "x", "https://x", 4900, customer_id="cus_x", save_card=False, embedded=True))

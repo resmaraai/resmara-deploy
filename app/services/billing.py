@@ -147,7 +147,7 @@ def checkout_payload(boost_id: int, user_id: int, address: str, base_url: str,
     if embedded:
         # Stripe's form inside our pop-up (the sign-up tour engine, section 9): no jump to a
         # hosted page. Stripe comes back to return_url only for redirect-based methods.
-        urls = [("ui_mode", "embedded"),
+        urls = [("ui_mode", "embedded_page"),
                 ("return_url", "%s/?checkout=done&boost=%d&session_id={CHECKOUT_SESSION_ID}"
                  % (base_url.rstrip("/"), boost_id)),
                 ("redirect_on_completion", "if_required")]
@@ -334,14 +334,17 @@ def card_setup_payload(customer_id: str, user_id: int, base_url: str, embedded: 
     embedded=True is Stripe's form inside the Resmara pop-up (Engine 10, section 4), never a
     separate Stripe page."""
     base = (base_url or "").rstrip("/")
-    urls = ([("ui_mode", "embedded"), ("return_url", "%s/?card=saved&session_id={CHECKOUT_SESSION_ID}" % base),
+    urls = ([("ui_mode", "embedded_page"), ("return_url", "%s/?card=saved&session_id={CHECKOUT_SESSION_ID}" % base),
              ("redirect_on_completion", "if_required")] if embedded else
             [("success_url", "%s/?card=saved" % base), ("cancel_url", "%s/?card=cancelled" % base)])
     return [
         ("mode", "setup"),
         ("customer", customer_id),
         ("currency", CURRENCY),
-        ("payment_method_types[0]", "card"),
+        # Stripe retired `payment_method_types` for Checkout sessions (API 2026-09-30); the
+        # replacement is allowed_payment_method_types. Sending the old key answers 400 and the
+        # whole "add a card" step dies with a 502.
+        ("allowed_payment_method_types[0]", "card"),
         *urls,
         # kind=card_setup tells the webhook this session has no campaign and no order behind it.
         ("metadata[kind]", "card_setup"),

@@ -380,7 +380,14 @@
     try {
       const Stripe = await loadStripe();
       const cfg = await RM.request('/api/billing/config');
-      if (!cfg.enabled || !cfg.publishable_key) throw new Error('Card payments aren’t switched on yet.');
+      if (!cfg.enabled) throw new Error('Card payments aren’t switched on yet.');
+      // Without a publishable key Stripe.js cannot mount the embedded form; the hosted
+      // Checkout page needs no key, so use it rather than refusing to take the money.
+      if (!cfg.publishable_key) {
+        const hosted = await post('/api/billing/checkout', { boost_id: Number(boostId), embedded: false, save_card: !!(save && save.checked) });
+        if (hosted && hosted.url) { window.location.href = hosted.url; return; }
+        throw new Error('Stripe did not return a payment page.');
+      }
       if (checkoutInstance) { try { checkoutInstance.destroy(); } catch (e) {} checkoutInstance = null; }
       const stripe = Stripe(cfg.publishable_key);
       let sessionId = null;

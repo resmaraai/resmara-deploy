@@ -277,9 +277,17 @@ async function addPaymentCard() {
     <div class="modal-actions"><span></span><button type="button" class="alt" onclick="closeCardForm()">Cancel</button></div>`);
   try {
     if (!window.loadStripe) throw new Error('Stripe could not load.');
-    var Stripe = await window.loadStripe();
     var cfg = await RM.billingConfig();
-    if (!cfg.enabled || !cfg.publishable_key) throw new Error('Card payments aren’t switched on yet.');
+    if (!cfg.enabled) throw new Error('Card payments aren’t switched on yet.');
+    // No publishable key on the service means Stripe.js cannot mount its embedded form. The
+    // hosted Checkout page needs no key, so send the agent there instead of dead-ending on
+    // "card payments aren't switched on" while the server can take the card perfectly well.
+    if (!cfg.publishable_key) {
+      var host = await RM.addCard(false);
+      if (host && host.url) { window.location.href = host.url; return; }
+      throw new Error('Stripe did not return a card page.');
+    }
+    var Stripe = await window.loadStripe();
     if (cardFormInstance) { try { cardFormInstance.destroy(); } catch (e) {} cardFormInstance = null; }
     var sessionId = null;
     cardFormInstance = await Stripe(cfg.publishable_key).initEmbeddedCheckout({

@@ -128,6 +128,18 @@ function details(index){document.querySelector('#content')?.classList.remove('re
  // why building a campaign dropped the person back on the Active campaigns list: the next
  // background sync saw view==='campaigns' and repainted the list over the page they had opened.
  const freshOpen=openCampaignKey!==campaignKey(c);if(freshOpen)state.folds={};view='campaign';openCampaignKey=campaignKey(c);const key=reviewKey(c,index);state.reviews=state.reviews||{};if(!state.reviews[key]||(examples.includes(c)&&state.reviews[key].v!==5))state.reviews[key]={v:5,approved:false,items:(c.scopeFirst||campaignBoostId(c)!=null)?[]:sampleReviewItems(c)};const r=state.reviews[key];if(freshOpen){const isLive=(typeof campaignIsLive==='function'&&campaignIsLive(c))||r.approved;if(isLive)state.folds.leads=true;else if(!r.scopeConfirmed)state.folds.scope=true;else if(!r.calendarApproved)state.folds.calendar=true}if(r.videoUrl===undefined)r.videoUrl='';if(examples.includes(c)&&typeof SAMPLE_POSTS!=='undefined')(r.items||[]).forEach(it=>{if(it.image===img||it.image===img2||!it.image)it.image=demoItemImage(it.id)});r.scopeFirst=Boolean(c.scopeFirst)||(campaignBoostId(c)!=null&&!Number(c.posts_total||0)&&!r.approved);r.liveGeneration=Boolean(c.liveGeneration)||campaignBoostId(c)!=null;r.scope ||= initialCampaignScope(c);
+ // A campaign built in an earlier visit (or after the 9-minute client cap) has its posts on the
+ // server and none in this browser. Read them back, or the page sits on "still building your
+ // calendar" with an empty gallery and a dead Approve button forever.
+ if(campaignBoostId(c)!=null&&!r.items.length&&!r.scopeFirst&&!r.backendPostsTried&&window.RM&&RM.posts&&!ReviewStudio.building.has(r)){
+  r.backendPostsTried=true;
+  RM.posts(campaignBoostId(c)).then(posts=>{
+   if(!Array.isArray(posts)||!posts.length)return;
+   r.items=posts.map(post=>({id:post.id,postId:post.id,day:post.day||1,title:post.title||String(post.caption||'Scheduled post').split(/[.\n]/)[0].slice(0,42)||'Scheduled post',kicker:post.kicker||'',overlay:post.overlay_text||'',room:post.photo_room||'',kind:post.kind==='short_video'?'Video post':'Photo post',caption:post.caption||'',image:post.image_url||'',reviewed:post.client_status==='approved',publishStatus:post.publish_status||'',time:(post.publish_at||'').slice(11,16)||undefined}));
+   r.needsBuild=false;persist();
+   if(activeReview()===r&&typeof details==='function')details(index);
+  }).catch(()=>{});
+ }
  // A stored scope from before a campaign launched carries a go-live date in the future; a live
  // campaign's calendar has to start on the date it actually launched.
  if(r.scope&&!r.scopeConfirmed&&!r.approved&&!(typeof campaignIsLive==='function'&&campaignIsLive(c)))r.scope.start=goLiveDate(r.scope.start);if(typeof campaignIsLive==='function'&&campaignIsLive(c)){const liveStart=String(c.go_live||c.go_live_date||'').slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(liveStart)&&r.scope.start!==liveStart)r.scope.start=liveStart}if(examples.includes(c)&&!r.scope.demoBrief&&!r.scopeConfirmed&&!r.approved){r.scope.highlights ||= demoPropertyHighlights(c);r.scope.demoBrief=true;}const live=typeof campaignIsLive==='function'&&campaignIsLive(c);if(live&&examples.includes(c)){r.scopeConfirmed=true;r.calendarApproved=true;r.approved=true}$('#content').innerHTML=`<div class="review-heading${live?' has-stamp':''}"><h1>${esc(campaignBoostId(c)!=null?c.address:(r.scope.address||c.address))}</h1>${live?campaignStamp(c,r):''}</div>${live?leadsPanel(c,index)+'<div class="live-cal">'+liveCalendar(reviewCalendar(r,c))+'</div>'+(typeof listingPagePanel==='function'?listingPagePanel(c,index):''):campaignScopePanel(r)+'<div class="draft-cal">'+reviewCalendar(r,c)+'</div>'+(r.items.length&&typeof listingPagePanel==='function'?listingPagePanel(c,index,true):'')}${live?'':`<div class="review-approval"><div><h2 class="campaign-step-title"><span>${r.items.length&&typeof listingPagePanel==='function'?4:3}</span> ${r.approved?'Campaign approved':'Ready to go?'}</h2><p>${r.approved?'Approved. Your campaign goes live on your go-live date.':'When your launch details and calendar are approved, launch the campaign. Your posts and ad start on your go-live date.'}</p><p class="fine">${!r.items.length?'Resmara is still building your calendar.':!r.scopeConfirmed?'Confirm your launch details first.':!r.calendarApproved?'Approve your calendar first.':r.items.filter(i=>i.reviewed).length+' of '+r.items.length+' posts and ads opened. Opening each one is optional.'}</p></div>${r.approved?'':`<button class="campaign-primary scope-approval-button" onclick="approveReview()" ${r.scopeConfirmed&&r.calendarApproved&&r.items.length?'':'disabled'}>Approve and launch</button>`}</div>`}<section class="panel${live?' live-reports':' draft-reports'}">${live?'<h2 class="campaign-step-title"><span>4</span> Reports for this property</h2>':'<h3>Reports for this property</h3>'}<div class="pr-picks">${[7,14].map(day=>campaignDaysRun(c)>=day?`<button type="button" class="pr-pick" onclick="openPropertyReport(${index},${day},this)"><b>Day ${day} report</b><small>Ready · click to open</small></button>`:`<div class="pr-pick off"><b>Day ${day} report</b><small>${campaignDaysRun(c)||(typeof campaignIsLive==='function'&&campaignIsLive(c))?'Ready on day '+day:'Ready after launch'}</small></div>`).join('')}</div><div id="pr-view"></div></section>`;refreshPhotoAssets();hydrateReviewItems(r);persist();if(typeof setupFolds==='function')setupFolds();
@@ -464,7 +476,9 @@ async function buildCampaignFromBackend(){
   // The build is a background run (four model calls, minutes long) — a single request would be
   // cut by any hosted proxy. Poll the status, then read the posts it wrote.
   if(started&&started.status==='running'){
-   const waitStart=Date.now(), limitMs=9*60*1000; let last='running';
+   // The design step alone is 12-14 minutes on a full gallery; a 9-minute cap stranded every
+   // real build on "still running" and the posts were never read. Poll for the real deadline.
+   const waitStart=Date.now(), limitMs=17*60*1000; let last='running';
    while(Date.now()-waitStart<limitMs){
     await new Promise(res=>setTimeout(res,3000));
     const st=(await RM.buildStatus(boostId).catch(()=>null))||{};
@@ -475,7 +489,7 @@ async function buildCampaignFromBackend(){
     if(st.status==='error') throw new Error(st.error||'The content engine stopped without an error message.');
     if(st.status==='done'){finalStatus=st;last='done';break}
    }
-   if(last!=='done') throw new Error('The build is still running after 9 minutes. Check the campaign again in a moment — the posts it writes are saved either way.');
+   if(last!=='done') throw new Error('The build is still running. Reopen the campaign in a moment — the posts it writes are saved either way.');
   }
   const backendPosts=await RM.posts(boostId);
   const result=finalStatus||started||{};

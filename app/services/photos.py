@@ -106,6 +106,9 @@ _SKIP_HINTS = (
     "no_img_available", "no-image-available", "noimage", "flexmls-ui", "/assets/error",
     "error-", "coming-soon", "default-photo", "placeholder-", "apple-touch-icon",
     "/css/", "/fonts/", "sprite-", "-logo.", "_logo.",
+    # An app icon on a portal page is named with underscores, not the hyphen the older
+    # hints caught: Trulia's "blue_heart_trulia_app_icon_small.png" became photo one.
+    "icon_", "_icon", "app_icon", "appicon",
 )
 
 _META_RE = re.compile(r"<meta\b[^>]*>", re.I)
