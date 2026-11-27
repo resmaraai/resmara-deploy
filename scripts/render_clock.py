@@ -143,6 +143,19 @@ def main() -> int:
                        answer.get("stopped_after_launch") or 0))
             except (ValueError, TypeError):
                 say(f"onboarding emails: {status} {body[:200]}")
+        # Engine 10 §8: the yearly reminder while Run it until it sells stays on. It prints a line
+        # every time it runs — once a day — because a job whose only proof is an email nobody
+        # happened to receive cannot be told apart from a job that stopped firing.
+        status, body = post_body("/api/admin/consent/reminders", 180)
+        if status != 200:
+            say(f"renewal reminders: {status or 'ERR'} {body[:300]}")
+        else:
+            try:
+                answer = json.loads(body)
+                say("renewal reminders: due %d, sent %d"
+                    % (answer.get("due") or 0, len(answer.get("sent") or [])))
+            except (ValueError, TypeError):
+                say(f"renewal reminders: {status} {body[:200]}")
 
     return 0
 
