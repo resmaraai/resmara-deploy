@@ -19,9 +19,12 @@ Rows this script owns carry ``plan["_sample"] = True``; running --seed again rep
 those, so it never touches a real campaign. Everything is written through the app's own models
 and ``listing_site.build(writer=offline_words)`` - no LLM call, no Meta call, no email.
 
-Photos are copied out of the existing test builds (their bytes live in ``assets.data``) and
-re-encoded to a 1600 px JPEG, so the demo keeps working after the source rows are deleted and
-the database does not carry 45 MB originals for a sample.
+Photos: each campaign imports a full gallery (20+) from a real listing page through the app's
+own importer, re-encoded to a 1600 px JPEG, and a local vision model tags each photo's room so the
+copy on that day names the room the picture actually shows. A 14-day campaign gets 14 DIFFERENT
+photos, one per day - never the same picture twice - and the rest of the gallery stays for the
+listing page. ``GALLERY_MIN`` is the floor: a run that cannot reach it for a campaign fails loudly
+instead of seeding a five-photo demo.
 """
 from __future__ import annotations
 
@@ -150,6 +153,34 @@ ROOMS = {
         "A quiet corner room away from the living side of the house, with its own window and "
         "closet, and a bathroom a few steps down the hall.",
         "Message me for a private showing."),
+    # Rooms the vision tagger can name that have no canned paragraph: say something true about the
+    # house without claiming a room it might not be.
+    "other": (
+        "A closer look", "THE HOUSE", "Take your time",
+        "A closer look at the house, photographed the week it was listed.",
+        "The kind of detail that does not photograph as a headline but is the reason people stay "
+        "once they are inside.",
+        "Message me for a private showing."),
+    "laundry": (
+        "The practical end of the house", "LAUNDRY", "Where it gets done",
+        "There is a proper laundry room, not a cupboard.",
+        "Room for the machines, a counter for folding and a door that closes on the noise.",
+        "Ask me for a walk-through."),
+    "garage": (
+        "The garage", "GARAGE", "Room for the cars",
+        "The garage is bigger than the photos make it look.",
+        "Two bays, a wall for storage and a door straight into the house on a wet morning.",
+        "Call or text me anytime."),
+    "hallway": (
+        "The first ten steps", "THE ENTRY", "Through the door",
+        "The entry tells you how the rest of the house is going to feel.",
+        "Wide enough for a bench and a coat hook, with the light following you into the rooms.",
+        "Message me for a private showing."),
+    "pool": (
+        "The pool", "OUTSIDE", "Summer, sorted",
+        "The pool sits where the afternoon sun lands.",
+        "Room for loungers and a table, screened from the street and a few steps from the house.",
+        "Ask me for a walk-through."),
 }
 ROOM_ORDER = ["front exterior", "living room", "kitchen", "dining room", "primary bedroom",
               "bathroom", "home office", "back garden", "other bedroom"]
@@ -269,68 +300,205 @@ def clear_tests(db, *, keep_sample: bool = False, include_emails=None) -> list[s
 
 
 # ----------------------------------------------------------------------------------------- photos
-def pick_photos(db, source_boost: int, count: int) -> list[Asset]:
-    """Photos from an old test build, spread across rooms so a calendar is not one wall."""
-    rows = (db.query(Asset).filter(Asset.boost_id == source_boost, Asset.kind == "photo")
-            .order_by(Asset.id).all())
-    by_room: dict[str, list[Asset]] = {}
-    for a in rows:
-        by_room.setdefault((a.room or "").strip().lower(), []).append(a)
-    picked: list[Asset] = []
-    for room in ROOM_ORDER:
-        for a in by_room.get(room, []):
-            if a not in picked:
-                picked.append(a)
-                break
-    for room, items in by_room.items():
-        for a in items:
-            if len(picked) >= count:
-                break
-            if a not in picked:
-                picked.append(a)
-    return picked[:count]
+# A 14-day campaign needs at least one photo per day, and the demo has to LOOK like a real listing,
+# so every sample campaign imports a full gallery from a real listing page (the app's own importer)
+# instead of a handful of leftovers. 20+ photos each, tagged by a local vision model so the copy on
+# each day names the room that photo actually shows.
+GALLERY_MIN = 14          # one photo per campaign day - the whole point of the rebuild
+GALLERY_SIZE = 20         # what we ask the importer for
+
+ROOM_LABELS = (
+    "front exterior, back garden, living room, kitchen, dining room, primary bedroom, bedroom, "
+    "bathroom, office, laundry, garage, hallway, pool, other"
+)
+ROOM_MAP = {
+    "bedroom": "other bedroom", "guest bedroom": "other bedroom",
+    "master bedroom": "primary bedroom", "primary suite": "primary bedroom",
+    "home office": "home office", "study": "home office",
+    "exterior": "front exterior", "front yard": "front exterior", "backyard": "back garden",
+    "yard": "back garden", "garden": "back garden", "patio": "back garden",
+    "dining area": "dining room", "living area": "living room", "family room": "living room",
+    "bath": "bathroom", "kitchen/dining": "kitchen",
+}
 
 
-def copy_photos(db, source_boost: int, boost: Boost, user: User, count: int) -> list[tuple[str, str]]:
-    """New asset rows (own bytes) for this campaign. Returns [(filename, room)]."""
+def _tag_room(jpeg: bytes) -> str:
+    """One word of truth about the photo, from a local vision model. No cloud call, no cost."""
+    import base64
+    try:
+        import urllib.request as _rq
+        small = io.BytesIO()
+        img = Image.open(io.BytesIO(jpeg))
+        img.thumbnail((640, 640))
+        img.convert("RGB").save(small, "JPEG", quality=80)
+        payload = json.dumps({
+            "model": os.environ.get("RESMARA_TAG_MODEL", "qwen2.5vl:3b"),
+            "prompt": ("This is a photo from a real-estate listing. Which part of the house is it? "
+                       "Answer with exactly one of: " + ROOM_LABELS),
+            "images": [base64.b64encode(small.getvalue()).decode()],
+            "stream": False, "options": {"temperature": 0, "num_predict": 12},
+        }).encode()
+        req = _rq.Request("http://127.0.0.1:11434/api/generate", data=payload,
+                          headers={"Content-Type": "application/json"})
+        with _rq.urlopen(req, timeout=90) as resp:   # noqa: S310 - loopback
+            said = json.loads(resp.read().decode()).get("response", "")
+    except Exception:  # noqa: BLE001 - a tag is a nicety, the photo is the point
+        return "other"
+    said = " ".join(str(said).lower().replace("\n", " ").split()).strip(" .,:;")
+    if said in ROOM_MAP:
+        return ROOM_MAP[said]
+    for label in sorted(list(ROOM_MAP) + list(ROOMS) + ["other"], key=len, reverse=True):
+        if said == label or said.startswith(label):
+            return ROOM_MAP.get(label, label)
+    return "other"
+
+
+async def _download(url: str) -> bytes | None:
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=40, follow_redirects=True,
+                                     headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}) as c:
+            r = await c.get(url)
+            if r.status_code != 200:
+                return None
+            return r.content
+    except Exception:  # noqa: BLE001
+        return None
+
+
+async def import_photos(db, boost: Boost, user: User, listing_url: str,
+                        want: int = GALLERY_SIZE) -> list[tuple[str, str]]:
+    """A full gallery for this campaign, from a real listing page. Returns [(filename, room)].
+
+    Raises when the page gives up fewer than GALLERY_MIN photos: a demo campaign with five photos
+    is exactly the bug this replaces, so it is better to fail loudly than to seed it.
+    """
+    from app.services import photos as photos_service
+
+    urls = await photos_service.discover(listing_url, limit=want)
+    urls = [u for u in urls if u][:want]
+    if len(urls) < GALLERY_MIN:
+        raise SystemExit(f"gallery import for {boost.address} returned {len(urls)} photos "
+                         f"from {listing_url} - need at least {GALLERY_MIN}")
+
     made: list[tuple[str, str]] = []
-    for i, src in enumerate(pick_photos(db, source_boost, count)):
-        raw = bytes(src.data) if src.data else _fetch_bytes(src.filename)
+    for url in urls:
+        raw = await _download(url)
         data = _resize_jpeg(raw) if raw else None
         if not data:
             continue
+        room = _tag_room(data)
         name = _hash() + ".jpg"
-        room = (src.room or "").strip().lower() or ROOM_CYCLE[i % len(ROOM_CYCLE)]
         db.add(Asset(user_id=user.id, boost_id=boost.id, filename=name, url=f"/uploads/{name}",
-                     original_name=src.original_name, kind="photo", room=room,
-                     social_score=src.social_score or "8", shape=src.shape or "landscape",
-                     see=src.see, story=src.story, tags=src.tags or [], tagged_by="sample",
+                     original_name=url.rsplit("/", 1)[-1][:120], kind="photo", room=room,
+                     social_score="8", shape="landscape", tags=[f"ROOM: {room}"],
+                     tagged_by="sample-vision", see="", story="",
                      data=data, content_type="image/jpeg"))
         made.append((name, room))
     db.commit()
+    if len(made) < GALLERY_MIN:
+        raise SystemExit(f"only {len(made)} of {len(urls)} photos downloaded for {boost.address}")
     return made
 
 
 # ------------------------------------------------------------------------------------------ posts
-def caption(room: str, city: str, day: int) -> tuple[str, str, str, str]:
-    title, kicker, overlay, opener, body, cta = ROOMS.get(room, ROOMS["living room"])
-    if day == 1:
-        opener = f"Just listed in {city}. {opener}" if room != "front exterior" else opener.format(city=city)
-    text = f"{opener.format(city=city)} {body}\n\n{cta}\n\n{SIGNATURE}\n\n" + " ".join(
-        HASHTAGS + ["#" + "".join(w.capitalize() for w in room.split())])
+# The 14-day content arc. The copy is keyed to the DAY, not to the room: the gallery's photos are
+# tagged by a vision model that can only say "kitchen" or "living room", and a campaign with four
+# kitchen photos would otherwise publish four identical captions. One arc per campaign means every
+# day reads differently, and the photo on that day is its own.
+DAY_ARC = [
+    ("Just listed", "WELCOME HOME", "The walk up",
+     "Just listed in {city}.",
+     "The front elevation is quiet from the street and opens up as soon as you are through the door. "
+     "Mature trees, a deep porch and a drive that does not crowd the house.",
+     "Message me for a private showing."),
+    ("Property highlights", "WHAT YOU GET", "Worth a second look",
+     "A first walk through the house, room by room.",
+     "Light on two sides, floors that run the length of the plan and a layout that keeps the busy "
+     "parts away from the quiet ones.",
+     "Ask me for a walk-through."),
+    ("Step inside", "THE ENTRY", "Through the door",
+     "The entry tells you how the rest of the house is going to feel.",
+     "Wide enough for a bench and a coat hook, with the light following you into the rooms.",
+     "Message me for a private showing."),
+    ("Room spotlight", "SPOTLIGHT", "This one",
+     "The room people stop in.",
+     "It is the one the photos do not do justice to: the scale only makes sense when you are standing "
+     "in it, with the garden on one side and the rest of the house on the other.",
+     "Call or text me with a time that suits."),
+    ("The details", "THE FINISH", "Done properly",
+     "The parts of a house that age well.",
+     "Solid surfaces, honest materials and joinery done properly the first time - the things that are "
+     "still right in ten years.",
+     "Message me for a private showing."),
+    ("A closer look", "UP CLOSE", "Take your time",
+     "A closer look at the house, photographed the week it was listed.",
+     "The kind of detail that never makes a headline but is the reason people stay once they are inside.",
+     "Ask me for a walk-through."),
+    ("Weekend viewing", "COME SEE IT", "Saturday morning",
+     "Open this weekend, and it is worth the drive.",
+     "Bring your questions - about the roof, the systems, the street - and I will have the answers or "
+     "get them before you leave.",
+     "Message me to book a time."),
+    ("Around town", "THE AREA", "Minutes from here",
+     "The house is one thing; the ten minutes around it is the other half.",
+     "Coffee, groceries, the school run and the trailhead are all a short drive, and the street "
+     "itself stays quiet in the evenings.",
+     "Ask me anything about the area."),
+    ("Design details", "THE LOOK", "Chosen, not defaulted",
+     "The finishes were chosen rather than defaulted.",
+     "Warm floors, neutral walls and lighting that was actually thought about, so the house takes "
+     "your furniture instead of fighting it.",
+     "Message me for a private showing."),
+    ("Living spaces", "ROOM TO LIVE", "Everyday life",
+     "This is what the plan is for: ordinary days.",
+     "Somewhere to work, somewhere to gather and somewhere to be on your own without leaving the house.",
+     "Call or text me anytime."),
+    ("Key features", "WHAT MATTERS", "The list",
+     "The short version, for the people who read the listing twice.",
+     "The layout, the light, the storage and the garden - the four things that come up on every "
+     "second viewing.",
+     "Ask me for the full list."),
+    ("Viewing reminder", "STILL AVAILABLE", "Yes, it is",
+     "Still available, and the sellers are motivated.",
+     "If this one has been sitting in your saved list, this is the week to walk it. Showings are easy "
+     "to arrange.",
+     "Message me for a private showing."),
+    ("Outdoor living", "OUTSIDE", "End of the day",
+     "Out back, the house gives you somewhere to end the day.",
+     "A covered run of the garden, room for a table, and planting that is already grown in rather than "
+     "a lawn waiting to be planted.",
+     "Call or text me with a time that suits."),
+    ("Final spotlight", "LAST LOOK", "One more time",
+     "One more look before the weekend.",
+     "If you have been waiting for a reason to see this house, this is it - the photos are good, but "
+     "the house is better.",
+     "Message me and I will set it up."),
+]
+
+
+def caption(day: int, city: str) -> tuple[str, str, str, str]:
+    """The copy for one day of the arc: title, kicker, overlay, caption."""
+    title, kicker, overlay, opener, body, cta = DAY_ARC[(day - 1) % len(DAY_ARC)]
+    text = (f"{opener.format(city=city)} {body}\n\n{cta}\n\n{SIGNATURE}\n\n" + " ".join(HASHTAGS))
     return title, kicker, overlay, text
 
 
 def build_posts(db, boost: Boost, photos: list[tuple[str, str]], spec: dict) -> list[Post]:
-    """14 days of posts. `spec['published']` of them went out (the publisher stores "posted")."""
+    """14 days of posts, ONE PHOTO PER DAY - no photo repeats inside a campaign.
+
+    The gallery is 20+ photos, so the arc opens on the exterior and then walks the rooms; the
+    photos left over stay in the gallery for the listing page. `spec['published']` of the days
+    went out (the publisher stores "posted").
+    """
     rows: list[Post] = []
     start = date.fromisoformat(boost.go_live_date) if boost.go_live_date else date.today()
+    ordered = sorted(photos, key=lambda p: ROOM_ORDER.index(p[1]) if p[1] in ROOM_ORDER else 99)
     for i in range(14):
         day = i + 1
-        room = photos[i % len(photos)][1] if photos else ROOM_CYCLE[i % len(ROOM_CYCLE)]
-        filename = photos[i % len(photos)][0] if photos else ""
+        filename, room = ordered[i] if i < len(ordered) else ("", ROOM_CYCLE[i])
         # Prefer the room of the photo actually shipped on that day.
-        title, kicker, overlay, text = caption(room, spec["city"], day)
+        title, kicker, overlay, text = caption(day, spec["city"])
         when = start + timedelta(days=i)
         posted = day <= spec["published"]
         if not posted and spec.get("shift_days"):
@@ -339,14 +507,14 @@ def build_posts(db, boost: Boost, photos: list[tuple[str, str]], spec: dict) -> 
             when += timedelta(days=int(spec["shift_days"]))
         post = Post(
             boost_id=boost.id, day=day, slot=1,
-            kind="static", caption=text, hashtags="", cta=ROOMS.get(room, ROOMS["living room"])[5],
+            kind="static", caption=text, hashtags="", cta=DAY_ARC[(day - 1) % len(DAY_ARC)][5],
             image_url=f"/uploads/{filename}" if filename else "",
             client_status="approved" if spec.get("approved", True) else "pending",
             publish_at=_publish_at(when, TIMES[(day - 1) % 3]),
             publish_status="posted" if posted else "scheduled",
             publish_target="both",
             title=title, kicker=kicker, overlay_text=overlay,
-            photo_room=room, photo_file=filename, post_type="photo",
+            photo_room="", photo_file=filename, post_type="photo",
             design_style="overlay", details_treatment="agent-card",
             fb_post_id=f"sample_fb_{boost.id}_{day}" if posted else None,
             ig_media_id=f"sample_ig_{boost.id}_{day}" if posted else None,
@@ -407,21 +575,24 @@ STAGES = [
         key="awaiting", address="1809 Woodland Avenue, Austin, TX 78704", city="Austin",
         facts="3 beds · 2 baths · 1,860 sq ft · $845,000", price="$845,000",
         created_days_ago=1, go_in_days=2, launched=False, published=0, approved=False,
-        stage="PENDING", main_status="Awaiting approval", source_boost=7, photos=4,
+        stage="PENDING", main_status="Awaiting approval",
+        gallery="https://www.trulia.com/home/3710-riverview-dr-redding-ca-96001-15208370",
         description="Built, waiting on the agent: 14 posts, calendar not approved yet.",
     ),
     dict(
         key="ready", address="4412 Bell Mountain Drive, Austin, TX 78731", city="Austin",
         facts="4 beds · 3 baths · 2,640 sq ft · $1,150,000", price="$1,150,000",
         created_days_ago=2, go_in_days=3, launched=True, published=0, approved=True,
-        stage="APPROVED", main_status="Approved", source_boost=3, photos=10,
+        stage="APPROVED", main_status="Approved",
+        gallery="https://www.trulia.com/home/700-royal-oaks-dr-redding-ca-96001-15230716",
         description="Approved and launched, go-live date still ahead.",
     ),
     dict(
         key="active", address="1204 Lost Creek Boulevard, Austin, TX 78746", city="Austin",
         facts="4 beds · 3.5 baths · 3,180 sq ft · $1,285,000", price="$1,285,000",
         created_days_ago=7, go_in_days=-6, launched=True, published=6, approved=True,
-        stage="LIVE", main_status="Active", source_boost=19, photos=10,
+        stage="LIVE", main_status="Active",
+        gallery="https://www.trulia.com/home/4626-nantucket-dr-redding-ca-96001-79849568",
         listing_status="active", until_sold=True, ad_status="live", leads=True,
         description="Live: 6 of 14 posts published, listing page up, two new leads.",
     ),
@@ -429,7 +600,8 @@ STAGES = [
         key="paused", address="2301 Woodmont Avenue, Austin, TX 78703", city="Austin",
         facts="3 beds · 2.5 baths · 2,110 sq ft · $975,000", price="$975,000",
         created_days_ago=12, go_in_days=-10, launched=True, published=9, approved=True,
-        stage="LIVE", main_status="Paused", source_boost=9, photos=10,
+        stage="LIVE", main_status="Paused",
+        gallery="https://www.trulia.com/home/5855-poppy-hills-dr-redding-ca-96003-15221909",
         listing_status="active", paused_days_ago=2, paused_reason="agent", ad_status="paused",
         shift_days=2,
         description="Paused by the agent two days ago: 9 of 14 published, 5 held.",
@@ -438,7 +610,8 @@ STAGES = [
         key="completed", address="5604 Highland Hills Drive, Austin, TX 78731", city="Austin",
         facts="5 beds · 4 baths · 3,720 sq ft · $1,540,000", price="$1,540,000",
         created_days_ago=22, go_in_days=-20, launched=True, published=14, approved=True,
-        stage="LIVE", main_status="Completed", source_boost=16, photos=10,
+        stage="LIVE", main_status="Completed",
+        gallery="https://www.trulia.com/home/1437-casa-vereda-way-redding-ca-96003-15221053",
         listing_status="sold", paused_days_ago=6, paused_reason="sold", ad_status="live",
         description="Finished: all 14 posts published, the listing sold.",
     ),
@@ -484,7 +657,7 @@ async def seed(db, user: User) -> list[str]:
         db.commit()
         db.refresh(boost)
 
-        photos = copy_photos(db, spec["source_boost"], boost, user, spec["photos"])
+        photos = await import_photos(db, boost, user, spec["gallery"])
         posts = build_posts(db, boost, photos, spec)
         build_ad(db, boost, posts, spec)
         if spec.get("leads"):
