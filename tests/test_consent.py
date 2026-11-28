@@ -25,6 +25,12 @@ import os
 import sys
 import tempfile
 from datetime import date, datetime, timedelta, timezone
+
+def utc_today():
+    """The server's own clock. app/services/consent.py counts the 30-day notice from
+    datetime.now(timezone.utc).date(); using the Mac's local date here makes this test fail
+    every evening between 4pm and midnight Pacific, when UTC is already the next day."""
+    return datetime.now(timezone.utc).date()
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -233,7 +239,7 @@ def main() -> int:
                      kind="campaign"))
         db.commit()
     short = client.post("/api/admin/price-notice", headers=H,
-                        json={"new_cents": 5900, "effective_on": (date.today() + timedelta(days=10)).isoformat()})
+                        json={"new_cents": 5900, "effective_on": (utc_today() + timedelta(days=10)).isoformat()})
     check("a notice 10 days out is refused", short.status_code in (400, 403),
           "%s %s" % (short.status_code, short.text[:160]))
     # The operator is the admin in RESMARA_ADMIN_EMAILS, not this customer.
@@ -253,16 +259,16 @@ def main() -> int:
                                                 "password": "ownerpass123"})
     AH = {"Authorization": "Bearer " + (atok.json().get("access_token") or "")}
     short2 = client.post("/api/admin/price-notice", headers=AH,
-                         json={"new_cents": 5900, "effective_on": (date.today() + timedelta(days=10)).isoformat()})
+                         json={"new_cents": 5900, "effective_on": (utc_today() + timedelta(days=10)).isoformat()})
     check("the operator's 10-day notice is refused 400", short2.status_code == 400,
           "%s %s" % (short2.status_code, short2.text[:160]))
     check("and the refusal names the earliest allowed date",
           (short2.json().get("detail") or {}).get("earliest") ==
-          (date.today() + timedelta(days=30)).isoformat(),
+          (utc_today() + timedelta(days=30)).isoformat(),
           str(short2.json().get("detail"))[:200])
     good = client.post("/api/admin/price-notice", headers=AH,
                        json={"new_cents": 5900,
-                             "effective_on": (date.today() + timedelta(days=45)).isoformat(),
+                             "effective_on": (utc_today() + timedelta(days=45)).isoformat(),
                              "note": "The first change since launch."})
     check("45 days out is accepted", good.status_code == 200, "%s %s" % (good.status_code, good.text[:200]))
     body = good.json() if good.status_code == 200 else {}
